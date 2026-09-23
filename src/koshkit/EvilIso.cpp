@@ -275,10 +275,17 @@ fn append_namespace_report(String &output, bool should_color,
 
 struct cgroup_membership
 {
-  String hierarchy{heap_allocator()};
+  cgroup_membership(StringView hierarchy, u64 hierarchy_value,
+                    StringView controller, StringView path,
+                    Allocator allocator)
+      : hierarchy(allocator, hierarchy), hierarchy_value(hierarchy_value),
+        controller(allocator, controller), path(allocator, path)
+  {}
+
+  String hierarchy;
   u64 hierarchy_value{0};
-  String controller{heap_allocator()};
-  String path{heap_allocator()};
+  String controller;
+  String path;
 };
 
 fn cgroup_proc_path(StringView suffix, Allocator allocator) throws -> String
@@ -366,12 +373,8 @@ fn parse_cgroup_memberships(StringView text, Allocator allocator) throws
       }
     }
     if (is_known) continue;
-    memberships.push({
-        String{allocator, hierarchy},
-        hierarchy_value.value(),
-        String{allocator, controller_name},
-        String{allocator, path},
-    });
+    memberships.push(cgroup_membership{
+        hierarchy, hierarchy_value.value(), controller_name, path, allocator});
   }
   return memberships;
 }
@@ -397,22 +400,32 @@ pure fn process_snapshot_identity_is_valid(process_snapshot_status status)
 
 struct process_cgroup_snapshot
 {
+  explicit process_cgroup_snapshot(Allocator allocator)
+      : name(allocator), command(allocator), memberships(allocator),
+        evidence(allocator)
+  {}
+
   i64 process_id{0};
   u64 start_token{0};
   u32 owner_id{0};
-  String name{heap_allocator()};
-  String command{heap_allocator()};
-  ArrayList<cgroup_membership> memberships{heap_allocator()};
+  String name;
+  String command;
+  ArrayList<cgroup_membership> memberships;
   struct identity_evidence
   {
-    String runtime{heap_allocator()};
-    String container_id{heap_allocator()};
-    String pod_uid{heap_allocator()};
-    String qos{heap_allocator()};
+    identity_evidence(StringView path, Allocator allocator)
+        : runtime(allocator, "-"), container_id(allocator, "-"),
+          pod_uid(allocator, "-"), qos(allocator, "-"), path(allocator, path)
+    {}
+
+    String runtime;
+    String container_id;
+    String pod_uid;
+    String qos;
     bool is_kubernetes{false};
-    String path{heap_allocator()};
+    String path;
   };
-  ArrayList<identity_evidence> evidence{heap_allocator()};
+  ArrayList<identity_evidence> evidence;
   process_snapshot_status status{process_snapshot_status::Unavailable};
 };
 
@@ -492,10 +505,7 @@ pure fn normalized_pod_uid(StringView component, Allocator allocator) throws
 fn parse_cgroup_identity(StringView path, Allocator allocator) throws
     -> process_cgroup_snapshot::identity_evidence
 {
-  let result = process_cgroup_snapshot::identity_evidence{
-      String{allocator, "-"}, String{allocator, "-"},
-      String{allocator, "-"}, String{allocator, "-"},
-      false, String{allocator, path}};
+  let result = process_cgroup_snapshot::identity_evidence{path, allocator};
   let previous = StringView{};
   let remaining = path;
   bool has_kubernetes_component = false;
@@ -577,7 +587,7 @@ fn collect_process_cgroup_snapshot(Allocator allocator,
   let snapshot = ArrayList<process_cgroup_snapshot>{allocator};
   snapshot.reserve(candidates.count());
   for (let const &process : candidates) {
-    let record = process_cgroup_snapshot{};
+    let record = process_cgroup_snapshot{allocator};
     record.process_id = process.pid;
     record.start_token = process.start_token;
     record.owner_id = process.owner_id;
@@ -587,10 +597,6 @@ fn collect_process_cgroup_snapshot(Allocator allocator,
     record.command = process.command_line.is_empty()
                          ? String{allocator, "-"}
                          : String{allocator, process.command_line.view()};
-    record.memberships = ArrayList<cgroup_membership>{allocator};
-    record.evidence =
-        ArrayList<process_cgroup_snapshot::identity_evidence>{allocator};
-
     if (should_collect_cgroups) {
       let suffix = String::from(process.pid, allocator);
       suffix += "/cgroup";
