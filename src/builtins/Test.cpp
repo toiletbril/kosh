@@ -30,15 +30,13 @@ namespace koshka {
 
 namespace {
 
-fn parse_integer(StringView text, i64 &out) throws -> bool
+fn parse_integer(StringView text) throws -> Maybe<i64>
 {
   bool is_out_of_range = false;
   let const parsed = utils::parse_decimal_i64(text, &is_out_of_range);
-  if (parsed.is_error() || is_out_of_range) {
-    return false;
-  }
-  out = parsed.value();
-  return true;
+  if (parsed.is_error() || is_out_of_range) return None;
+
+  return parsed.value();
 }
 
 /* The window is [pos, end), so the argument-count rules can strip a wrapping
@@ -103,11 +101,11 @@ public:
       return (operand_path.*(*predicate))();
 
     if (op == "-t") {
-      i64 file_descriptor = 0;
-      if (!parse_integer(operand.view(), file_descriptor)) return false;
+      let const file_descriptor = parse_integer(operand.view());
+      if (!file_descriptor.has_value()) return false;
       /* Any descriptor is checked, not only the standard three, since a config
          dups the controlling terminal onto a higher descriptor and tests it. */
-      return os::shell_fd_is_a_tty(static_cast<int>(file_descriptor));
+      return os::shell_fd_is_a_tty(static_cast<int>(*file_descriptor));
     }
     fail(
         StringView{"'"} + op +
@@ -137,24 +135,23 @@ public:
     if (op == "-nt") return Path{left}.is_newer_than(Path{right});
     if (op == "-ot") return Path{left}.is_older_than(Path{right});
 
-    i64 left_number = 0, right_number = 0;
     if (op == "-eq" || op == "-ne" || op == "-lt" || op == "-le" ||
         op == "-gt" || op == "-ge")
     {
-      let const left_is_integer = parse_integer(left, left_number);
-      let const right_is_integer = parse_integer(right, right_number);
-      if (!left_is_integer || !right_is_integer) {
-        let const &not_a_number = left_is_integer ? right : left;
+      let const left_number = parse_integer(left);
+      let const right_number = parse_integer(right);
+      if (!left_number.has_value() || !right_number.has_value()) {
+        let const &not_a_number = left_number.has_value() ? right : left;
         fail(StringView{"Cannot compare with '"} + op + "', '" + not_a_number +
              "' is not an integer");
         return false;
       }
-      if (op == "-eq") return left_number == right_number;
-      if (op == "-ne") return left_number != right_number;
-      if (op == "-lt") return left_number < right_number;
-      if (op == "-le") return left_number <= right_number;
-      if (op == "-gt") return left_number > right_number;
-      return left_number >= right_number;
+      if (op == "-eq") return *left_number == *right_number;
+      if (op == "-ne") return *left_number != *right_number;
+      if (op == "-lt") return *left_number < *right_number;
+      if (op == "-le") return *left_number <= *right_number;
+      if (op == "-gt") return *left_number > *right_number;
+      return *left_number >= *right_number;
     }
     fail(StringView{"'"} + op +
          "' is not a known binary operator, expected one of = != < > -eq -ne "
