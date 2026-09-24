@@ -308,12 +308,11 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
       let const source = sources[chunk.source_index];
       usize position = 0;
       while (position < chunk.content.length) {
-        let delimiter_position = position;
-        while (delimiter_position < chunk.content.length &&
-               chunk.content[delimiter_position] != '\n')
-        {
-          delimiter_position++;
-        }
+        let const remaining = chunk.content.substring(position);
+        let const newline_offset = remaining.find_character('\n');
+        let const delimiter_position =
+            newline_offset.has_value() ? position + *newline_offset
+                                        : chunk.content.length;
 
         let const segment = chunk.content.substring_of_length(
             position, delimiter_position - position);
