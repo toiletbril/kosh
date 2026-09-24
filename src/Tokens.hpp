@@ -404,7 +404,8 @@ public:
 
   SegmentText text;
 
-  fn get_eval_cache() const throws -> segment_eval_cache &;
+  fn get_eval_cache(BumpArena *cache_arena) const throws
+      -> segment_eval_cache &;
 
   pure fn is_split_eligible() const wontthrow -> bool;
   pure fn has_live_glob_chars() const wontthrow -> bool;
@@ -438,12 +439,14 @@ public:
            m_eval_cache->has_optimizer_arithmetic_result;
   }
 
-  fn set_optimizer_arithmetic_result(StringView exact_text = {}) const throws
+  fn set_optimizer_arithmetic_result(StringView exact_text,
+                                     BumpArena *cache_arena) const throws
       -> void
   {
-    let &cache = get_eval_cache();
+    let &cache = get_eval_cache(cache_arena);
     cache.has_optimizer_arithmetic_result = true;
-    if (!exact_text.is_empty()) set_exact_constant_arithmetic_text(exact_text);
+    if (!exact_text.is_empty())
+      set_exact_constant_arithmetic_text(exact_text, cache_arena);
   }
 
   fn move_resources_to_arena(BumpArena &arena) throws -> void;
@@ -475,7 +478,9 @@ public:
   pure fn has_glob_metacharacter() const wontthrow -> bool;
 
 private:
-  fn set_exact_constant_arithmetic_text(StringView text) const throws -> void;
+  fn set_exact_constant_arithmetic_text(StringView text,
+                                        BumpArena *cache_arena) const throws
+      -> void;
   fn release_eval_cache() wontthrow -> void;
 
   mutable segment_eval_cache *m_eval_cache{nullptr};

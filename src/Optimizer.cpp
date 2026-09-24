@@ -514,7 +514,9 @@ fn fold_constant_arithmetic_in_word(
           static_cast<int>(segment.text.view().length),
           segment.text.view().data, result->c_str());
       segment.set_optimizer_arithmetic_result(
-          is_direct_constant ? result->view() : StringView{});
+          is_direct_constant ? result->view() : StringView{},
+          actx.eval_context != nullptr ? actx.eval_context->parse_arena()
+                                       : nullptr);
       did_fold = true;
       actx.optimizer_eliminated_count++;
       if (actx.should_report_optimizer_diagnostics) {

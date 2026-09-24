@@ -371,7 +371,7 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
   {
     if (did_push_source_frame) m_source_frames.pop_back();
   };
-  let &cache = segment.get_eval_cache();
+  let &cache = segment.get_eval_cache(cache_arena);
   if (cache.substitution_ast == nullptr ||
       !cache_arena->is_lifetime_valid(cache.substitution_lifetime))
   {
@@ -746,7 +746,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   {
     if (did_push_source_frame) m_source_frames.pop_back();
   };
-  let &cache = segment.get_eval_cache();
+  let &cache = segment.get_eval_cache(cache_arena);
   if (cache.substitution_ast == nullptr ||
       !cache_arena->is_lifetime_valid(cache.substitution_lifetime))
   {

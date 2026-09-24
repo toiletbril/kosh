@@ -71,13 +71,12 @@ pure fn WordSegment::has_glob_metacharacter() const wontthrow -> bool
   return optimizer::word_segment_has_glob_metacharacter(*this);
 }
 
-fn WordSegment::get_eval_cache() const throws -> segment_eval_cache &
+fn WordSegment::get_eval_cache(BumpArena *cache_arena) const throws
+    -> segment_eval_cache &
 {
   if (m_eval_cache == nullptr) {
-    let const arena =
-        is_substitution_cache_in_function_arena ? FUNCTION_ARENA : AST_ARENA;
-    if (arena != nullptr) {
-      m_eval_cache = arena->create<segment_eval_cache>();
+    if (cache_arena != nullptr) {
+      m_eval_cache = cache_arena->create<segment_eval_cache>();
       is_eval_cache_in_arena = true;
     } else {
       let const block = heap_allocator().alloc_array<segment_eval_cache>(1);
@@ -88,12 +87,12 @@ fn WordSegment::get_eval_cache() const throws -> segment_eval_cache &
   return *m_eval_cache;
 }
 
-fn WordSegment::set_exact_constant_arithmetic_text(StringView text) const throws
-    -> void
+fn WordSegment::set_exact_constant_arithmetic_text(StringView text,
+                                                    BumpArena *cache_arena)
+    const throws -> void
 {
-  let &cache = get_eval_cache();
-  let const arena =
-      is_substitution_cache_in_function_arena ? FUNCTION_ARENA : AST_ARENA;
+  let &cache = get_eval_cache(cache_arena);
+  let const arena = cache_arena;
   if (arena == nullptr) return;
   let const allocator = bump_allocator(*arena);
   if (cache.arith == nullptr ||

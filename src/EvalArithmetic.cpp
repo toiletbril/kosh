@@ -2221,7 +2221,7 @@ fn EvalContext::evaluate_arithmetic_cached_text(
         segment.text.view(),
         source_location.has_value() ? &*source_location : nullptr);
 
-  let &cache = segment.get_eval_cache();
+  let &cache = segment.get_eval_cache(cache_arena);
   if (cache.arith == nullptr ||
       !cache_arena->is_lifetime_valid(cache.arithmetic_lifetime))
   {
@@ -2279,7 +2279,7 @@ fn EvalContext::evaluate_arithmetic_cached(const WordSegment &segment) throws
                                                         : nullptr);
   }
 
-  let &cache = segment.get_eval_cache();
+  let &cache = segment.get_eval_cache(cache_arena);
   if (cache.arith == nullptr ||
       !cache_arena->is_lifetime_valid(cache.arithmetic_lifetime))
   {
