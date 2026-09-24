@@ -69,6 +69,37 @@ public:
 
   fn set_mood(mimic_mood mood) wontthrow -> void { m_mood = mood; }
 
+  pure fn should_collect_debug_words() const wontthrow -> bool
+  {
+    return m_should_collect_debug_words;
+  }
+
+  fn set_should_collect_debug_words(bool should_collect) wontthrow -> void
+  {
+    m_should_collect_debug_words = should_collect;
+  }
+
+  pure fn should_collect_analysis_metadata() const wontthrow -> bool
+  {
+    return m_should_collect_analysis_metadata;
+  }
+
+  fn set_should_collect_analysis_metadata(bool should_collect) wontthrow -> void
+  {
+    m_should_collect_analysis_metadata = should_collect;
+  }
+
+  pure fn should_collect_shellcheck_directives() const wontthrow -> bool
+  {
+    return m_should_collect_shellcheck_directives;
+  }
+
+  fn set_should_collect_shellcheck_directives(bool should_collect) wontthrow
+      -> void
+  {
+    m_should_collect_shellcheck_directives = should_collect;
+  }
+
   fn set_arena(BumpArena &arena, AllocationKind allocation_kind) wontthrow
       -> void
   {
@@ -82,6 +113,9 @@ private:
   AllocationKind m_allocation_kind{AllocationKind::Syntax};
   u32 m_source_name_index{0};
   mimic_mood m_mood{mimic_mood::Default};
+  bool m_should_collect_debug_words{false};
+  bool m_should_collect_analysis_metadata{false};
+  bool m_should_collect_shellcheck_directives{false};
 };
 
 struct heredoc_contents
@@ -198,10 +232,13 @@ public:
   fn advance_past_last_peek() throws -> usize;
 
   fn set_should_collect_shellcheck_directives(bool should_collect) wontthrow
-      -> void;
+      -> void
+  {
+    m_parse_session.set_should_collect_shellcheck_directives(should_collect);
+  }
   fn set_should_collect_analysis_metadata(bool should_collect) wontthrow -> void
   {
-    m_should_collect_analysis_metadata = should_collect;
+    m_parse_session.set_should_collect_analysis_metadata(should_collect);
   }
   fn take_shellcheck_directives() throws
       -> ArrayList<shellcheck_directive_span>;
@@ -241,10 +278,7 @@ protected:
   ArrayList<Word> m_debug_words{heap_allocator()};
   usize m_last_collected_word_position{static_cast<usize>(-1)};
 
-  bool m_should_collect_debug_words{false};
   bool m_last_shell_token_was_newline{false};
-  bool m_should_collect_analysis_metadata{false};
-  bool m_should_collect_shellcheck_directives{false};
   ArrayList<shellcheck_directive_span> m_pending_shellcheck_directives{
       heap_allocator()};
   ArrayList<shellcheck_directive_span> m_shellcheck_directive_spans{

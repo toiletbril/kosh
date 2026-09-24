@@ -202,13 +202,13 @@ hot pure fn is_special_parameter_char(char ch) wontthrow -> bool
 Lexer::Lexer(StringView source, BumpArena &arena,
              bool should_collect_debug_words, Maybe<StringView> filename,
              mimic_mood mood, ParseSession::AllocationKind allocation_kind)
-    : m_source(source), m_parse_session(arena),
-      m_should_collect_debug_words(should_collect_debug_words)
+    : m_source(source), m_parse_session(arena)
 {
   m_parse_session.set_arena(arena, allocation_kind);
   m_parse_session.set_source_name_index(
       filename.has_value() ? intern_source_name(*filename) : 0);
   m_parse_session.set_mood(mood);
+  m_parse_session.set_should_collect_debug_words(should_collect_debug_words);
   LOG(Debug, "starting a lexer over %zu bytes of source", m_source.length);
 }
 
@@ -246,12 +246,6 @@ pure fn Lexer::source() const wontthrow -> StringView { return m_source; }
 pure fn Lexer::cursor_position() const wontthrow -> usize
 {
   return m_cursor_position;
-}
-
-fn Lexer::set_should_collect_shellcheck_directives(
-    bool should_collect) wontthrow -> void
-{
-  m_should_collect_shellcheck_directives = should_collect;
 }
 
 fn Lexer::take_shellcheck_directives() throws
@@ -398,7 +392,8 @@ cold fn Lexer::walk_heredoc_body(usize start, StringView delimiter,
     let const is_delimiter = (delimiter == stripped);
     did_find_delimiter = did_find_delimiter || is_delimiter;
 
-    if (m_should_collect_analysis_metadata && !is_delimiter && !has_near_miss &&
+    if (m_parse_session.should_collect_analysis_metadata() && !is_delimiter &&
+        !has_near_miss &&
         line_length > delimiter.length)
     {
       usize content_start = line_offset;
@@ -538,7 +533,7 @@ hot flatten alwaysinline fn Lexer::skip_whitespace() throws -> void
       let const comment_remaining = m_source.substring(m_cursor_position + i);
       i += comment_remaining.find_character('\n').value_or(
           comment_remaining.length);
-      if (m_should_collect_analysis_metadata) {
+      if (m_parse_session.should_collect_analysis_metadata()) {
         let comment = m_source.substring_of_length(
             m_cursor_position + comment_start, i - comment_start);
         usize content_position = 1;
@@ -556,7 +551,7 @@ hot flatten alwaysinline fn Lexer::skip_whitespace() throws -> void
           let const span = shellcheck_directive_span{
               m_cursor_position + comment_start, i - comment_start};
 
-          if (m_should_collect_shellcheck_directives)
+          if (m_parse_session.should_collect_shellcheck_directives())
             m_pending_shellcheck_directives.push(span);
 
           m_shellcheck_directive_spans.push(span);
@@ -1281,7 +1276,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
       segment.is_substitution_cache_in_function_arena = true;
   }
 
-  if (m_should_collect_debug_words &&
+  if (m_parse_session.should_collect_debug_words() &&
       m_cursor_position != m_last_collected_word_position)
   {
     m_debug_words.push(word);
