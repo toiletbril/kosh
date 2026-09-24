@@ -1648,9 +1648,7 @@ fn expressions::internal::analyze_followed_source(
 
   let const arena_mark = AST_ARENA->mark();
   defer { AST_ARENA->release(arena_mark); };
-  let *previous_function_arena = FUNCTION_ARENA;
-  FUNCTION_ARENA = nullptr;
-  defer { FUNCTION_ARENA = previous_function_arena; };
+  let const function_arena_scope = FunctionArenaScope{nullptr};
 
   let parser = Parser{
       Lexer{contents->view(), *AST_ARENA, false, canonical_path->text().view(),

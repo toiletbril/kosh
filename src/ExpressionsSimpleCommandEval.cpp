@@ -841,10 +841,10 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
        rebases the position onto the definition copy. The error is marked
        rendered so the top-level handler keeps the status without printing it
        twice. */
-    let const previous_function_arena = FUNCTION_ARENA;
-    if (command_function_storage.has_value())
-      FUNCTION_ARENA = command_function_storage.get_arena();
-    defer { FUNCTION_ARENA = previous_function_arena; };
+    let const function_arena_scope = FunctionArenaScope{
+        command_function_storage.has_value()
+            ? command_function_storage.get_arena()
+            : FUNCTION_ARENA};
 
     /* Bash traces the entry into the frame as a second DEBUG fire. The depth
        gate reaches that fire only while functrace is on. LINENO names the line
