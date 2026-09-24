@@ -549,13 +549,22 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
               has_bootstrap = true;
             }
             let const launch = os::launch_compound_stage(
-                stage_source.view(), ec.in_fd, stage_out, stage_err,
-                ec.source_location(),
-                source != nullptr ? source->view() : StringView{},
-                process_group_id, has_bootstrap ? &bootstrap : nullptr,
-                cxt.shell_name(), cxt.last_exit_status(),
-                os::get_shell_process_id(), cxt.get_subshell_depth() + 1,
-                cxt.mood(), process_group);
+                os::compound_stage_options{
+                    .source = stage_source.view(),
+                    .in_fd = ec.in_fd,
+                    .out_fd = stage_out,
+                    .err_fd = stage_err,
+                    .location = ec.source_location(),
+                    .diagnostic_source =
+                        source != nullptr ? source->view() : StringView{},
+                    .process_group_id = process_group_id,
+                    .bootstrap = has_bootstrap ? &bootstrap : nullptr,
+                    .shell_name = cxt.shell_name(),
+                    .previous_exit_status = cxt.last_exit_status(),
+                    .shell_process_id = os::get_shell_process_id(),
+                    .subshell_depth = cxt.get_subshell_depth() + 1,
+                    .mood = cxt.mood(),
+                    .process_group = process_group});
             forked_child = launch.child;
           } catch (...) {
             ec.close_fds();

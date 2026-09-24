@@ -531,25 +531,21 @@ fn try_fork_job_process() throws -> Maybe<process>
 
 fn can_fork_evaluator() wontthrow -> bool { return true; }
 
-fn launch_process_substitution(StringView source, bool source_traces_enabled,
-                               const subshell_bootstrap *bootstrap,
-                               StringView shell_name, i32 previous_exit_status,
-                               i64 shell_process_id, usize subshell_depth,
-                               process_substitution_direction direction,
-                               mimic_mood mood) throws
+fn launch_process_substitution(
+    const process_substitution_options &options) throws
     -> process_substitution_launch
 {
-  unused(source);
-  unused(mood);
-  unused(source_traces_enabled);
-  unused(bootstrap);
-  unused(shell_name);
-  unused(previous_exit_status);
-  unused(shell_process_id);
-  unused(subshell_depth);
+  unused(options.source);
+  unused(options.mood);
+  unused(options.source_traces_enabled);
+  unused(options.bootstrap);
+  unused(options.shell_name);
+  unused(options.previous_exit_status);
+  unused(options.shell_process_id);
+  unused(options.subshell_depth);
 
   let const command_writes_pipe =
-      direction == process_substitution_direction::CommandWrites;
+      options.direction == process_substitution_direction::CommandWrites;
 
   let const pipe = make_pipe();
   if (!pipe.has_value())
@@ -597,27 +593,13 @@ fn release_unused_process_substitution(opaque *cleanup) wontthrow -> void
   unused(cleanup);
 }
 
-fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
-                         Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
-                         SourceLocation location, StringView diagnostic_source,
-                         i64 process_group_id,
-                         const subshell_bootstrap *bootstrap,
-                         StringView shell_name, i32 previous_exit_status,
-                         i64 shell_process_id, usize subshell_depth,
-                         mimic_mood mood,
-                         process_group_mode process_group) throws
+fn launch_compound_stage(const compound_stage_options &options) throws
     -> compound_stage_launch
 {
-  unused(source);
-  unused(mood);
-  unused(bootstrap);
-  unused(shell_name);
-  unused(previous_exit_status);
-  unused(shell_process_id);
-  unused(subshell_depth);
   const process child = fork_compound_stage(
-      steal(in_fd), steal(out_fd), steal(err_fd), steal(location),
-      diagnostic_source, process_group_id, process_group);
+      steal(options.in_fd), steal(options.out_fd), steal(options.err_fd),
+      steal(options.location), options.diagnostic_source,
+      options.process_group_id, options.process_group);
   return compound_stage_launch{
       .child = child,
       .should_evaluate_child = child == 0,

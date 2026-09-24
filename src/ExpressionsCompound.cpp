@@ -635,13 +635,21 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
           !is_async() ? os::process_group_mode::Inherit
                       : os::background_process_group_mode(process_group_id);
       bootstrap.evaluation_mode = stage_mode;
-      let const launch = os::launch_compound_stage(
-          stage_text, stage_in, stage_out, None, stage_location,
-          stage_source != nullptr ? stage_source->view() : StringView{},
-          process_group_id,
-          should_launch_fresh_evaluator ? &bootstrap : nullptr,
-          cxt.shell_name(), cxt.last_exit_status(), os::get_shell_process_id(),
-          cxt.get_subshell_depth() + 1, cxt.mood(), process_group);
+      let const launch = os::launch_compound_stage(os::compound_stage_options{
+          .source = stage_text,
+          .in_fd = stage_in,
+          .out_fd = stage_out,
+          .location = stage_location,
+          .diagnostic_source =
+              stage_source != nullptr ? stage_source->view() : StringView{},
+          .process_group_id = process_group_id,
+          .bootstrap = should_launch_fresh_evaluator ? &bootstrap : nullptr,
+          .shell_name = cxt.shell_name(),
+          .previous_exit_status = cxt.last_exit_status(),
+          .shell_process_id = os::get_shell_process_id(),
+          .subshell_depth = cxt.get_subshell_depth() + 1,
+          .mood = cxt.mood(),
+          .process_group = process_group});
       let const child = launch.child;
 
       if (launch.should_evaluate_child) {

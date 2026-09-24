@@ -2000,12 +2000,22 @@ private:
   fn close_owned_processes() wontthrow -> void;
 };
 
-fn launch_process_substitution(StringView source, bool source_traces_enabled,
-                               const subshell_bootstrap *bootstrap,
-                               StringView shell_name, i32 previous_exit_status,
-                               i64 shell_process_id, usize subshell_depth,
-                               process_substitution_direction direction,
-                               mimic_mood mood) throws
+struct process_substitution_options
+{
+  StringView source{};
+  bool source_traces_enabled{true};
+  const subshell_bootstrap *bootstrap{nullptr};
+  StringView shell_name{};
+  i32 previous_exit_status{0};
+  i64 shell_process_id{0};
+  usize subshell_depth{0};
+  process_substitution_direction direction{
+      process_substitution_direction::CommandReads};
+  mimic_mood mood{static_cast<mimic_mood>(0)};
+};
+
+fn launch_process_substitution(const process_substitution_options &options)
+    throws
     -> process_substitution_launch;
 fn release_unused_process_substitution(opaque *cleanup) wontthrow -> void;
 
@@ -2025,14 +2035,25 @@ struct compound_stage_launch
   bool should_evaluate_child{false};
 };
 
-fn launch_compound_stage(
-    StringView source, Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
-    Maybe<descriptor> err_fd, SourceLocation location = {},
-    StringView diagnostic_source = {}, i64 process_group_id = 0,
-    const subshell_bootstrap *bootstrap = nullptr, StringView shell_name = {},
-    i32 previous_exit_status = 0, i64 shell_process_id = 0,
-    usize subshell_depth = 0, mimic_mood mood = static_cast<mimic_mood>(0),
-    process_group_mode process_group = process_group_mode::Inherit) throws
+struct compound_stage_options
+{
+  StringView source{};
+  Maybe<descriptor> in_fd{None};
+  Maybe<descriptor> out_fd{None};
+  Maybe<descriptor> err_fd{None};
+  SourceLocation location{};
+  StringView diagnostic_source{};
+  i64 process_group_id{0};
+  const subshell_bootstrap *bootstrap{nullptr};
+  StringView shell_name{};
+  i32 previous_exit_status{0};
+  i64 shell_process_id{0};
+  usize subshell_depth{0};
+  mimic_mood mood{static_cast<mimic_mood>(0)};
+  process_group_mode process_group{process_group_mode::Inherit};
+};
+
+fn launch_compound_stage(const compound_stage_options &options) throws
     -> compound_stage_launch;
 
 fn register_platform_flags(FlagList &flags) throws -> void;

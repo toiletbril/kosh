@@ -87,13 +87,18 @@ fn CompoundCommand::evaluate_async(EvalContext &cxt) const throws -> i64
   let bootstrap = os::subshell_bootstrap{};
   let const should_launch_fresh_evaluator = !os::can_fork_evaluator();
   if (should_launch_fresh_evaluator) bootstrap = cxt.make_subshell_bootstrap();
-  let const launch = os::launch_compound_stage(
-      command_text, None, None, None, source_location(),
-      source != nullptr ? source->view() : StringView{}, 0,
-      should_launch_fresh_evaluator ? &bootstrap : nullptr, cxt.shell_name(),
-      cxt.last_exit_status(), os::get_shell_process_id(),
-      cxt.get_subshell_depth() + 1, cxt.mood(),
-      os::process_group_mode::NewBackground);
+  let const launch = os::launch_compound_stage(os::compound_stage_options{
+      .source = command_text,
+      .location = source_location(),
+      .diagnostic_source =
+          source != nullptr ? source->view() : StringView{},
+      .bootstrap = should_launch_fresh_evaluator ? &bootstrap : nullptr,
+      .shell_name = cxt.shell_name(),
+      .previous_exit_status = cxt.last_exit_status(),
+      .shell_process_id = os::get_shell_process_id(),
+      .subshell_depth = cxt.get_subshell_depth() + 1,
+      .mood = cxt.mood(),
+      .process_group = os::process_group_mode::NewBackground});
   let const child = launch.child;
 
   if (launch.should_evaluate_child) {
@@ -1513,13 +1518,20 @@ fn CoprocCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   let const should_launch_fresh_evaluator = !os::can_fork_evaluator();
   if (should_launch_fresh_evaluator) bootstrap = cxt.make_subshell_bootstrap();
 
-  let const launch = os::launch_compound_stage(
-      command_text, toward_child->in, away_from_child->out, None,
-      source_location(), source != nullptr ? source->view() : StringView{}, 0,
-      should_launch_fresh_evaluator ? &bootstrap : nullptr, cxt.shell_name(),
-      cxt.last_exit_status(), os::get_shell_process_id(),
-      cxt.get_subshell_depth() + 1, cxt.mood(),
-      os::process_group_mode::NewBackground);
+  let const launch = os::launch_compound_stage(os::compound_stage_options{
+      .source = command_text,
+      .in_fd = toward_child->in,
+      .out_fd = away_from_child->out,
+      .location = source_location(),
+      .diagnostic_source =
+          source != nullptr ? source->view() : StringView{},
+      .bootstrap = should_launch_fresh_evaluator ? &bootstrap : nullptr,
+      .shell_name = cxt.shell_name(),
+      .previous_exit_status = cxt.last_exit_status(),
+      .shell_process_id = os::get_shell_process_id(),
+      .subshell_depth = cxt.get_subshell_depth() + 1,
+      .mood = cxt.mood(),
+      .process_group = os::process_group_mode::NewBackground});
   let const child = launch.child;
 
   if (launch.should_evaluate_child) {

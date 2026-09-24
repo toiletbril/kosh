@@ -1125,16 +1125,12 @@ static fn send_internal_pipe(StringView path, StringView content,
   }
 }
 
-fn launch_process_substitution(StringView source, bool source_traces_enabled,
-                               const subshell_bootstrap *bootstrap,
-                               StringView shell_name, i32 previous_exit_status,
-                               i64 shell_process_id, usize subshell_depth,
-                               process_substitution_direction direction,
-                               mimic_mood mood) throws
+fn launch_process_substitution(
+    const process_substitution_options &options) throws
     -> process_substitution_launch
 {
   let const command_writes_pipe =
-      direction == process_substitution_direction::CommandWrites;
+      options.direction == process_substitution_direction::CommandWrites;
   let path = make_internal_pipe_path();
   let const wide_path = utf8_to_wide(path.view(), heap_allocator());
   if (!wide_path.has_value())
@@ -1396,30 +1392,24 @@ fn try_fork_job_process() -> Maybe<process> { return koshka::None; }
 
 fn can_fork_evaluator() wontthrow -> bool { return false; }
 
-fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
-                         Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
-                         SourceLocation location, StringView diagnostic_source,
-                         i64 process_group_id,
-                         const subshell_bootstrap *bootstrap,
-                         StringView shell_name, i32 previous_exit_status,
-                         i64 shell_process_id, usize subshell_depth,
-                         mimic_mood mood,
-                         process_group_mode process_group) throws
+fn launch_compound_stage(const compound_stage_options &options) throws
     -> compound_stage_launch
 {
-  unused(diagnostic_source);
-  if (source.is_empty())
+  unused(options.diagnostic_source);
+  if (options.source.is_empty())
     throw ErrorWithLocation{
-        steal(location),
+        steal(options.location),
         "A compound command in a pipeline is not supported on this platform"};
 
-  unused(process_group_id);
+  unused(options.process_group_id);
   let child =
-      spawn_subshell_stage(source, in_fd, out_fd, err_fd, true, bootstrap,
-                           shell_name, previous_exit_status, shell_process_id,
-                           subshell_depth, mood, process_group);
+      spawn_subshell_stage(options.source, options.in_fd, options.out_fd,
+                           options.err_fd, true, options.bootstrap,
+                           options.shell_name, options.previous_exit_status,
+                           options.shell_process_id, options.subshell_depth,
+                           options.mood, options.process_group);
   if (!child.has_value())
-    throw ErrorWithLocation{steal(location),
+    throw ErrorWithLocation{steal(options.location),
                             "Could not spawn the compound pipeline stage"};
 
   return compound_stage_launch{
