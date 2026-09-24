@@ -13,16 +13,31 @@
 #include "base/Containers.hpp"
 #include "base/Trace.hpp"
 
+#include <atomic>
+
 namespace koshka {
 
-BumpArena *AST_ARENA = nullptr;
-BumpArena *FUNCTION_ARENA = nullptr;
-static u32 NEXT_ARENA_INCARNATION = 1;
+static std::atomic<u32> NEXT_ARENA_INCARNATION{1};
+static BumpArena *LIVE_ARENAS = nullptr;
+static std::atomic_flag LIVE_ARENAS_LOCK = ATOMIC_FLAG_INIT;
+
+class live_arenas_lock
+{
+public:
+  live_arenas_lock() wontthrow
+  {
+    while (LIVE_ARENAS_LOCK.test_and_set(std::memory_order_acquire)) {}
+  }
+
+  ~live_arenas_lock() wontthrow
+  {
+    LIVE_ARENAS_LOCK.clear(std::memory_order_release);
+  }
+};
 
 fn is_arena_pointer(const opaque *pointer) wontthrow -> bool
 {
-  return (AST_ARENA != nullptr && AST_ARENA->owns(pointer)) ||
-         (FUNCTION_ARENA != nullptr && FUNCTION_ARENA->owns(pointer));
+  return BumpArena::owns_live_pointer(pointer);
 }
 
 hot fn bump_arena_allocate(BumpArena *arena, usize length,
@@ -37,13 +52,25 @@ fn bump_arena_owns(const BumpArena *arena, const opaque *pointer) wontthrow
   return arena != nullptr && arena->owns(pointer);
 }
 
-BumpArena::BumpArena() : m_arena_incarnation{NEXT_ARENA_INCARNATION++} {}
+BumpArena::BumpArena()
+    : m_arena_incarnation{
+          NEXT_ARENA_INCARNATION.fetch_add(1, std::memory_order_relaxed)}
+{
+  register_live();
+}
 
 BumpArena::BumpArena(usize initial_block_size)
-    : m_arena_incarnation{NEXT_ARENA_INCARNATION++}
+    : m_arena_incarnation{
+          NEXT_ARENA_INCARNATION.fetch_add(1, std::memory_order_relaxed)}
 {
   ASSERT(initial_block_size > 0);
-  add_block(initial_block_size, initial_block_size);
+  register_live();
+  try {
+    add_block(initial_block_size, initial_block_size);
+  } catch (...) {
+    unregister_live();
+    throw;
+  }
 }
 
 BumpArena::~BumpArena()
@@ -53,6 +80,41 @@ BumpArena::~BumpArena()
 
   for (block &block : m_blocks)
     heap_allocator().free_array(block.base, block.size);
+
+  unregister_live();
+}
+
+fn BumpArena::register_live() wontthrow -> void
+{
+  let const lock = live_arenas_lock{};
+  m_previous_live = nullptr;
+  m_next_live = LIVE_ARENAS;
+  if (m_next_live != nullptr) m_next_live->m_previous_live = this;
+  LIVE_ARENAS = this;
+}
+
+fn BumpArena::unregister_live() wontthrow -> void
+{
+  let const lock = live_arenas_lock{};
+  if (m_previous_live != nullptr)
+    m_previous_live->m_next_live = m_next_live;
+  else if (LIVE_ARENAS == this)
+    LIVE_ARENAS = m_next_live;
+  if (m_next_live != nullptr) m_next_live->m_previous_live = m_previous_live;
+  m_previous_live = nullptr;
+  m_next_live = nullptr;
+}
+
+fn BumpArena::owns_live_pointer(const opaque *pointer) wontthrow -> bool
+{
+  if (pointer == nullptr) return false;
+  let const lock = live_arenas_lock{};
+  for (let *arena = LIVE_ARENAS; arena != nullptr;
+       arena = arena->m_next_live)
+  {
+    if (arena->owns(pointer)) return true;
+  }
+  return false;
 }
 
 fn BumpArena::push_destructor(pending_destructor pending) throws -> void

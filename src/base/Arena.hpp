@@ -26,6 +26,8 @@ public:
   BumpArena(const BumpArena &) = delete;
   BumpArena &operator=(const BumpArena &) = delete;
 
+  static fn owns_live_pointer(const opaque *pointer) wontthrow -> bool;
+
   hot fn allocate(usize size, usize alignment) throws -> opaque *;
   fn owns(const opaque *pointer) const wontthrow -> bool;
   cold fn reset() wontthrow -> void;
@@ -169,43 +171,11 @@ private:
    */
   fn run_destructors_down_to(usize first) wontthrow -> void;
   fn release_destructor_chunks(usize kept_chunk_count) wontthrow -> void;
-};
+  fn register_live() wontthrow -> void;
+  fn unregister_live() wontthrow -> void;
 
-/* The arena that the lexer and parser allocate nodes from while a command is
-   being built. The operator delete on a node consults it to tell arena storage
-   apart from an ordinary heap node. */
-extern BumpArena *AST_ARENA;
-
-/* The arena that holds function bodies. A function body outlives the command
-   that defined it, so it is parsed here instead of the per-command arena. */
-extern BumpArena *FUNCTION_ARENA;
-
-/* Temporarily selects the function-body arena for allocations and restores the
- * previous selection when the owning operation leaves scope. */
-class FunctionArenaScope
-{
-public:
-  explicit FunctionArenaScope(BumpArena *arena)
-      : m_previous(FUNCTION_ARENA)
-  {
-    FUNCTION_ARENA = arena;
-  }
-
-  ~FunctionArenaScope() { restore(); }
-
-  fn restore() wontthrow -> void
-  {
-    if (!m_is_active) return;
-    FUNCTION_ARENA = m_previous;
-    m_is_active = false;
-  }
-
-  FunctionArenaScope(const FunctionArenaScope &) = delete;
-  FunctionArenaScope &operator=(const FunctionArenaScope &) = delete;
-
-private:
-  BumpArena *m_previous;
-  bool m_is_active{true};
+  BumpArena *m_previous_live{nullptr};
+  BumpArena *m_next_live{nullptr};
 };
 
 fn is_arena_pointer(const opaque *pointer) wontthrow -> bool;

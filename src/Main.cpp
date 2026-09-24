@@ -220,9 +220,7 @@ fn kosh_main(int argc, char **argv) -> int
       koshka::os::set_default_signal_handlers(
           koshka::os::signal_profile::NonInteractive);
       let ast_arena = koshka::BumpArena{};
-      koshka::AST_ARENA = &ast_arena;
       let function_arena = koshka::BumpArena{};
-      koshka::FUNCTION_ARENA = &function_arena;
 
       let context = koshka::EvalContext{
           false, false, false, false, false, koshka::String{invocation}};
@@ -916,12 +914,10 @@ fn kosh_main(int argc, char **argv) -> int
   /* The parse arena holds the AST and its tokens for one command, reset between
      commands. */
   let ast_arena = koshka::BumpArena{};
-  koshka::AST_ARENA = &ast_arena;
 
   /* Function bodies outlive the command that defined them, so the function
      arena is never reset during the run. */
   let function_arena = koshka::BumpArena{};
-  koshka::FUNCTION_ARENA = &function_arena;
   context.set_parse_arena(&ast_arena);
   context.set_function_arena(&function_arena);
 

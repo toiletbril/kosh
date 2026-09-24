@@ -502,12 +502,6 @@ static fn run_script_contents(
         out_ast == nullptr && !(should_print_ast && context.show_ast()) &&
         !context.show_lexed_words();
 
-    /* A function body parsed into the function arena would outlive the unit
-       that defined it, and that arena is never reset. */
-    let function_arena_scope = FunctionArenaScope{
-        (should_stream_units || should_stream_execution) ? nullptr
-                                                         : context.function_arena()};
-
     /* A file with any parse error must not run, so every error is collected
        and reported at once. */
     let parse_errors = ArrayList<koshka::String>{heap_allocator()};
@@ -687,7 +681,6 @@ static fn run_script_contents(
             Lexer{script_contents.view(), ast_arena, false, filename,
                   context.mood()}
         };
-        function_arena_scope.restore();
         let const was_terminal_exec_allowed = context.terminal_exec_allowed();
         defer { context.set_terminal_exec_allowed(was_terminal_exec_allowed); };
 

@@ -34,7 +34,6 @@ function_body_storage::~function_body_storage()
     LIVE_EVAL_FUNCTION_STORAGES = next_live;
   if (next_live != nullptr) next_live->previous_live = previous_live;
 
-  let const function_arena_scope = FunctionArenaScope{arena};
   arena->~BumpArena();
   heap_allocator().free_array(arena, 1);
 }

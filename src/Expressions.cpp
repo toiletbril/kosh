@@ -1649,8 +1649,6 @@ fn expressions::internal::analyze_followed_source(
 
   let const arena_mark = actx.eval_context->parse_arena()->mark();
   defer { actx.eval_context->parse_arena()->release(arena_mark); };
-  let const function_arena_scope = FunctionArenaScope{nullptr};
-
   let parser = Parser{
       Lexer{contents->view(), *actx.eval_context->parse_arena(), false,
             canonical_path->text().view(), actx.eval_context->mood()}

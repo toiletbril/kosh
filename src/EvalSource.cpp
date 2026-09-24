@@ -555,9 +555,6 @@ fn EvalContext::run_source(StringView source, StringView origin,
     }
     source = retained_source->view();
 
-    let const function_arena_scope = FunctionArenaScope{
-        cached_body != nullptr ? cached_body->get_arena() : function_arena()};
-
     let const previous_history_recording_root = m_history_recording_root;
     let const previous_history_recording_source = m_history_recording_source;
     if (should_record_history) {
