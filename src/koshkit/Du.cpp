@@ -291,10 +291,6 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
         do_try_complete(frame_index);
         continue;
       }
-      children->sort([](const Path::directory_child &left,
-                        const Path::directory_child &right) {
-        return left.name.view() < right.name.view();
-      });
       frames[frame_index].pending_stat_count += children->count();
       frames[frame_index].is_enumerated = true;
       for (let const &child : *children) {
