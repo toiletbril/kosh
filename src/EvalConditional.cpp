@@ -590,17 +590,17 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws
   key += is_case_insensitive ? 'i' : 's';
   key += pattern;
 
-  if (CompiledRegex *cached = m_regex_cache.find(key.view()); cached != nullptr)
+  if (CompiledRegex *cached = expansion_store().regex_cache().find(key.view()); cached != nullptr)
   {
     LOG(All, "regex cache hit for the pattern '%.*s'",
         static_cast<int>(pattern.length), pattern.data);
     return cached->get();
   }
 
-  if (m_regex_cache.count() >= REGEX_CACHE_CAP) {
+  if (expansion_store().regex_cache().count() >= REGEX_CACHE_CAP) {
     LOG(Debug, "regex cache full, dropping %zu compiled patterns",
-        m_regex_cache.count());
-    m_regex_cache.clear();
+        expansion_store().regex_cache().count());
+    expansion_store().regex_cache().clear();
   }
 
   LOG(Debug, "regex cache miss, compiling the pattern '%.*s'",
@@ -619,7 +619,7 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws
     fail_conditional(reason.view(),
                      "The pattern must be a valid extended regular expression");
   }
-  return m_regex_cache.set(key.view(), CompiledRegex{compiled})->get();
+  return expansion_store().regex_cache().set(key.view(), CompiledRegex{compiled})->get();
 }
 
 fn EvalContext::evaluate_conditional(

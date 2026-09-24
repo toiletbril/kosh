@@ -635,6 +635,22 @@ private:
   StringMap<FunctionBodyHandle> m_cached_bodies{heap_allocator()};
 };
 
+class ExpansionStore
+{
+public:
+  fn regex_cache() wontthrow -> StringMap<CompiledRegex> &
+  {
+    return m_regex_cache;
+  }
+  pure fn regex_cache() const wontthrow -> const StringMap<CompiledRegex> &
+  {
+    return m_regex_cache;
+  }
+
+private:
+  StringMap<CompiledRegex> m_regex_cache{heap_allocator()};
+};
+
 class EvalContext
 {
 public:
@@ -683,6 +699,14 @@ public:
   pure fn trap_store() const wontthrow -> const TrapStore &
   {
     return m_trap_store;
+  }
+  fn expansion_store() wontthrow -> ExpansionStore &
+  {
+    return m_expansion_store;
+  }
+  pure fn expansion_store() const wontthrow -> const ExpansionStore &
+  {
+    return m_expansion_store;
   }
   fn function_store() wontthrow -> FunctionStore & { return m_function_store; }
   pure fn function_store() const wontthrow -> const FunctionStore &
@@ -2428,7 +2452,7 @@ protected:
   u64 m_shopt_option_values{0};
   /* The compiled form of each [[ =~ ]] pattern, keyed by the pattern text, so a
      hot loop with a constant regex compiles it once and reuses it. */
-  StringMap<CompiledRegex> m_regex_cache{heap_allocator()};
+  ExpansionStore m_expansion_store{};
   /* The cached value of IFS, kept current by set_shell_variable, so word
      splitting does not look it up per word. */
   VariableStore m_variable_store{};
