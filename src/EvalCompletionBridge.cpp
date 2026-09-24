@@ -25,27 +25,27 @@ fn EvalContext::register_completion_spec(StringView command,
       "word-list bytes",
       static_cast<int>(command.length), command.data,
       spec.function_name.c_str(), spec.word_list.length());
-  m_completion_specs.set(command, steal(spec));
+  completion_store().specs().set(command, steal(spec));
 }
 
 fn EvalContext::register_default_completion_spec(completion_spec spec) throws
     -> void
 {
   LOG(Debug, "registering the default completion spec");
-  m_default_completion_spec = steal(spec);
+  completion_store().default_spec() = steal(spec);
 }
 
 pure fn EvalContext::default_completion_spec() const wontthrow
     -> const completion_spec *
 {
-  return m_default_completion_spec.has_value() ? &*m_default_completion_spec
+  return completion_store().default_spec().has_value() ? &*completion_store().default_spec()
                                                : nullptr;
 }
 
 pure fn EvalContext::lookup_completion_spec(StringView command) const wontthrow
     -> const completion_spec *
 {
-  return m_completion_specs.find(command);
+  return completion_store().specs().find(command);
 }
 
 fn EvalContext::run_completion_function(StringView function_name,

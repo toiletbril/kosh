@@ -734,8 +734,8 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       m_shell_variables,
       m_special_variable_definition_locations,
       indexed_arrays(),
-      m_completion_specs,
-      m_default_completion_spec,
+      completion_store().specs(),
+      completion_store().default_spec(),
       associative_names(),
       associative_values(),
       sparse_array_values(),
@@ -799,8 +799,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_special_variable_definition_locations =
       steal(snapshot.special_variable_definition_locations);
   indexed_arrays() = steal(snapshot.indexed_arrays);
-  m_completion_specs = steal(snapshot.completion_specs);
-  m_default_completion_spec = steal(snapshot.default_completion_spec);
+  completion_store().specs() = steal(snapshot.completion_specs);
+  completion_store().default_spec() = steal(snapshot.default_completion_spec);
   associative_names() = steal(snapshot.associative_names);
   associative_values() = steal(snapshot.associative_values);
   sparse_array_values() = steal(snapshot.sparse_array_values);
@@ -1275,7 +1275,7 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
     append_subshell_bootstrap_text(body, name.view());
 
   let completion_names = ArrayList<String>{heap_allocator()};
-  m_completion_specs.for_each([&](StringView command, const completion_spec &) {
+  completion_store().specs().for_each([&](StringView command, const completion_spec &) {
     completion_names.push_managed(command);
   });
   completion_names.sort();
@@ -1291,15 +1291,15 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
   };
 
   for (let const &command : completion_names) {
-    let const *spec = m_completion_specs.find(command.view());
+    let const *spec = completion_store().specs().find(command.view());
     ASSERT(spec != nullptr);
     append_subshell_bootstrap_text(body, command.view());
     do_append_completion_spec(*spec);
   }
 
-  body.push(static_cast<char>(m_default_completion_spec.has_value()));
-  if (m_default_completion_spec.has_value())
-    do_append_completion_spec(*m_default_completion_spec);
+  body.push(static_cast<char>(completion_store().default_spec().has_value()));
+  if (completion_store().default_spec().has_value())
+    do_append_completion_spec(*completion_store().default_spec());
 
   let const do_reference_process = [&](os::process process) throws -> u32 {
     if (bootstrap.processes.count() >= UINT32_MAX) throw std::bad_alloc{};
@@ -1670,8 +1670,8 @@ fn EvalContext::apply_subshell_bootstrap(
     if (storage == nullptr) invalid_subshell_bootstrap();
     push_function_call_name(name.view(), *storage);
   }
-  m_completion_specs = steal(completion_specs);
-  m_default_completion_spec = steal(default_completion_spec);
+  completion_store().specs() = steal(completion_specs);
+  completion_store().default_spec() = steal(default_completion_spec);
   m_job_table.m_jobs = steal(jobs);
   m_job_table.m_detached_job_processes = steal(detached_processes);
   bootstrap.release_process_ownership();

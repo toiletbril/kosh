@@ -448,6 +448,28 @@ private:
   HashSet m_sparse_array_names{heap_allocator()};
 };
 
+class CompletionStore
+{
+public:
+  fn specs() wontthrow -> StringMap<completion_spec> & { return m_specs; }
+  pure fn specs() const wontthrow -> const StringMap<completion_spec> &
+  {
+    return m_specs;
+  }
+  fn default_spec() wontthrow -> Maybe<completion_spec> &
+  {
+    return m_default_spec;
+  }
+  pure fn default_spec() const wontthrow -> const Maybe<completion_spec> &
+  {
+    return m_default_spec;
+  }
+
+private:
+  StringMap<completion_spec> m_specs{heap_allocator()};
+  Maybe<completion_spec> m_default_spec{};
+};
+
 class EvalContext
 {
 public:
@@ -877,6 +899,14 @@ public:
 
   fn register_completion_spec(StringView command, completion_spec spec) throws
       -> void;
+  fn completion_store() wontthrow -> CompletionStore &
+  {
+    return m_completion_store;
+  }
+  pure fn completion_store() const wontthrow -> const CompletionStore &
+  {
+    return m_completion_store;
+  }
   pure fn lookup_completion_spec(StringView command) const wontthrow
       -> const completion_spec *;
   fn register_default_completion_spec(completion_spec spec) throws -> void;
@@ -884,7 +914,7 @@ public:
   pure fn completion_specs() const wontthrow
       -> const StringMap<completion_spec> &
   {
-    return m_completion_specs;
+    return m_completion_store.specs();
   }
   /* out_exit_status receives the function's return status, so the engine sees
      the 124 a dynamic loader returns to request a retry. */
@@ -2180,8 +2210,7 @@ protected:
   StringMap<String> m_shell_variables{heap_allocator()};
   StringMap<SourceLocation> m_special_variable_definition_locations{
       heap_allocator()};
-  StringMap<completion_spec> m_completion_specs{heap_allocator()};
-  Maybe<completion_spec> m_default_completion_spec{};
+  CompletionStore m_completion_store{};
   /* An indexed array element whose subscript is past the dense limit, held by
      its name and decimal index so a sparse far subscript does not pad a huge
      dense gap. The name still reads as indexed. */
