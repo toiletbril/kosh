@@ -1184,16 +1184,18 @@ fn append_remote_report(String &output, bool should_color,
         row.user = do_get_user(socket.process_id, socket.owner_id);
       }
 
-      const remote_process_context *process_context = nullptr;
-      for (let const &context : process_contexts) {
+      let process_context_index = Maybe<usize>{None};
+      for (usize context_index = 0; context_index < process_contexts.count();
+           context_index++) {
+        let const &context = process_contexts[context_index];
         if (context.process_id == socket.process_id &&
             context.start_token == socket.owner_start_token)
         {
-          process_context = &context;
+          process_context_index = context_index;
           break;
         }
       }
-      if (process_context == nullptr && socket.process_id != 0 &&
+      if (!process_context_index.has_value() && socket.process_id != 0 &&
           socket.has_owner_start_token)
       {
         remote_process_context context{allocator};
@@ -1258,23 +1260,25 @@ fn append_remote_report(String &output, bool should_color,
           break;
         }
         process_contexts.push(steal(context));
-        process_context = &process_contexts[process_contexts.count() - 1];
+        process_context_index = process_contexts.count() - 1;
       }
-      if (process_context != nullptr && process_context->is_available) {
+      if (process_context_index.has_value() &&
+          process_contexts[*process_context_index].is_available) {
+        let const &process_context = process_contexts[*process_context_index];
         if (!socket.has_owner_id) {
           row.owner_id =
-              String::from(process_context->owner_id, allocator);
-          row.user = do_get_user(socket.process_id, process_context->owner_id);
+              String::from(process_context.owner_id, allocator);
+          row.user = do_get_user(socket.process_id, process_context.owner_id);
         }
-        row.name = process_context->name;
-        row.command = process_context->command;
-        if (!process_context->net_namespace.is_empty()) {
-          row.net_namespace = process_context->net_namespace;
+        row.name = process_context.name;
+        row.command = process_context.command;
+        if (!process_context.net_namespace.is_empty()) {
+          row.net_namespace = process_context.net_namespace;
         }
-        row.cgroup = process_context->cgroups;
-        row.orchestrator = process_context->orchestrator;
-        row.runtime = process_context->runtime;
-        row.container = process_context->container;
+        row.cgroup = process_context.cgroups;
+        row.orchestrator = process_context.orchestrator;
+        row.runtime = process_context.runtime;
+        row.container = process_context.container;
       }
     }
     remote_rows.push(steal(row));
