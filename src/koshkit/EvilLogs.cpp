@@ -417,7 +417,7 @@ fn collect_log_entries(StringView directory, Allocator allocator) throws
     if (!child_entry.has_status) continue;
 
     let const &child = child_entry.child;
-    let child_path = Path{directory};
+    let child_path = Path{directory, allocator};
     child_path.append(child.name.view());
 
     let entry = log_entry{};

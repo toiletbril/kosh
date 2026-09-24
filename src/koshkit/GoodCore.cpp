@@ -173,10 +173,12 @@ fn infer_binary(EvalContext &cxt, StringView core, Allocator allocator) throws
     if (!end_position.has_value()) continue;
 
     let const candidate = remainder.substring_of_length(0, *end_position);
-    if (Path{candidate}.is_regular_file()) return String{allocator, candidate};
+    if (Path{candidate, allocator}.is_regular_file())
+      return String{allocator, candidate};
 
     let const matches = cxt.get_program_resolver().search(
-        Path{candidate}.filename(), ProgramResolver::SearchMode::First,
+        Path{candidate, allocator}.filename(),
+        ProgramResolver::SearchMode::First,
         ProgramResolver::Requirement::Runnable,
         ProgramResolver::CachePolicy::Bypass);
     if (!matches.is_empty()) return matches[0].text().clone();

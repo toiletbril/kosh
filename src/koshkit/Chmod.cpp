@@ -123,7 +123,9 @@ fn Chmod::execute(const ExecContext &ec, EvalContext &cxt,
 
   for (usize index = 1; index < operands.count(); index++) {
     if (os::INTERRUPT_REQUESTED) return 130;
-    if (!change_mode(ec, cxt, Path{operands[index].view()}, expression,
+    if (!change_mode(ec, cxt,
+                     Path{operands[index].view(), cxt.scratch_allocator()},
+                     expression,
                      FLAG_CHMOD_RECURSIVE.is_enabled()))
       status = 1;
     if (os::INTERRUPT_REQUESTED) return 130;
