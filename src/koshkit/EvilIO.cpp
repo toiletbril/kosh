@@ -357,28 +357,51 @@ fn get_process_window_status(const live_process_row &row,
                              u64 window_start_nanoseconds) wontthrow
     -> os::process_io_status
 {
-  let const oldest = rolling_window_baseline_index(row.history_nanoseconds,
-                                                   window_start_nanoseconds);
-  let const &before = row.history[oldest];
-
+  let const boundary = find_rolling_window_boundary(
+      row.history_nanoseconds, window_start_nanoseconds);
+  let const &before = row.history[boundary.before_index];
+  let const &after_boundary = row.history[boundary.after_index];
   let const &newest = row.history.back();
   os::process_io_status status{0, 0, 0, 0, false};
-  if (let const delta = counter_delta(before.read_bytes, newest.read_bytes);
-      delta.has_value())
-    status.read_bytes = *delta;
-  if (let const delta =
-          counter_delta(before.written_bytes, newest.written_bytes);
-      delta.has_value())
-    status.written_bytes = *delta;
-  if (before.has_operation_counts && newest.has_operation_counts) {
-    let const read_delta =
-        counter_delta(before.read_operation_count, newest.read_operation_count);
-    let const write_delta = counter_delta(before.write_operation_count,
-                                          newest.write_operation_count);
-    if (read_delta.has_value() && write_delta.has_value()) {
-      status.read_operation_count = *read_delta;
-      status.write_operation_count = *write_delta;
-      status.has_operation_counts = true;
+
+  let const get_baseline = [&](u64 before_value, u64 after_value) {
+    return interpolate_rolling_counter(
+        before_value, after_value,
+        row.history_nanoseconds[boundary.before_index],
+        row.history_nanoseconds[boundary.after_index], boundary.timestamp);
+  };
+  if (let const baseline = get_baseline(before.read_bytes,
+                                        after_boundary.read_bytes);
+      baseline.has_value()) {
+    if (let const delta = counter_delta(*baseline, newest.read_bytes);
+        delta.has_value())
+      status.read_bytes = *delta;
+  }
+  if (let const baseline = get_baseline(before.written_bytes,
+                                        after_boundary.written_bytes);
+      baseline.has_value()) {
+    if (let const delta = counter_delta(*baseline, newest.written_bytes);
+        delta.has_value())
+      status.written_bytes = *delta;
+  }
+  if (before.has_operation_counts && after_boundary.has_operation_counts &&
+      newest.has_operation_counts)
+  {
+    let const read_baseline = get_baseline(before.read_operation_count,
+                                           after_boundary.read_operation_count);
+    let const write_baseline =
+        get_baseline(before.write_operation_count,
+                     after_boundary.write_operation_count);
+    if (read_baseline.has_value() && write_baseline.has_value()) {
+      let const read_delta =
+          counter_delta(*read_baseline, newest.read_operation_count);
+      let const write_delta =
+          counter_delta(*write_baseline, newest.write_operation_count);
+      if (read_delta.has_value() && write_delta.has_value()) {
+        status.read_operation_count = *read_delta;
+        status.write_operation_count = *write_delta;
+        status.has_operation_counts = true;
+      }
     }
   }
   return status;
@@ -988,15 +1011,56 @@ struct live_disk_row
 fn make_disk_window_row(const live_disk_row &row, u64 window_start_nanoseconds,
                         Allocator allocator) throws -> disk_io_row
 {
-  let const oldest = rolling_window_baseline_index(row.history_nanoseconds,
-                                                   window_start_nanoseconds);
-  let const oldest_nanoseconds = row.history_nanoseconds[oldest];
-  let const newest_nanoseconds = row.history_nanoseconds.back();
-  let const elapsed_nanoseconds = newest_nanoseconds > oldest_nanoseconds
-                                      ? newest_nanoseconds - oldest_nanoseconds
+  let const boundary = find_rolling_window_boundary(
+      row.history_nanoseconds, window_start_nanoseconds);
+  let const &lower = row.history[boundary.before_index];
+  let const &upper = row.history[boundary.after_index];
+  let const &newest = row.history.back();
+  os::disk_io_status before{};
+  before.name = String{allocator, row.name.view()};
+  before.available_fields = lower.available_fields & upper.available_fields;
+  let const do_interpolate = [&](os::disk_io_field field,
+                                 u64 os::disk_io_status::*member) {
+    if (!lower.has_field(field) || !upper.has_field(field)) return;
+    if (let const value = interpolate_rolling_counter(
+            lower.*member, upper.*member,
+            row.history_nanoseconds[boundary.before_index],
+            row.history_nanoseconds[boundary.after_index], boundary.timestamp);
+        value.has_value())
+      before.*member = *value;
+  };
+  do_interpolate(os::disk_io_field::ReadBytes,
+                 &os::disk_io_status::read_bytes);
+  do_interpolate(os::disk_io_field::WrittenBytes,
+                 &os::disk_io_status::written_bytes);
+  do_interpolate(os::disk_io_field::ReadOperations,
+                 &os::disk_io_status::read_operation_count);
+  do_interpolate(os::disk_io_field::WriteOperations,
+                 &os::disk_io_status::write_operation_count);
+  do_interpolate(os::disk_io_field::ReadTime,
+                 &os::disk_io_status::read_time_nanoseconds);
+  do_interpolate(os::disk_io_field::WriteTime,
+                 &os::disk_io_status::write_time_nanoseconds);
+  do_interpolate(os::disk_io_field::BusyTime,
+                 &os::disk_io_status::busy_time_nanoseconds);
+  do_interpolate(os::disk_io_field::IdleTime,
+                 &os::disk_io_status::idle_time_nanoseconds);
+  do_interpolate(os::disk_io_field::WeightedBusyTime,
+                 &os::disk_io_status::weighted_busy_time_nanoseconds);
+  do_interpolate(os::disk_io_field::ReadErrors,
+                 &os::disk_io_status::read_error_count);
+  do_interpolate(os::disk_io_field::WriteErrors,
+                 &os::disk_io_status::write_error_count);
+  do_interpolate(os::disk_io_field::ReadRetries,
+                 &os::disk_io_status::read_retry_count);
+  do_interpolate(os::disk_io_field::WriteRetries,
+                 &os::disk_io_status::write_retry_count);
+  let const elapsed_nanoseconds = row.history_nanoseconds.back() >
+                                          boundary.timestamp
+                                      ? row.history_nanoseconds.back() -
+                                            boundary.timestamp
                                       : 0;
-  return make_disk_io_row(&row.history[oldest], row.history.back(),
-                          elapsed_nanoseconds, allocator,
+  return make_disk_io_row(&before, newest, elapsed_nanoseconds, allocator,
                           report_sampling_mode::Rolling);
 }
 
@@ -1370,7 +1434,7 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   }
   let const sample_duration_seconds = FLAG_EVILIO_CUMULATIVE.is_enabled()
                                           ? cumulative_duration_seconds
-                                          : live_interval_seconds;
+                                          : 1.0;
   String sample_duration_label{allocator, "/S"};
   if (FLAG_EVILIO_CUMULATIVE.is_enabled() || FLAG_EVILIO_LIVE.is_enabled())
     sample_duration_label =

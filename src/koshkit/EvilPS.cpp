@@ -146,21 +146,24 @@ fn set_cpu_percentage(tree_node &node, const live_process_cpu_row &history,
 {
   if (history.history_nanoseconds.count() < 2) return;
 
-  let const oldest = rolling_window_baseline_index(history.history_nanoseconds,
-                                                   window_start_nanoseconds);
-  let const baseline_milliseconds = history.history_milliseconds[oldest];
-  let const baseline_nanoseconds = history.history_nanoseconds[oldest];
+  let const boundary = find_rolling_window_boundary(
+      history.history_nanoseconds, window_start_nanoseconds);
+  let const baseline = interpolate_rolling_counter(
+      history.history_milliseconds[boundary.before_index],
+      history.history_milliseconds[boundary.after_index],
+      history.history_nanoseconds[boundary.before_index],
+      history.history_nanoseconds[boundary.after_index], boundary.timestamp);
+  if (!baseline.has_value()) return;
 
   let const current_milliseconds = history.history_milliseconds.back();
-  if (current_milliseconds < baseline_milliseconds ||
-      now_nanoseconds <= baseline_nanoseconds)
+  if (current_milliseconds < *baseline || now_nanoseconds <= boundary.timestamp)
   {
     return;
   }
 
   node.cpu_percentage_hundredths = static_cast<u64>(
-      static_cast<u128>(current_milliseconds - baseline_milliseconds) *
-      10000000000ULL / (now_nanoseconds - baseline_nanoseconds));
+      static_cast<u128>(current_milliseconds - *baseline) *
+      10000000000ULL / (now_nanoseconds - boundary.timestamp));
   node.has_cpu_percentage = true;
 }
 
@@ -859,9 +862,6 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
       return 1;
     }
   }
-  if (FLAG_EVILPS_LIVE.is_enabled() && !FLAG_EVILPS_CUMULATIVE.is_enabled())
-    cumulative_interval_seconds = live_interval_seconds;
-
   let line_width_limit = SIZE_MAX;
   if (!FLAG_EVILPS_WIDE.is_enabled()) {
     if (let const dimensions =

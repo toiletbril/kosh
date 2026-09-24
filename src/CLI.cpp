@@ -1489,15 +1489,40 @@ fn format_live_duration(f64 seconds, Allocator allocator) throws -> String
   return result;
 }
 
-pure fn rolling_window_baseline_index(const ArrayList<u64> &timestamps,
-                                      u64 window_start) wontthrow -> usize
+pure fn find_rolling_window_boundary(const ArrayList<u64> &timestamps,
+                                     u64 window_start) wontthrow
+    -> rolling_window_boundary
 {
-  usize baseline = 0;
-  while (baseline + 1 < timestamps.count() &&
-         timestamps[baseline + 1] <= window_start)
-    baseline++;
+  ASSERT(!timestamps.is_empty());
+  if (window_start <= timestamps[0])
+    return {0, 0, timestamps[0]};
 
-  return baseline;
+  usize before = 0;
+  while (before + 1 < timestamps.count() &&
+         timestamps[before + 1] <= window_start)
+    before++;
+
+  if (before + 1 == timestamps.count())
+    return {before, before, timestamps[before]};
+
+  return {before, before + 1, window_start};
+}
+
+pure fn interpolate_rolling_counter(u64 before, u64 after,
+                                    u64 before_timestamp,
+                                    u64 after_timestamp,
+                                    u64 target_timestamp) wontthrow
+    -> Maybe<u64>
+{
+  if (after < before) return None;
+  if (target_timestamp <= before_timestamp) return before;
+  if (target_timestamp >= after_timestamp) return after;
+  if (after_timestamp <= before_timestamp) return before;
+
+  let const elapsed = after_timestamp - before_timestamp;
+  let const passed = target_timestamp - before_timestamp;
+  return before + static_cast<u64>(static_cast<u128>(after - before) * passed /
+                                   elapsed);
 }
 
 cold fn make_flag_help(const FlagList &flags, bool should_color) throws

@@ -467,8 +467,22 @@ fn append_live_controls_bar(String &output, StringView sample_label,
                             StringView refresh_label, bool should_color) throws
     -> void;
 fn format_live_duration(f64 seconds, Allocator allocator) throws -> String;
-pure fn rolling_window_baseline_index(const ArrayList<u64> &timestamps,
-                                      u64 window_start) wontthrow -> usize;
+
+struct rolling_window_boundary
+{
+  usize before_index{0};
+  usize after_index{0};
+  u64 timestamp{0};
+};
+
+pure fn find_rolling_window_boundary(const ArrayList<u64> &timestamps,
+                                     u64 window_start) wontthrow
+    -> rolling_window_boundary;
+pure fn interpolate_rolling_counter(u64 before, u64 after,
+                                    u64 before_timestamp,
+                                    u64 after_timestamp,
+                                    u64 target_timestamp) wontthrow
+    -> Maybe<u64>;
 
 fn show_message(StringView err) throws -> void;
 fn show_warning(StringView warning) throws -> void;
