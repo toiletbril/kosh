@@ -433,7 +433,7 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
   root_statuses.reserve(roots.count());
   batch.reserve(roots.count());
   for (let const &root : roots) {
-    root_paths.push(Path{root});
+    root_paths.push(Path{root, allocator});
     root_statuses.push({});
   }
   for (usize root_index = 0; root_index < roots.count(); root_index++) {

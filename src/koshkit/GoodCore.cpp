@@ -123,7 +123,8 @@ fn append_unique_path(ArrayList<String> &paths, StringView path,
     if (existing.view() == path) return;
   }
 
-  if (Path{path}.is_regular_file()) paths.push(String{allocator, path});
+  if (Path{path, allocator}.is_regular_file())
+    paths.push(String{allocator, path});
 }
 
 fn collect_paths_from_output(StringView output, ArrayList<String> &paths,
