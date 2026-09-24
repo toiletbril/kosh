@@ -101,7 +101,9 @@ fn Chown::execute(const ExecContext &ec, EvalContext &cxt,
   for (usize index = 1; index < operands.count(); index++) {
     if (os::INTERRUPT_REQUESTED) return 130;
     if (!utils::change_path_ownership(
-            ec, cxt, "chown", Path{operands[index].view()}, owner_id, group_id,
+            ec, cxt, "chown",
+            Path{operands[index].view(), cxt.scratch_allocator()}, owner_id,
+            group_id,
             FLAG_CHOWN_RECURSIVE.is_enabled(),
             FLAG_CHOWN_NO_DEREFERENCE.is_enabled(),
             FLAG_CHOWN_COMMAND_LINE_FOLLOW.position(),

@@ -288,7 +288,7 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
       continue;
     }
 
-    let const target = Path{operand.view()};
+    let const target = Path{operand.view(), allocator};
     if (!target.exists() && !target.is_symbolic_link()) {
       if (should_force) continue;
       report_soft_koshkit_util_error(ec, cxt, args[0].view(),
