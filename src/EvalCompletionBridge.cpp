@@ -157,9 +157,8 @@ fn EvalContext::run_completion_function(StringView function_name,
   set_terminal_exec_allowed(false);
   defer { set_terminal_exec_allowed(saved_terminal_exec); };
 
-  let const previous_function_arena = FUNCTION_ARENA;
-  FUNCTION_ARENA = body_storage.get_arena();
-  defer { FUNCTION_ARENA = previous_function_arena; };
+  let const function_arena_scope =
+      FunctionArenaScope{body_storage.get_arena()};
 
   /* A completion function that errors must not abort the prompt, so any error
      is swallowed and a stray break or return is consumed. */

@@ -321,9 +321,8 @@ fn EvalContext::cached_trap_body(StringView condition, StringView action) throws
   let const *stored_action = body_storage.get_source();
   ASSERT(stored_action != nullptr);
 
-  let const previous_function_arena = FUNCTION_ARENA;
-  FUNCTION_ARENA = body_storage.get_arena();
-  defer { FUNCTION_ARENA = previous_function_arena; };
+  let const function_arena_scope =
+      FunctionArenaScope{body_storage.get_arena()};
 
   let parser = Parser{
       Lexer{stored_action->view(), *body_storage.get_arena(), false, None,

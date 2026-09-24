@@ -180,6 +180,26 @@ extern BumpArena *AST_ARENA;
    that defined it, so it is parsed here instead of the per-command arena. */
 extern BumpArena *FUNCTION_ARENA;
 
+/* Temporarily selects the function-body arena for allocations and restores the
+ * previous selection when the owning operation leaves scope. */
+class FunctionArenaScope
+{
+public:
+  explicit FunctionArenaScope(BumpArena *arena)
+      : m_previous(FUNCTION_ARENA)
+  {
+    FUNCTION_ARENA = arena;
+  }
+
+  ~FunctionArenaScope() { FUNCTION_ARENA = m_previous; }
+
+  FunctionArenaScope(const FunctionArenaScope &) = delete;
+  FunctionArenaScope &operator=(const FunctionArenaScope &) = delete;
+
+private:
+  BumpArena *m_previous;
+};
+
 fn is_arena_pointer(const opaque *pointer) wontthrow -> bool;
 
 } /* namespace koshka */
