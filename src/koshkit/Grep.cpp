@@ -219,10 +219,10 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   os::compiled_regex compiled;
   if (!should_use_literal_search) {
     if (os::compile_search_regex(
-            pattern,
+            pattern, compiled,
             should_ignore_case ? os::case_sensitivity::Insensitive
-                               : os::case_sensitivity::Sensitive,
-            compiled) != os::regex_compile_result::Ok) {
+                               : os::case_sensitivity::Sensitive) !=
+        os::regex_compile_result::Ok) {
       report_soft_koshkit_util_error(
           ec, cxt, operand_locations[0], args[0].view(),
           "the pattern '" + operands[0] + "' is not a valid regex");

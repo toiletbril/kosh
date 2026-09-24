@@ -201,9 +201,9 @@ private:
       String anchored{m_allocator, "^"};
       anchored += pattern.view();
       os::compiled_regex compiled;
-      if (os::compile_basic_regex(anchored.view(),
-                                  os::case_sensitivity::Sensitive,
-                                  compiled) != os::regex_compile_result::Ok)
+      if (os::compile_basic_regex(anchored.view(), compiled,
+                                  os::case_sensitivity::Sensitive) !=
+          os::regex_compile_result::Ok)
       {
         throw ErrorWithLocationAndDetails{
             m_token_locations[pattern_position], "invalid regular expression",

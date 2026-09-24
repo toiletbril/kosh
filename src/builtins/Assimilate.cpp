@@ -383,7 +383,8 @@ fn run_program(const ArrayList<String> &arguments, const ExecContext &ec,
                trace_output trace, StringView stage) throws -> i32
 {
   trace_stage(ec, trace, stage);
-  let const result = os::run_measured(arguments, os::measured_output::Inherit);
+  let const result =
+      os::run_measured(arguments, {}, os::measured_output::Inherit);
   if (!result.has_value()) return 126;
 
   return static_cast<i32>(result->exit_status);

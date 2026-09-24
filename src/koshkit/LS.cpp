@@ -734,7 +734,8 @@ static fn resolve_depth_limit(const ExecContext &ec, EvalContext &cxt,
   if (!FLAG_LS_LEVEL.is_set()) return true;
 
   let const parsed =
-      utils::parse_integer_in_base(FLAG_LS_LEVEL.value(), int_base::decimal);
+      utils::parse_integer_in_base(FLAG_LS_LEVEL.value(), nullptr,
+                                   int_base::decimal);
   if (parsed.is_error() || parsed.value() < 1) {
     report_soft_koshkit_util_error(
         ec, cxt, utility_name,

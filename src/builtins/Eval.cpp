@@ -70,8 +70,9 @@ fn Eval::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   LOG(Debug, "eval running %zu joined bytes in the current shell",
       joined.length());
 
-  return cxt.run_source(joined, "eval", return_handling::Propagate,
-                        ec.source_location(), StringView{"eval"});
+  return cxt.run_source(joined, "eval", ec.source_location(),
+                        StringView{"eval"}, nullptr, nullptr,
+                        return_handling::Propagate);
 }
 
 } /* namespace koshka */

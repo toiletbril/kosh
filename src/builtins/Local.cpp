@@ -131,8 +131,12 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                    : arg.view();
     /* process_args passes a local append through as name+=value, so a trailing
        plus on the name marks the append and is stripped before the binding. */
-    let const is_append = !name.is_empty() && name[name.count() - 1] == '+';
-    if (is_append) name = name.substring_of_length(0, name.count() - 1);
+    let const update_mode =
+        !name.is_empty() && name[name.count() - 1] == '+'
+            ? assignment_update_mode::Append
+            : assignment_update_mode::Replace;
+    if (update_mode == assignment_update_mode::Append)
+      name = name.substring_of_length(0, name.count() - 1);
 
     let identifier = name;
     if (let const bracket = identifier.find_character('[');
@@ -175,7 +179,8 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
        this scope, so a first local += starts from empty the way bash localizes
        it fresh. */
     let const was_already_local =
-        is_append && cxt.is_local_in_current_scope(name);
+        update_mode == assignment_update_mode::Append &&
+        cxt.is_local_in_current_scope(name);
     LOG(All, "local declaring '%.*s' in the function scope",
         static_cast<int>(name.length), name.data);
     cxt.declare_local(
@@ -199,7 +204,7 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         cxt.set_indexed_array(name, ArrayList<String>{heap_allocator()});
     } else if (equals_position.has_value()) {
       let const value = arg.substring(*equals_position + 1);
-      if (is_append) {
+      if (update_mode == assignment_update_mode::Append) {
         let appended = String{cxt.scratch_allocator()};
         if (was_already_local)
           if (let const existing = cxt.get_variable_value(name))

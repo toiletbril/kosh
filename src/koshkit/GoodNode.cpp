@@ -36,6 +36,12 @@ namespace koshka::koshkit {
 
 namespace {
 
+enum class goodnode_verification_mode : u8
+{
+  Skip,
+  Verify,
+};
+
 fn file_crc32c(const ExecContext &ec, StringView path,
                Allocator allocator) throws -> Maybe<String>
 {
@@ -88,7 +94,8 @@ fn filesystem_features(StringView filesystem_type) throws -> Maybe<StringView>
 
 fn append_node_report(String &output, const ExecContext &ec, StringView path,
                       const os::file_status &status, bool should_color,
-                      bool should_verify, Allocator allocator) throws -> void
+                      Allocator allocator,
+                      goodnode_verification_mode verification) throws -> void
 {
   append_report_text(output, path, colors::ansi::BOLD_BLUE, should_color);
   output += '\n';
@@ -169,7 +176,7 @@ fn append_node_report(String &output, const ExecContext &ec, StringView path,
     do_append_field("Integrity", "not verified");
   }
 
-  if (should_verify) {
+  if (verification == goodnode_verification_mode::Verify) {
     constexpr u64 VERIFICATION_TIMEOUT_NANOSECONDS = 300'000'000'000;
     let verification = StringView{"unavailable"};
     switch (os::verify_filesystem_integrity(
@@ -276,8 +283,8 @@ fn GoodNode::execute(
   }
 
   if (FLAG_GOODNODE_INODE.is_set()) {
-    let const parsed = utils::parse_integer_in_base(FLAG_GOODNODE_INODE.value(),
-                                                    int_base::decimal);
+    let const parsed = utils::parse_integer_in_base(
+        FLAG_GOODNODE_INODE.value(), nullptr, int_base::decimal);
     if (parsed.is_error() || parsed.value() < 0) {
       KOSHKIT_REPORT_ERROR_AT(FLAG_GOODNODE_INODE.value_location(),
                               "invalid inode",
@@ -329,7 +336,9 @@ fn GoodNode::execute(
   }
 
   let const should_color = koshkit_should_color();
-  let const should_verify = FLAG_GOODNODE_VERIFY.is_enabled();
+  let const verification = FLAG_GOODNODE_VERIFY.is_enabled()
+                               ? goodnode_verification_mode::Verify
+                               : goodnode_verification_mode::Skip;
 
   let output = String{allocator};
   i32 exit_status = 0;
@@ -361,7 +370,7 @@ fn GoodNode::execute(
 
     if (!output.is_empty()) output += '\n';
     append_node_report(output, ec, path.view(), report_statuses[index],
-                       should_color, should_verify, allocator);
+                       should_color, allocator, verification);
     if (os::INTERRUPT_REQUESTED) return 130;
   }
 

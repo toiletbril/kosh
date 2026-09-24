@@ -284,9 +284,9 @@ static fn make_analysis_source(StringView host_source, usize host_start,
 
 fn parser_format_add_fragment(parsed_format_document &document,
                               StringView host_source, usize host_start,
-                              usize host_end, mimic_mood mood,
-                              parser_format_codec codec, usize indent_length,
-                              Maybe<String> prepared_analysis_source) throws
+                              usize host_end, usize indent_length,
+                              Maybe<String> prepared_analysis_source,
+                              parser_format_codec codec, mimic_mood mood) throws
     -> void
 {
   if (host_start >= host_end || host_end > host_source.length) return;
@@ -313,8 +313,9 @@ fn parser_format_add_indented_fragment(parsed_format_document &document,
                                        usize host_end, usize indent_length,
                                        mimic_mood mood) throws -> void
 {
-  parser_format_add_fragment(document, host_source, host_start, host_end, mood,
-                             parser_format_codec::Indented, indent_length);
+  parser_format_add_fragment(document, host_source, host_start, host_end,
+                             indent_length, None,
+                             parser_format_codec::Indented, mood);
   if (document.fragments.is_empty()) return;
 
   let &fragment = document.fragments.back();
@@ -503,13 +504,15 @@ static fn add_yaml_inline_fragment(parsed_format_document &document,
     start++;
     end--;
   }
-  parser_format_add_fragment(document, source, start, end, mood, codec);
+  parser_format_add_fragment(document, source, start, end, 0, None, codec,
+                             mood);
 }
 
 fn parser_format_extract_yaml_keys(parsed_format_document &document,
                                    StringView source, const StringView *keys,
-                                   usize key_count, mimic_mood default_mood,
-                                   bool should_select_workflow_shell) throws
+                                   usize key_count,
+                                   mimic_mood default_mood,
+                                   yaml_shell_selection selection) throws
     -> void
 {
   usize position = 0;
@@ -519,7 +522,7 @@ fn parser_format_extract_yaml_keys(parsed_format_document &document,
     usize content_position = 0;
     if (!yaml_key_match(line, keys, key_count, content_position)) continue;
     let const mood =
-        should_select_workflow_shell
+        selection == yaml_shell_selection::Workflow
             ? selected_workflow_mood(source, line_start, line, default_mood)
             : Maybe<mimic_mood>{mood_near(source, line_start, default_mood)};
     if (!mood.has_value()) continue;
@@ -580,8 +583,8 @@ fn parser_format_add_json_fragment(parsed_format_document &document,
                                    mimic_mood mood) throws -> void
 {
   if (start >= end) return;
-  parser_format_add_fragment(document, source, start, end, mood,
-                             parser_format_codec::JsonString);
+  parser_format_add_fragment(document, source, start, end, 0, None,
+                             parser_format_codec::JsonString, mood);
   if (document.fragments.is_empty()) return;
   let &fragment = document.fragments.back();
   let decoded = String{heap_allocator()};

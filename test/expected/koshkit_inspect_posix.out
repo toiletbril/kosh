@@ -76,11 +76,17 @@
   [CompoundListCondition, None]
     [SimpleCommand "printf" "%s\n" "9000 string MARK far-string"]
   [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "head" "-c" "9000" "/dev/zero"]
+    [Pipeline]
+      [SimpleCommand "koshkit" "yes" "A"]
+      [SimpleCommand "koshkit" "tr" "-d" "\n"]
+      [SimpleCommand "koshkit" "head" "-c" "9000"]
   [CompoundListCondition, None]
     [SimpleCommand "printf" "MARK"]
   [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "head" "-c" "9000" "/dev/zero"]
+    [Pipeline]
+      [SimpleCommand "koshkit" "yes" "A"]
+      [SimpleCommand "koshkit" "tr" "-d" "\n"]
+      [SimpleCommand "koshkit" "head" "-c" "9000"]
   [CompoundListCondition, None]
     [SimpleCommand "printf" "MAR"]
   [CompoundListCondition, None]
@@ -88,7 +94,10 @@
   [CompoundListCondition, None]
     [SimpleCommand "printf" "%s\n" "10000 uC 7 far-number"]
   [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "head" "-c" "10000" "/dev/zero"]
+    [Pipeline]
+      [SimpleCommand "koshkit" "yes" "A"]
+      [SimpleCommand "koshkit" "tr" "-d" "\n"]
+      [SimpleCommand "koshkit" "head" "-c" "10000"]
   [CompoundListCondition, None]
     [SimpleCommand "printf" "\007"]
   [CompoundListCondition, None]
@@ -99,16 +108,25 @@
     [SimpleCommand "printf" "%s\n" "65534 string A end-65535" "65535 string B end-65536" "65536 string C end-65537"]
   [CompoundListCondition, None]
     [Pipeline]
-      [SimpleCommand "printf" "A"]
-      [SimpleCommand "dd" "of=magic-end-65535" "bs=1" "seek=65534"]
+      [SimpleCommand "koshkit" "yes" "X"]
+      [SimpleCommand "koshkit" "tr" "-d" "\n"]
+      [SimpleCommand "koshkit" "head" "-c" "65534"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "A"]
   [CompoundListCondition, None]
     [Pipeline]
-      [SimpleCommand "printf" "B"]
-      [SimpleCommand "dd" "of=magic-end-65536" "bs=1" "seek=65535"]
+      [SimpleCommand "koshkit" "yes" "X"]
+      [SimpleCommand "koshkit" "tr" "-d" "\n"]
+      [SimpleCommand "koshkit" "head" "-c" "65535"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "B"]
   [CompoundListCondition, None]
     [Pipeline]
-      [SimpleCommand "printf" "C"]
-      [SimpleCommand "dd" "of=magic-end-65537" "bs=1" "seek=65536"]
+      [SimpleCommand "koshkit" "yes" "X"]
+      [SimpleCommand "koshkit" "tr" "-d" "\n"]
+      [SimpleCommand "koshkit" "head" "-c" "65536"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "C"]
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "file" "-M" "magic-boundaries" "magic-end-65535" "magic-end-65536" "magic-end-65537"]
   [CompoundListCondition, None]
@@ -117,18 +135,13 @@
     [SimpleCommand "printf" "M"]
   [CompoundListCondition, None]
     [Pipeline]
-      [SimpleCommand "printf" "Z"]
-      [SimpleCommand "dd" "of=magic-continuation-data" "bs=1" "seek=70000" "conv=notrunc"]
+      [SimpleCommand "koshkit" "yes" "X"]
+      [SimpleCommand "koshkit" "tr" "-d" "\n"]
+      [SimpleCommand "koshkit" "head" "-c" "69999"]
+  [CompoundListCondition, None]
+    [SimpleCommand "printf" "Z"]
   [CompoundListCondition, None]
     [SimpleCommand "koshkit" "file" "-M" "magic-far-continuation" "magic-continuation-data"]
-  [CompoundListCondition, None]
-    [SimpleCommand "dd" "if=/dev/zero" "of=magic-sparse" "bs=1" "count=1" "seek=1073741823"]
-  [CompoundListCondition, None]
-    [Pipeline]
-      [SimpleCommand "printf" "MARK"]
-      [SimpleCommand "dd" "of=magic-sparse" "bs=1" "seek=9000" "conv=notrunc"]
-  [CompoundListCondition, None]
-    [SimpleCommand "koshkit" "file" "-M" "magic-far" "magic-sparse"]
   [CompoundListCondition, None]
     [SimpleCommand "printf" "%s\n" "9000 string Z far-no-match"]
   [CompoundListCondition, None]
@@ -734,6 +747,27 @@ flash|FWS]
   Unquoted "koshkit"
 ]
 [Word
+  Unquoted "yes"
+]
+[Word
+  Unquoted "A"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "tr"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Literal "\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
   Unquoted "head"
 ]
 [Word
@@ -741,9 +775,6 @@ flash|FWS]
 ]
 [Word
   Unquoted "9000"
-]
-[Word
-  Unquoted "/dev/zero"
 ]
 [Word
   Unquoted "magic-far-exact"
@@ -761,6 +792,27 @@ flash|FWS]
   Unquoted "koshkit"
 ]
 [Word
+  Unquoted "yes"
+]
+[Word
+  Unquoted "A"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "tr"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Literal "\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
   Unquoted "head"
 ]
 [Word
@@ -768,9 +820,6 @@ flash|FWS]
 ]
 [Word
   Unquoted "9000"
-]
-[Word
-  Unquoted "/dev/zero"
 ]
 [Word
   Unquoted "magic-far-short"
@@ -818,6 +867,27 @@ flash|FWS]
   Unquoted "koshkit"
 ]
 [Word
+  Unquoted "yes"
+]
+[Word
+  Unquoted "A"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "tr"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Literal "\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
   Unquoted "head"
 ]
 [Word
@@ -825,9 +895,6 @@ flash|FWS]
 ]
 [Word
   Unquoted "10000"
-]
-[Word
-  Unquoted "/dev/zero"
 ]
 [Word
   Unquoted "magic-number-data"
@@ -890,28 +957,85 @@ flash|FWS]
   Unquoted "magic-boundaries"
 ]
 [Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "yes"
+]
+[Word
+  Unquoted "X"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "tr"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Literal "\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "head"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "65534"
+]
+[Word
+  Unquoted "magic-end-65535"
+]
+[Word
   Unquoted "printf"
 ]
 [Word
   Unquoted "A"
 ]
 [Word
-  Unquoted "dd"
+  Unquoted "magic-end-65535"
 ]
 [Word
-  Unquoted "of=magic-end-65535"
+  Unquoted "koshkit"
 ]
 [Word
-  Unquoted "bs=1"
+  Unquoted "yes"
 ]
 [Word
-  Unquoted "seek=65534"
+  Unquoted "X"
 ]
 [Word
-  Unquoted "2"
+  Unquoted "koshkit"
 ]
 [Word
-  Variable "TEST_NULL_DEVICE"
+  Unquoted "tr"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Literal "\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "head"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "65535"
+]
+[Word
+  Unquoted "magic-end-65536"
 ]
 [Word
   Unquoted "printf"
@@ -920,22 +1044,43 @@ flash|FWS]
   Unquoted "B"
 ]
 [Word
-  Unquoted "dd"
+  Unquoted "magic-end-65536"
 ]
 [Word
-  Unquoted "of=magic-end-65536"
+  Unquoted "koshkit"
 ]
 [Word
-  Unquoted "bs=1"
+  Unquoted "yes"
 ]
 [Word
-  Unquoted "seek=65535"
+  Unquoted "X"
 ]
 [Word
-  Unquoted "2"
+  Unquoted "koshkit"
 ]
 [Word
-  Variable "TEST_NULL_DEVICE"
+  Unquoted "tr"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Literal "\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "head"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "65536"
+]
+[Word
+  Unquoted "magic-end-65537"
 ]
 [Word
   Unquoted "printf"
@@ -944,22 +1089,7 @@ flash|FWS]
   Unquoted "C"
 ]
 [Word
-  Unquoted "dd"
-]
-[Word
-  Unquoted "of=magic-end-65537"
-]
-[Word
-  Unquoted "bs=1"
-]
-[Word
-  Unquoted "seek=65536"
-]
-[Word
-  Unquoted "2"
-]
-[Word
-  Variable "TEST_NULL_DEVICE"
+  Unquoted "magic-end-65537"
 ]
 [Word
   Unquoted "koshkit"
@@ -1007,31 +1137,49 @@ flash|FWS]
   Unquoted "magic-continuation-data"
 ]
 [Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "yes"
+]
+[Word
+  Unquoted "X"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "tr"
+]
+[Word
+  Unquoted "-d"
+]
+[Word
+  Literal "\n"
+]
+[Word
+  Unquoted "koshkit"
+]
+[Word
+  Unquoted "head"
+]
+[Word
+  Unquoted "-c"
+]
+[Word
+  Unquoted "69999"
+]
+[Word
+  Unquoted "magic-continuation-data"
+]
+[Word
   Unquoted "printf"
 ]
 [Word
   Unquoted "Z"
 ]
 [Word
-  Unquoted "dd"
-]
-[Word
-  Unquoted "of=magic-continuation-data"
-]
-[Word
-  Unquoted "bs=1"
-]
-[Word
-  Unquoted "seek=70000"
-]
-[Word
-  Unquoted "conv=notrunc"
-]
-[Word
-  Unquoted "2"
-]
-[Word
-  Variable "TEST_NULL_DEVICE"
+  Unquoted "magic-continuation-data"
 ]
 [Word
   Unquoted "koshkit"
@@ -1047,72 +1195,6 @@ flash|FWS]
 ]
 [Word
   Unquoted "magic-continuation-data"
-]
-[Word
-  Unquoted "dd"
-]
-[Word
-  Unquoted "if=/dev/zero"
-]
-[Word
-  Unquoted "of=magic-sparse"
-]
-[Word
-  Unquoted "bs=1"
-]
-[Word
-  Unquoted "count=1"
-]
-[Word
-  Unquoted "seek=1073741823"
-]
-[Word
-  Unquoted "2"
-]
-[Word
-  Variable "TEST_NULL_DEVICE"
-]
-[Word
-  Unquoted "printf"
-]
-[Word
-  Unquoted "MARK"
-]
-[Word
-  Unquoted "dd"
-]
-[Word
-  Unquoted "of=magic-sparse"
-]
-[Word
-  Unquoted "bs=1"
-]
-[Word
-  Unquoted "seek=9000"
-]
-[Word
-  Unquoted "conv=notrunc"
-]
-[Word
-  Unquoted "2"
-]
-[Word
-  Variable "TEST_NULL_DEVICE"
-]
-[Word
-  Unquoted "koshkit"
-]
-[Word
-  Unquoted "file"
-]
-[Word
-  Unquoted "-M"
-]
-[Word
-  Unquoted "magic-far"
-]
-[Word
-  Unquoted "magic-sparse"
 ]
 [Word
   Unquoted "printf"
@@ -2175,7 +2257,6 @@ magic-end-65535: end-65535
 magic-end-65536: end-65536
 magic-end-65537: end-65537
 magic-continuation-data: parent child
-magic-sparse: far-string
 magic-default-data: text
 magic-m-option: batch-match
 magic-probe-01: batch-match

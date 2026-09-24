@@ -343,13 +343,13 @@ pure fn smart_case_prefix_matches(StringView candidate,
 
 hot flatten fn glob_matches(StringView glob, StringView str,
                             const Bitset &glob_active, usize mask_offset,
-                            bool extglob) throws -> bool
+                            extglob_mode mode) throws -> bool
 {
   /* The extended-glob grammar needs backtracking over alternatives and
      repetition, so it runs in a separate recursive matcher. It is taken only
      when extglob is on and the pattern actually holds a group, so a plain glob
      keeps the iterative matcher below, unchanged, and pays nothing. */
-  if (extglob) {
+  if (mode == extglob_mode::Enabled) {
     for (usize i = 0; i + 1 < glob.count(); i++) {
       let const c = glob[i];
       if ((c == '?' || c == '*' || c == '+' || c == '@' || c == '!') &&

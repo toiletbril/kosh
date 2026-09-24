@@ -251,10 +251,10 @@ static fn format_time_report_custom(StringView format, double real_seconds,
   return report;
 }
 
-fn format_time_report(time_report_layout layout, bool should_report_rss,
-                      const Maybe<String> &time_format, double real_seconds,
+fn format_time_report(const Maybe<String> &time_format, double real_seconds,
                       double user_seconds, double system_seconds,
-                      u64 peak_rss_bytes) throws -> String
+                      u64 peak_rss_bytes, time_report_layout layout,
+                      time_report_rss rss) throws -> String
 {
   let report = String{heap_allocator()};
   let const should_use_pretty_format =
@@ -276,7 +276,9 @@ fn format_time_report(time_report_layout layout, bool should_report_rss,
         format_time_report_pretty(real_seconds, user_seconds, system_seconds);
   }
 
-  if (should_report_rss || (should_use_pretty_format && peak_rss_bytes > 0)) {
+  if (rss == time_report_rss::Include ||
+      (should_use_pretty_format && peak_rss_bytes > 0))
+  {
     switch (layout) {
     case time_report_layout::Bash: report += "rss\t"; break;
     case time_report_layout::Posix: report += "rss "; break;
@@ -608,8 +610,8 @@ static fn parse_magnitude_in_base(StringView text, int_base base) throws
   return parsed_integer_magnitude{magnitude, is_negative, has_overflowed};
 }
 
-fn parse_integer_in_base(StringView text, int_base base,
-                         bool *out_of_range) throws -> ErrorOr<i64>
+fn parse_integer_in_base(StringView text, bool *out_of_range,
+                         int_base base) throws -> ErrorOr<i64>
 {
   let const parsed = TRY(parse_magnitude_in_base(text, base));
 

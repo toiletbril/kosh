@@ -17,7 +17,8 @@ fn parse_bitbucket_pipelines_format(const parser_format_input &input,
 {
   static const StringView KEYS[] = {"script", "after-script"};
   parser_format_extract_yaml_keys(document, input.source, KEYS, 2,
-                                  mimic_mood::Posix);
+                                  mimic_mood::Posix,
+                                  yaml_shell_selection::Nearby);
 }
 
 } // namespace koshka

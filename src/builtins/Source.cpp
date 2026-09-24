@@ -108,8 +108,9 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
     status =
         cxt.run_source(*contents, "the file '" + path + "'",
-                       return_handling::Consume, ec.arg_location_at(path_index),
-                       StringView{path}, false, &status_before_return);
+                       ec.arg_location_at(path_index), StringView{path},
+                       &status_before_return, nullptr,
+                       return_handling::Consume);
   }
 
   /* A sourced file runs in the current scope, and its finish fires the RETURN

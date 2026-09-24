@@ -965,7 +965,7 @@ static constexpr usize RECORDED_LITERAL_LENGTH_LIMIT = 256;
 
 fn AnalysisContext::note_variable_assignment_record(
     StringView name, const Word *value_word, const SourceLocation &location,
-    bool is_conditional, bool is_append) throws -> void
+    bool is_conditional, assignment_update_mode update_mode) throws -> void
 {
   if (name.is_empty()) return;
 
@@ -990,7 +990,7 @@ fn AnalysisContext::note_variable_assignment_record(
 
   symbol_records->assignments.push(variable_assignment_record{
       String{name}, steal(literal_value), location.position, location.length,
-      assignment_binder::Assignment, is_conditional, is_append,
+      assignment_binder::Assignment, is_conditional, update_mode,
       value_word == nullptr});
 }
 
@@ -1008,14 +1008,15 @@ fn AnalysisContext::note_variable_binding_record(StringView name,
 
   symbol_records->assignments.push(variable_assignment_record{
       String{name}, None, location.position, location.length, binder,
-      is_conditional, false, false});
+      is_conditional, assignment_update_mode::Replace, false});
 }
 
 fn AnalysisContext::note_variable_occurrence(StringView name,
                                              const SourceLocation &location,
                                              variable_occurrence_kind kind,
                                              bool is_unresolved,
-                                             bool is_append) throws -> void
+                                             assignment_update_mode update_mode)
+    throws -> void
 {
   if (name.is_empty() || location.length == 0) return;
 
@@ -1039,7 +1040,8 @@ fn AnalysisContext::note_variable_occurrence(StringView name,
                                 : usize{0};
 
   if (kind == variable_occurrence_kind::Assignment) {
-    if (is_append && symbol_records != nullptr) {
+    if (update_mode == assignment_update_mode::Append &&
+        symbol_records != nullptr) {
       let const *prior_state = variable_occurrence_assignments.find(name);
       if (prior_state == nullptr)
         prior_state = inherited_variable_occurrence_assignments.find(name);
@@ -2180,12 +2182,14 @@ pure fn Command::is_negated() const wontthrow -> bool
   return has_execution_flag(ExecutionFlag::Negated);
 }
 
-fn Command::set_timed(bool posix_format, bool should_report_rss,
-                      SourceLocation location) wontthrow -> void
+fn Command::set_timed(SourceLocation location, time_format_mode format,
+                      time_rss_mode rss) wontthrow -> void
 {
   set_execution_flag(ExecutionFlag::Timed);
-  set_execution_flag(ExecutionFlag::TimePosixFormat, posix_format);
-  set_execution_flag(ExecutionFlag::TimeReportRss, should_report_rss);
+  set_execution_flag(ExecutionFlag::TimePosixFormat,
+                     format == time_format_mode::Posix);
+  set_execution_flag(ExecutionFlag::TimeReportRss,
+                     rss == time_rss_mode::Include);
   m_time_position = location.position;
 }
 
@@ -2202,14 +2206,18 @@ pure fn Command::time_location() const wontthrow -> SourceLocation
                         source_location().source_name_index};
 }
 
-pure fn Command::time_uses_posix_format() const wontthrow -> bool
+pure fn Command::get_time_format_mode() const wontthrow -> time_format_mode
 {
-  return has_execution_flag(ExecutionFlag::TimePosixFormat);
+  return has_execution_flag(ExecutionFlag::TimePosixFormat)
+             ? time_format_mode::Posix
+             : time_format_mode::Default;
 }
 
-pure fn Command::should_time_report_rss() const wontthrow -> bool
+pure fn Command::get_time_rss_mode() const wontthrow -> time_rss_mode
 {
-  return has_execution_flag(ExecutionFlag::TimeReportRss);
+  return has_execution_flag(ExecutionFlag::TimeReportRss)
+             ? time_rss_mode::Include
+             : time_rss_mode::Omit;
 }
 
 fn Command::set_local_vars(ArrayList<PrefixAssignment> &&vars) throws -> void

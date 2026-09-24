@@ -300,12 +300,13 @@ static pure fn dynamic_reader_of(StringView name) wontthrow
 pure fn EvalContext::is_dynamic_reader_unset(StringView name) const wontthrow
     -> bool
 {
-  if (m_unset_dynamic_readers == 0) return false;
+  if (variable_store().unset_dynamic_readers() == 0) return false;
 
   let const id = dynamic_reader_of(name);
 
   return id.has_value() &&
-         (m_unset_dynamic_readers & dynamic_reader_mask(*id)) != 0;
+         (variable_store().unset_dynamic_readers() & dynamic_reader_mask(*id)) !=
+         0;
 }
 
 fn EvalContext::unset_dynamic_reader(StringView name) wontthrow -> void
@@ -315,7 +316,7 @@ fn EvalContext::unset_dynamic_reader(StringView name) wontthrow -> void
 
   LOG(Debug, "taking the dynamic reader of '%.*s' away",
       static_cast<int>(name.length), name.data);
-  m_unset_dynamic_readers |= dynamic_reader_mask(*id);
+  variable_store().unset_dynamic_readers() |= dynamic_reader_mask(*id);
 }
 
 pure fn EvalContext::is_dynamic_write_owner(StringView name) const wontthrow
@@ -326,7 +327,8 @@ pure fn EvalContext::is_dynamic_write_owner(StringView name) const wontthrow
   let const id = dynamic_reader_of(name);
 
   return id.has_value() &&
-         (m_unset_dynamic_readers & dynamic_reader_mask(*id)) == 0;
+         (variable_store().unset_dynamic_readers() & dynamic_reader_mask(*id)) ==
+         0;
 }
 
 hot fn EvalContext::write_dynamic_variable(StringView name,
@@ -336,7 +338,9 @@ hot fn EvalContext::write_dynamic_variable(StringView name,
 
   let const id = dynamic_reader_of(name);
   if (!id.has_value()) return false;
-  if ((m_unset_dynamic_readers & dynamic_reader_mask(*id)) != 0) return false;
+  if ((variable_store().unset_dynamic_readers() & dynamic_reader_mask(*id)) !=
+      0)
+    return false;
   /* A local declaration turns the name into an ordinary frozen variable for the
      length of the call, and the outer state keeps moving underneath it. */
   if (is_local_in_any_active_scope(name)) return false;
@@ -430,7 +434,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     }
   }
 
-  if (let const *stored = m_shell_variables.find(name); stored != nullptr)
+  if (let const *stored = m_variable_store.shell_variables().find(name);
+      stored != nullptr)
     return *stored;
 
   /* A read of an array name with no scalar yields element zero, the way bash
@@ -462,7 +467,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
           return String::from(*trigger_line, heap_allocator());
         }
 
-        return String::from(line_number_at_location(m_current_location),
+        return String::from(line_number_at_location(source_store().m_current_location),
                             heap_allocator());
       }
       case dynamic_var::KOSH_GIT_BRANCH: {

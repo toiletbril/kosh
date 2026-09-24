@@ -527,8 +527,8 @@ hot fn Parser::parse_command_list(u64 terminator_mask) throws -> Expression *
   bool should_parse_command = true;
   bool should_negate_pending = false;
   bool should_time_pending = false;
-  bool is_time_posix_format = false;
-  bool should_time_report_rss = false;
+  time_format_mode time_format = time_format_mode::Default;
+  time_rss_mode time_rss = time_rss_mode::Omit;
   SourceLocation time_location{};
   Maybe<usize> active_shellcheck_suppression{};
 
@@ -545,11 +545,10 @@ hot fn Parser::parse_command_list(u64 terminator_mask) throws -> Expression *
       should_negate_pending = false;
     }
     if (should_time_pending) {
-      pending->set_timed(is_time_posix_format, should_time_report_rss,
-                         time_location);
+      pending->set_timed(time_location, time_format, time_rss);
       should_time_pending = false;
-      is_time_posix_format = false;
-      should_time_report_rss = false;
+      time_format = time_format_mode::Default;
+      time_rss = time_rss_mode::Omit;
     }
     compound_list->append_node(m_lexer.arena().create<CompoundListCondition>(
         at->source_location(), next_cond, pending));
@@ -621,9 +620,9 @@ hot fn Parser::parse_command_list(u64 terminator_mask) throws -> Expression *
             if (is_unquoted_word(maybe_option, "-p") ||
                 is_unquoted_word(maybe_option, "--posix"))
             {
-              is_time_posix_format = true;
+              time_format = time_format_mode::Posix;
             } else if (is_unquoted_word(maybe_option, "-R")) {
-              should_time_report_rss = true;
+              time_rss = time_rss_mode::Include;
             } else {
               break;
             }
@@ -941,12 +940,14 @@ fn Parser::build_file_or_dup_redirection(
 }
 
 fn Parser::build_both_streams_redirection(
-    bool is_append, const SourceLocation &op_location,
-    Maybe<SourceLocation> &first_location,
-    ArrayList<expressions::Redirection> &out) throws -> void
+    const SourceLocation &op_location, Maybe<SourceLocation> &first_location,
+    ArrayList<expressions::Redirection> &out,
+    assignment_update_mode update_mode) throws -> void
 {
   build_file_or_dup_redirection(
-      1, is_append ? Token::Kind::DoubleGreater : Token::Kind::Greater,
+      1, update_mode == assignment_update_mode::Append
+             ? Token::Kind::DoubleGreater
+             : Token::Kind::Greater,
       op_location, first_location, out, /*fd_was_explicit=*/true);
   out.back().is_both_streams_spelling = true;
   out.push(stderr_to_stdout_dup());
@@ -1137,9 +1138,11 @@ mustuse fn Parser::try_parse_trailing_redirection(
     let const op_kind = token->kind();
     let const op_location = token->source_location();
     m_lexer.advance_past_last_peek();
-    build_both_streams_redirection(op_kind ==
-                                       Token::Kind::AmpersandDoubleGreater,
-                                   op_location, ignored_first_location, out);
+    build_both_streams_redirection(
+        op_location, ignored_first_location, out,
+        op_kind == Token::Kind::AmpersandDoubleGreater
+            ? assignment_update_mode::Append
+            : assignment_update_mode::Replace);
     return true;
   }
 
@@ -1329,9 +1332,11 @@ hot fn Parser::parse_simple_command(const Token *leading_token) throws
       switch (token->kind()) {
       case Token::Kind::If: return attach_trailing_redirections(parse_if());
       case Token::Kind::While:
-        return attach_trailing_redirections(parse_while_or_until(false));
+        return attach_trailing_redirections(
+            parse_while_or_until(loop_kind::While));
       case Token::Kind::Until:
-        return attach_trailing_redirections(parse_while_or_until(true));
+        return attach_trailing_redirections(
+            parse_while_or_until(loop_kind::Until));
       case Token::Kind::For: return attach_trailing_redirections(parse_for());
       case Token::Kind::Case: return attach_trailing_redirections(parse_case());
       case Token::Kind::LeftParen:
@@ -1440,7 +1445,7 @@ hot fn Parser::parse_simple_command(const Token *leading_token) throws
                 static_cast<u32>(m_lexer.cursor_position());
             array_args.push(array_builtin_assignment{
                 a->key().clone(), steal(elements), a->source_location(),
-                assignment_end_position, a->is_append()});
+                assignment_end_position, a->get_update_mode()});
             break;
           }
         }
@@ -1456,7 +1461,7 @@ hot fn Parser::parse_simple_command(const Token *leading_token) throws
             static_cast<u32>(m_lexer.cursor_position());
         array_args.push(array_builtin_assignment{
             a->key().clone(), steal(elements), a->source_location(),
-            assignment_end_position, a->is_append()});
+            assignment_end_position, a->get_update_mode()});
         break;
       }
 
@@ -1489,8 +1494,10 @@ hot fn Parser::parse_simple_command(const Token *leading_token) throws
       let const op_location = token->source_location();
       m_lexer.advance_past_last_peek();
       build_both_streams_redirection(
-          op_kind == Token::Kind::AmpersandDoubleGreater, op_location,
-          source_location, redirections);
+          op_location, source_location, redirections,
+          op_kind == Token::Kind::AmpersandDoubleGreater
+              ? assignment_update_mode::Append
+              : assignment_update_mode::Replace);
     } break;
 
     case Token::Kind::DoubleLess: {

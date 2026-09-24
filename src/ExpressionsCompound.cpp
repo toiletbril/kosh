@@ -435,14 +435,17 @@ hot fn CompoundListCondition::evaluate_root_status_impl(
     let const system_cpu = system_after - system_before;
 
     let const layout =
-        m_cmd->time_uses_posix_format() ? utils::time_report_layout::Posix
-        : cxt.is_bash_compatible()      ? utils::time_report_layout::Bash
-                                        : utils::time_report_layout::Rich;
+        m_cmd->get_time_format_mode() == time_format_mode::Posix
+            ? utils::time_report_layout::Posix
+        : cxt.is_bash_compatible() ? utils::time_report_layout::Bash
+                                    : utils::time_report_layout::Rich;
 
     let const time_format = cxt.get_variable_value("TIMEFORMAT");
     let const report = utils::format_time_report(
-        layout, m_cmd->should_time_report_rss(), time_format, real_seconds,
-        user_cpu, system_cpu, rss_after);
+        time_format, real_seconds, user_cpu, system_cpu, rss_after, layout,
+        m_cmd->get_time_rss_mode() == time_rss_mode::Include
+            ? utils::time_report_rss::Include
+            : utils::time_report_rss::Omit);
 
     if (!report.is_empty()) {
       print_error(report);
@@ -633,12 +636,12 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
                       : os::background_process_group_mode(process_group_id);
       bootstrap.evaluation_mode = stage_mode;
       let const launch = os::launch_compound_stage(
-          stage_text, stage_in, stage_out, None, cxt.mood(), stage_location,
+          stage_text, stage_in, stage_out, None, stage_location,
           stage_source != nullptr ? stage_source->view() : StringView{},
-          process_group, process_group_id,
+          process_group_id,
           should_launch_fresh_evaluator ? &bootstrap : nullptr,
           cxt.shell_name(), cxt.last_exit_status(), os::get_shell_process_id(),
-          cxt.get_subshell_depth() + 1);
+          cxt.get_subshell_depth() + 1, cxt.mood(), process_group);
       let const child = launch.child;
 
       if (launch.should_evaluate_child) {
@@ -855,8 +858,9 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
     let stage_arg_locations =
         ArrayList<SourceLocation>{cxt.scratch_allocator()};
     let stage_args =
-        cxt.process_args(e->args(), argument_lifetime::Transient,
-                         argument_context::Command, &stage_arg_locations);
+        cxt.process_args(e->args(), &stage_arg_locations,
+                         argument_lifetime::Transient,
+                         argument_context::Command);
     expand_command_aliases(cxt, stage_args, stage_arg_locations);
 
     if (stage_args.is_empty()) {
@@ -873,9 +877,9 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
       stage_ec = ExecContext::make_from(
           e->source_location(),
           source != nullptr ? source->view() : StringView{}, steal(stage_args),
-          cxt.mood(), cxt.koshkit_utilities_are_reachable(),
+          cxt.koshkit_utilities_are_reachable(),
           cxt.is_shopt_enabled(shopt_option_id::Checkhash),
-          cxt.get_program_resolver(), steal(stage_arg_locations));
+          cxt.get_program_resolver(), steal(stage_arg_locations), cxt.mood());
     } catch (const CommandResolutionErrorWithLocation &resolution_error) {
       /* The stage still applies its own redirections. A > onto its stdout takes
          the slot ahead of the pipe. The next stage still sees EOF. The message

@@ -203,12 +203,13 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
   unused(cxt.materialize_kosh_identity());
   os::process p =
       os::execute_program(ec,
+                          source != nullptr ? source->view() : StringView{}, 0,
                           is_async ? os::script_fallback_policy::Reject
                                    : os::script_fallback_policy::Allow,
+                          os::terminal_handoff::Keep,
                           is_async ? os::process_group_mode::NewBackground
                           : is_foreground_job ? os::process_group_mode::New
-                                              : os::process_group_mode::Inherit,
-                          source != nullptr ? source->view() : StringView{});
+                                              : os::process_group_mode::Inherit);
   if (p == KOSH_INVALID_PROCESS) {
     LOG(Debug, "running the file as a shell script in this process");
     const mimic_mood mode = cxt.mood();
@@ -453,9 +454,9 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
           !is_async ? os::process_group_mode::Inherit
                     : os::background_process_group_mode(process_group_id);
       let const child = os::execute_program(
-          ec, os::script_fallback_policy::Reject, process_group,
-          source != nullptr ? source->view() : StringView{},
-          os::terminal_handoff::Keep, process_group_id);
+          ec, source != nullptr ? source->view() : StringView{},
+          process_group_id, os::script_fallback_policy::Reject,
+          os::terminal_handoff::Keep, process_group);
       if (is_async && process_group_id == 0) {
         process_group_id = os::process_id_of(child);
       }
@@ -469,8 +470,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                     : os::background_process_group_mode(process_group_id);
       let forked_child = os::try_fork_compound_stage(
           ec.in_fd, ec.out_fd, ec.err_fd, ec.source_location(),
-          source != nullptr ? source->view() : StringView{}, process_group,
-          process_group_id);
+          source != nullptr ? source->view() : StringView{}, process_group_id,
+          process_group);
       let preflight_status = Maybe<i32>{};
       let preflight_location = SourceLocation{};
       let preflight_message = String{cxt.scratch_allocator()};
@@ -549,13 +550,13 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
               has_bootstrap = true;
             }
             let const launch = os::launch_compound_stage(
-                stage_source.view(), ec.in_fd, stage_out, stage_err, cxt.mood(),
+                stage_source.view(), ec.in_fd, stage_out, stage_err,
                 ec.source_location(),
                 source != nullptr ? source->view() : StringView{},
-                process_group, process_group_id,
+                process_group_id,
                 has_bootstrap ? &bootstrap : nullptr, cxt.shell_name(),
                 cxt.last_exit_status(), os::get_shell_process_id(),
-                cxt.get_subshell_depth() + 1);
+                cxt.get_subshell_depth() + 1, cxt.mood(), process_group);
             forked_child = launch.child;
           } catch (...) {
             ec.close_fds();

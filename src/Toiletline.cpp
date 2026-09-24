@@ -389,9 +389,10 @@ fn run_selector_program(koshka::EvalContext &context, koshka::StringView input,
 
   are_child_descriptors_owned = false;
   let const child = koshka::os::execute_program(
-      selector, koshka::os::script_fallback_policy::Reject,
-      koshka::os::process_group_mode::Inherit, koshka::StringView{},
-      koshka::os::terminal_handoff::BeforeStart);
+      selector, koshka::StringView{}, 0,
+      koshka::os::script_fallback_policy::Reject,
+      koshka::os::terminal_handoff::BeforeStart,
+      koshka::os::process_group_mode::Inherit);
 
   let const captured =
       koshka::os::read_fd_to_string(output_pipe->in, koshka::heap_allocator());
@@ -570,6 +571,7 @@ fn kosh_completion_callback(const char *buffer, size_t cursor,
     COMPLETION_RESULT->longest_common_prefix.clear();
     *COMPLETION_RESULT = koshka::completion::complete(
         line, byte_cursor, *COMPLETION_CONTEXT, *COMPLETION_BASE_DIRECTORY,
+        nullptr, false,
         for_listing != 0 ? koshka::completion::completion_mode::Listing
                          : koshka::completion::completion_mode::Ghost);
     let const &result = *COMPLETION_RESULT;

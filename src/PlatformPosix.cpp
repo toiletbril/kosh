@@ -54,10 +54,11 @@ static pure fn linux_socket_state(u64 value) wontthrow -> network_socket_state
   }
 }
 
-static fn linux_socket_address(StringView encoded, bool is_ipv6,
-                               Allocator allocator) throws -> Maybe<String>
+static fn linux_socket_address(StringView encoded, Allocator allocator,
+                               network_address_family family) throws
+    -> Maybe<String>
 {
-  if (is_ipv6) {
+  if (family == network_address_family::IPv6) {
     if (encoded.length != 32) return None;
     u8 bytes[16]{};
     for (usize word_index = 0; word_index < 4; word_index++) {
@@ -280,9 +281,9 @@ static pure fn linux_unix_socket_field(StringView text, usize index) wontthrow
   return StringView{};
 }
 
-static fn linux_unix_sockets(bool should_include_process_ids,
-                             const ArrayList<linux_socket_owner> *owners,
-                             Allocator allocator) throws
+static fn linux_unix_sockets(const ArrayList<linux_socket_owner> *owners,
+                             Allocator allocator,
+                             network_socket_process_mode process_mode) throws
     -> ArrayList<network_socket_entry>
 {
   let result = ArrayList<network_socket_entry>{allocator};
@@ -342,7 +343,8 @@ static fn linux_unix_sockets(bool should_include_process_ids,
       result.push(steal(socket));
     };
     bool has_process_owner = false;
-    if (should_include_process_ids && owners != nullptr) {
+    if (process_mode == network_socket_process_mode::WithProcesses &&
+        owners != nullptr) {
       for (let const &owner : *owners) {
         if (owner.inode == inode.value()) {
           do_push_socket(owner.pid, owner.start_token, owner.has_start_token);
@@ -416,9 +418,10 @@ static fn linux_socket_owners(Allocator allocator) throws
 }
 
 static fn linux_network_sockets_from_file(
-    StringView path, network_socket_protocol protocol, bool is_ipv6,
-    bool should_include_process_ids,
-    const ArrayList<linux_socket_owner> *owners, Allocator allocator) throws
+    StringView path, network_socket_protocol protocol,
+    const ArrayList<linux_socket_owner> *owners, Allocator allocator,
+    network_address_family family,
+    network_socket_process_mode process_mode) throws
     -> ArrayList<network_socket_entry>
 {
   let result = ArrayList<network_socket_entry>{allocator};
@@ -452,9 +455,9 @@ static fn linux_network_sockets_from_file(
       continue;
 
     let const local_address = linux_socket_address(
-        local.substring_of_length(0, *local_separator), is_ipv6, allocator);
+        local.substring_of_length(0, *local_separator), allocator, family);
     let const peer_address = linux_socket_address(
-        peer.substring_of_length(0, *peer_separator), is_ipv6, allocator);
+        peer.substring_of_length(0, *peer_separator), allocator, family);
     let const local_port = utils::parse_integer_in_base_u64(
         local.substring(*local_separator + 1), int_base::hex);
     let const peer_port = utils::parse_integer_in_base_u64(
@@ -487,7 +490,7 @@ static fn linux_network_sockets_from_file(
           static_cast<u16>(local_port.value()),
           static_cast<u16>(peer_port.value()),
           protocol,
-          is_ipv6 ? network_address_family::IPv6 : network_address_family::IPv4,
+          family,
           protocol == network_socket_protocol::Udp
               ? network_socket_state::Unconnected
               : linux_socket_state(state_value.value()),
@@ -502,7 +505,8 @@ static fn linux_network_sockets_from_file(
     };
 
     bool has_process_owner = false;
-    if (should_include_process_ids && owners != nullptr) {
+    if (process_mode == network_socket_process_mode::WithProcesses &&
+        owners != nullptr) {
       for (let const &owner : *owners) {
         if (owner.inode == inode.value()) {
           do_push_socket(owner.pid, owner.start_token, owner.has_start_token);
@@ -753,7 +757,7 @@ static fn highest_free_shell_fd() wontthrow -> int
   int ceiling_fd = SHELL_HIDDEN_FD_CEILING;
 
   resource_limit open_file_limit{};
-  if (get_resource_limit(resource_kind::OpenFiles, open_file_limit) &&
+  if (get_resource_limit(open_file_limit, resource_kind::OpenFiles) &&
       open_file_limit.soft != RESOURCE_UNLIMITED &&
       open_file_limit.soft <= static_cast<u64>(ceiling_fd))
   {
@@ -1132,7 +1136,7 @@ fn has_network_socket_listing() wontthrow -> bool
 #endif
 }
 
-fn network_sockets(bool should_include_process_ids) throws
+fn network_sockets(network_socket_process_mode process_mode) throws
     -> ArrayList<network_socket_entry>
 {
   let result = ArrayList<network_socket_entry>{heap_allocator()};
@@ -1189,7 +1193,9 @@ fn network_sockets(bool should_include_process_ids) throws
           info.soi_rcv.sbi_cc,
           info.soi_snd.sbi_cc,
           0,
-          should_include_process_ids ? static_cast<u32>(process.pid) : 0,
+          process_mode == network_socket_process_mode::WithProcesses
+              ? static_cast<u32>(process.pid)
+              : 0,
           ntohs(static_cast<u16>(internet.insi_lport)),
           ntohs(static_cast<u16>(internet.insi_fport)),
           protocol,
@@ -1209,35 +1215,38 @@ fn network_sockets(bool should_include_process_ids) throws
 #elif defined __linux__
   let const allocator = heap_allocator();
   let owners = ArrayList<linux_socket_owner>{allocator};
-  if (should_include_process_ids) owners = linux_socket_owners(allocator);
+  if (process_mode == network_socket_process_mode::WithProcesses)
+    owners = linux_socket_owners(allocator);
   struct linux_socket_source
   {
     StringView suffix;
     network_socket_protocol protocol;
-    bool is_ipv6;
+    network_address_family family;
   };
   constexpr linux_socket_source SOURCES[] = {
-      {"/net/tcp",  network_socket_protocol::Tcp, false},
-      {"/net/tcp6", network_socket_protocol::Tcp, true },
-      {"/net/udp",  network_socket_protocol::Udp, false},
-      {"/net/udp6", network_socket_protocol::Udp, true },
+      {"/net/tcp",  network_socket_protocol::Tcp, network_address_family::IPv4},
+      {"/net/tcp6", network_socket_protocol::Tcp, network_address_family::IPv6},
+      {"/net/udp",  network_socket_protocol::Udp, network_address_family::IPv4},
+      {"/net/udp6", network_socket_protocol::Udp, network_address_family::IPv6},
   };
   for (let const &source : SOURCES) {
     let const path = linux_socket_proc_path(source.suffix, allocator);
     let entries = linux_network_sockets_from_file(
-        path.view(), source.protocol, source.is_ipv6,
-        should_include_process_ids,
-        should_include_process_ids ? &owners : nullptr, allocator);
+        path.view(), source.protocol,
+        process_mode == network_socket_process_mode::WithProcesses ? &owners
+                                                                    : nullptr,
+        allocator, source.family, process_mode);
     for (let &entry : entries)
       result.push(steal(entry));
   }
   let unix_entries = linux_unix_sockets(
-      should_include_process_ids,
-      should_include_process_ids ? &owners : nullptr, allocator);
+      process_mode == network_socket_process_mode::WithProcesses ? &owners
+                                                                  : nullptr,
+      allocator, process_mode);
   for (let &entry : unix_entries)
     result.push(steal(entry));
 #else
-  unused(should_include_process_ids);
+  unused(process_mode);
 #endif
 
   result.sort(
@@ -1561,7 +1570,7 @@ static fn rlimit_resource_of(resource_kind kind) wontthrow -> Maybe<int>
   }
 }
 
-fn get_resource_limit(resource_kind kind, resource_limit &out) wontthrow -> bool
+fn get_resource_limit(resource_limit &out, resource_kind kind) wontthrow -> bool
 {
   let const which = rlimit_resource_of(kind);
   if (!which.has_value()) return false;
@@ -1576,7 +1585,7 @@ fn get_resource_limit(resource_kind kind, resource_limit &out) wontthrow -> bool
   return true;
 }
 
-fn set_resource_limit(resource_kind kind, const resource_limit &limit) wontthrow
+fn set_resource_limit(const resource_limit &limit, resource_kind kind) wontthrow
     -> bool
 {
   let const which = rlimit_resource_of(kind);
@@ -1783,14 +1792,14 @@ static fn append_terminal_character(String &output, cc_t value) throws -> void
   }
 }
 
-fn terminal_settings(descriptor terminal, bool should_encode,
-                     bool should_report_all, Allocator allocator) throws
+fn terminal_settings(descriptor terminal, Allocator allocator,
+                     terminal_settings_output_mode mode) throws
     -> Maybe<String>
 {
   termios state{};
   if (tcgetattr(terminal, &state) != 0) return None;
   let output = String{allocator};
-  if (should_encode) {
+  if (mode == terminal_settings_output_mode::Encoded) {
     bool is_first_field = true;
     let do_append_field = [&](u64 value) throws {
       if (!is_first_field) output += ':';
@@ -1826,7 +1835,7 @@ fn terminal_settings(descriptor terminal, bool should_encode,
     output += flag.name;
     output += ' ';
   }
-  if (should_report_all) {
+  if (mode == terminal_settings_output_mode::All) {
     for (let const &entry : TERMINAL_CONTROL_CHARACTER_ENTRIES) {
       let const &character = entry.value;
       output += character.name;

@@ -1008,10 +1008,10 @@ fn read_tcp_statistics(tcp_statistics &statistics) wontthrow -> bool
 
 fn has_network_socket_listing() wontthrow -> bool { return false; }
 
-fn network_sockets(bool should_include_process_ids) throws
+fn network_sockets(network_socket_process_mode process_mode) throws
     -> ArrayList<network_socket_entry>
 {
-  unused(should_include_process_ids);
+  unused(process_mode);
   return ArrayList<network_socket_entry>{heap_allocator()};
 }
 
@@ -1484,7 +1484,7 @@ fn path_component_length(StringView component) wontthrow -> Maybe<usize>
   return static_cast<usize>(wide_length);
 }
 
-fn get_resource_limit(resource_kind kind, resource_limit &out) wontthrow -> bool
+fn get_resource_limit(resource_limit &out, resource_kind kind) wontthrow -> bool
 {
   unused(kind);
   unused(out);
@@ -1492,7 +1492,7 @@ fn get_resource_limit(resource_kind kind, resource_limit &out) wontthrow -> bool
   return false;
 }
 
-fn set_resource_limit(resource_kind kind, const resource_limit &limit) wontthrow
+fn set_resource_limit(const resource_limit &limit, resource_kind kind) wontthrow
     -> bool
 {
   unused(kind);
@@ -1523,13 +1523,13 @@ fn terminal_size(u32 &columns, u32 &rows, descriptor output) wontthrow -> bool
   return true;
 }
 
-fn terminal_settings(descriptor terminal, bool should_encode,
-                     bool should_report_all, Allocator allocator) throws
+fn terminal_settings(descriptor terminal, Allocator allocator,
+                     terminal_settings_output_mode mode) throws
     -> Maybe<String>
 {
   DWORD mode = 0;
   if (GetConsoleMode(terminal, &mode) == FALSE) return None;
-  if (should_encode) {
+  if (mode == terminal_settings_output_mode::Encoded) {
     char encoded[32];
     let const length = std::snprintf(encoded, sizeof(encoded), "win32:%08lx\n",
                                      static_cast<unsigned long>(mode));
@@ -1544,7 +1544,8 @@ fn terminal_settings(descriptor terminal, bool should_encode,
   output += "icanon ";
   if ((mode & ENABLE_PROCESSED_INPUT) == 0) output += '-';
   output += "isig";
-  if (should_report_all) output += "; rows 0; columns 0";
+  if (mode == terminal_settings_output_mode::All)
+    output += "; rows 0; columns 0";
   output += '\n';
   return output;
 }

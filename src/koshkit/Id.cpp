@@ -30,19 +30,29 @@ REGISTER_KOSHKIT_UTIL_FLAGS(Id);
 
 namespace koshka::koshkit {
 
-static fn id_user_text(u32 id, bool should_use_name, Allocator allocator) throws
-    -> String
+namespace {
+
+enum class id_name_mode : u8
 {
-  if (should_use_name)
+  Numeric,
+  Name,
+};
+
+}
+
+static fn id_user_text(u32 id, Allocator allocator, id_name_mode name_mode)
+    throws -> String
+{
+  if (name_mode == id_name_mode::Name)
     if (let const name = os::uid_to_username(id); name.has_value())
       return *name;
   return String::from(id, allocator);
 }
 
-static fn id_group_text(u32 id, bool should_use_name,
-                        Allocator allocator) throws -> String
+static fn id_group_text(u32 id, Allocator allocator, id_name_mode name_mode)
+    throws -> String
 {
-  if (should_use_name)
+  if (name_mode == id_name_mode::Name)
     if (let const name = os::gid_to_groupname(id); name.has_value())
       return *name;
   return String::from(id, allocator);
@@ -89,14 +99,18 @@ fn Id::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (FLAG_ID_USER.is_enabled()) {
-    ec.print_to_stdout(id_user_text(user_id, FLAG_ID_NAME.is_enabled(),
-                                    cxt.scratch_allocator()) +
+    ec.print_to_stdout(id_user_text(
+                           user_id, cxt.scratch_allocator(),
+                           FLAG_ID_NAME.is_enabled() ? id_name_mode::Name
+                                                      : id_name_mode::Numeric) +
                        "\n");
     return 0;
   }
   if (FLAG_ID_GROUP.is_enabled()) {
-    ec.print_to_stdout(id_group_text(group_id, FLAG_ID_NAME.is_enabled(),
-                                     cxt.scratch_allocator()) +
+    ec.print_to_stdout(id_group_text(
+                           group_id, cxt.scratch_allocator(),
+                           FLAG_ID_NAME.is_enabled() ? id_name_mode::Name
+                                                      : id_name_mode::Numeric) +
                        "\n");
     return 0;
   }
@@ -106,8 +120,10 @@ fn Id::execute(const ExecContext &ec, EvalContext &cxt,
     let output = String{cxt.scratch_allocator()};
     for (usize index = 0; index < groups.count(); index++) {
       if (index != 0) output += ' ';
-      output += id_group_text(groups[index], FLAG_ID_NAME.is_enabled(),
-                              cxt.scratch_allocator());
+      output += id_group_text(
+          groups[index], cxt.scratch_allocator(),
+          FLAG_ID_NAME.is_enabled() ? id_name_mode::Name
+                                     : id_name_mode::Numeric);
     }
     output += '\n';
     ec.print_to_stdout(output);

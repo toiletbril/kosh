@@ -33,10 +33,30 @@ namespace koshka::koshkit {
 
 namespace {
 
-fn id_name(u32 id, bool is_owner, Allocator allocator) throws -> String
+enum class goodstat_identity_kind : u8
 {
-  let const named =
-      is_owner ? os::uid_to_username(id) : os::gid_to_groupname(id);
+  User,
+  Group,
+};
+
+enum class goodstat_filesystem_report : u8
+{
+  Omit,
+  Include,
+};
+
+enum class goodstat_checksum_report : u8
+{
+  Omit,
+  Include,
+};
+
+fn id_name(u32 id, Allocator allocator, goodstat_identity_kind kind) throws
+    -> String
+{
+  let const named = kind == goodstat_identity_kind::User
+                        ? os::uid_to_username(id)
+                        : os::gid_to_groupname(id);
   if (!named.has_value()) return String::from(id, allocator);
 
   let result = String{allocator, named->view()};
@@ -116,8 +136,9 @@ fn percent_used(const os::filesystem_status &filesystem) wontthrow -> u64
 
 fn append_subject(String &output, StringView operand,
                   const os::file_status &status, bool should_color,
-                  bool should_report_filesystem, bool should_report_checksum,
-                  const ExecContext &ec, Allocator allocator) throws -> void
+                  const ExecContext &ec, Allocator allocator,
+                  goodstat_filesystem_report filesystem_report,
+                  goodstat_checksum_report checksum_report) throws -> void
 {
   append_report_text(output, operand, colors::ansi::BOLD_BLUE, should_color);
   output += "\n";
@@ -151,9 +172,15 @@ fn append_subject(String &output, StringView operand,
                   colors::ansi::BOLD_CYAN, should_color);
   do_append_field("Permissions", permission_text(status.mode, allocator).view(),
                   colors::ansi::BOLD_CYAN, should_color);
-  do_append_field("Owner", id_name(status.owner_id, true, allocator).view(),
+  do_append_field("Owner",
+                  id_name(status.owner_id, allocator,
+                          goodstat_identity_kind::User)
+                      .view(),
                   colors::ansi::BOLD_CYAN, should_color);
-  do_append_field("Group", id_name(status.group_id, false, allocator).view(),
+  do_append_field("Group",
+                  id_name(status.group_id, allocator,
+                          goodstat_identity_kind::Group)
+                      .view(),
                   colors::ansi::BOLD_CYAN, should_color);
   do_append_field("Inode", String::from(status.file_id, allocator).view(),
                   colors::ansi::BOLD_CYAN, should_color);
@@ -199,7 +226,7 @@ fn append_subject(String &output, StringView operand,
                       .view(),
                   colors::ansi::BOLD_CYAN, should_color);
 
-  if (should_report_filesystem) {
+  if (filesystem_report == goodstat_filesystem_report::Include) {
     let filesystem = os::filesystem_status{};
     if (os::stat_filesystem(operand, filesystem)) {
       do_append_field("Filesystem", StringView{filesystem.type_name},
@@ -227,7 +254,9 @@ fn append_subject(String &output, StringView operand,
     }
   }
 
-  if (should_report_checksum && os::file_type_letter(status.mode) == '-') {
+  if (checksum_report == goodstat_checksum_report::Include &&
+      os::file_type_letter(status.mode) == '-')
+  {
     if (let const checksum = file_crc32c(ec, operand, allocator))
       do_append_field("CRC32C", checksum->view(), colors::ansi::BOLD_CYAN,
                       should_color);
@@ -260,8 +289,14 @@ fn GoodStat::execute(
   }
 
   let const should_color = koshkit_should_color();
-  let const should_report_filesystem = FLAG_GOODSTAT_FILESYSTEM.is_enabled();
-  let const should_report_checksum = FLAG_GOODSTAT_CHECKSUM.is_enabled();
+  let const filesystem_report =
+      FLAG_GOODSTAT_FILESYSTEM.is_enabled()
+          ? goodstat_filesystem_report::Include
+          : goodstat_filesystem_report::Omit;
+  let const checksum_report =
+      FLAG_GOODSTAT_CHECKSUM.is_enabled()
+          ? goodstat_checksum_report::Include
+          : goodstat_checksum_report::Omit;
 
   let const allocator = cxt.scratch_allocator();
   let output = String{allocator};
@@ -300,8 +335,7 @@ fn GoodStat::execute(
 
     if (!output.is_empty()) output += "\n";
     append_subject(output, operand.view(), file_statuses[index], should_color,
-                   should_report_filesystem, should_report_checksum, ec,
-                   allocator);
+                   ec, allocator, filesystem_report, checksum_report);
   }
 
   ec.print_to_stdout(output);

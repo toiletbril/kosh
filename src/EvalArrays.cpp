@@ -143,7 +143,8 @@ static fn parse_explicit_array_index(StringView element,
 
 fn EvalContext::assign_indexed_array_elements(StringView name,
                                               const ArrayList<String> &elements,
-                                              bool is_append) throws -> void
+                                              assignment_update_mode update_mode)
+    throws -> void
 {
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
@@ -160,7 +161,7 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
   }
 
   if (is_associative_array(name)) {
-    if (!is_append) {
+    if (update_mode != assignment_update_mode::Append) {
       clear_associative_array(name);
       declare_associative_array(name);
     }
@@ -178,8 +179,9 @@ fn EvalContext::assign_indexed_array_elements(StringView name,
 
   usize running_index = 0;
   if (is_bash_directory_stack_special(name)) {
-    if (is_append) running_index = bash_directory_stack_element_count();
-  } else if (is_append) {
+    if (update_mode == assignment_update_mode::Append)
+      running_index = bash_directory_stack_element_count();
+  } else if (update_mode == assignment_update_mode::Append) {
     if (let const *array = lookup_indexed_array(name); array != nullptr)
       running_index = array->count();
     if (sparse_array_names().contains(name))
@@ -241,12 +243,13 @@ fn EvalContext::set_array_element(StringView name, usize index,
   ArrayList<String> *dense = indexed_arrays().find(name);
   if (dense == nullptr) {
     let elements = ArrayList<String>{heap_allocator()};
-    if (let const *scalar = m_shell_variables.find(name); scalar != nullptr)
+    if (let const *scalar = m_variable_store.shell_variables().find(name);
+        scalar != nullptr)
       elements.push(String{heap_allocator(), scalar->view()});
     set_indexed_array(name, steal(elements));
     dense = indexed_arrays().find(name);
   }
-  m_shell_variables.erase(name);
+  m_variable_store.shell_variables().erase(name);
   ASSERT(dense != nullptr);
 
   let const dense_count = dense->count();
@@ -314,7 +317,8 @@ static fn associative_composite_key(StringView name, StringView key,
 }
 
 fn EvalContext::assign_array_element(StringView name, StringView subscript,
-                                     StringView value, bool is_append) throws
+                                     StringView value,
+                                     assignment_update_mode update_mode) throws
     -> void
 {
   LOG(All, "assigning the array element '%.*s[%.*s]'",
@@ -327,7 +331,7 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
   let const do_integer_element_value = [&](Maybe<String> existing)
                                            throws -> StringView {
     let joined = String{scratch_allocator()};
-    if (is_append) {
+    if (update_mode == assignment_update_mode::Append) {
       if (existing.has_value()) joined.append(existing->view());
       append_integer_expression(joined, value);
     } else {
@@ -347,7 +351,7 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
               lookup_associative_element(name, key.view())));
       return;
     }
-    if (is_append) {
+    if (update_mode == assignment_update_mode::Append) {
       let const existing = lookup_associative_element(name, key.view());
       let combined = existing.has_value()
                          ? String{scratch_allocator(), existing->view()}
@@ -385,7 +389,8 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
     }
 
     if (resolved_index == 0)
-      if (let const *scalar = m_shell_variables.find(name); scalar != nullptr)
+    if (let const *scalar = m_variable_store.shell_variables().find(name);
+        scalar != nullptr)
         return String{scalar->view()};
 
     return None;
@@ -393,14 +398,15 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
 
   if (is_integer_variable(name)) [[unlikely]] {
     let existing = Maybe<String>{};
-    if (is_append) existing = do_lookup_existing_element();
+    if (update_mode == assignment_update_mode::Append)
+      existing = do_lookup_existing_element();
     set_array_element(name, resolved_index,
                       do_integer_element_value(steal(existing)));
     return;
   }
 
   let element = String{scratch_allocator(), value};
-  if (is_append) {
+  if (update_mode == assignment_update_mode::Append) {
     let combined = String{scratch_allocator()};
     if (let const existing = do_lookup_existing_element(); existing.has_value())
       combined = String{existing->view()};
@@ -419,10 +425,11 @@ fn EvalContext::declare_associative_array(StringView name) throws -> void
   LOG(Debug, "declaring '%.*s' as an associative array",
       static_cast<int>(name.length), name.data);
   let scalar = Maybe<String>{};
-  if (let const *stored = m_shell_variables.find(name); stored != nullptr)
+  if (let const *stored = m_variable_store.shell_variables().find(name);
+      stored != nullptr)
     scalar = *stored;
   associative_names().add(name);
-  m_shell_variables.erase(name);
+  m_variable_store.shell_variables().erase(name);
   if (scalar.has_value()) set_associative_element(name, "0", scalar->view());
 }
 
@@ -445,7 +452,7 @@ fn EvalContext::set_associative_element(StringView name, StringView key,
 
   if (!is_associative_array(name)) {
     associative_names().add(name);
-    m_shell_variables.erase(name);
+    m_variable_store.shell_variables().erase(name);
   }
   associative_values().set(
       associative_composite_key(name, key, scratch_allocator()).view(), value);
@@ -646,7 +653,8 @@ fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
   let const previous_was_exported = is_exported(name);
 
   let previous_value = Maybe<String>{};
-  if (let const *scalar = m_shell_variables.find(name); scalar != nullptr) {
+  if (let const *scalar = m_variable_store.shell_variables().find(name);
+      scalar != nullptr) {
     previous_value = *scalar;
   } else if (previous_array.has_value() && !previous_array->is_empty()) {
     previous_value = previous_array->front();

@@ -687,7 +687,13 @@ fn verify_filesystem_integrity(StringView path,
 
 fn sync_filesystems() wontthrow -> bool;
 
-fn sync_path(StringView path, bool is_data_only) wontthrow -> bool;
+enum class sync_mode : u8
+{
+  All,
+  DataOnly,
+};
+
+fn sync_path(StringView path, sync_mode mode) wontthrow -> bool;
 
 enum class memory_status_field : u32
 {
@@ -1362,10 +1368,10 @@ enum class regex_match_result : u8
 
 constexpr bool HAS_REGEX_ENGINE = true;
 
-fn compile_regex(StringView pattern, case_sensitivity sensitivity,
-                 compiled_regex &out) throws -> regex_compile_result;
-fn compile_basic_regex(StringView pattern, case_sensitivity sensitivity,
-                       compiled_regex &out) throws -> regex_compile_result;
+fn compile_regex(StringView pattern, compiled_regex &out,
+                 case_sensitivity sensitivity) throws -> regex_compile_result;
+fn compile_basic_regex(StringView pattern, compiled_regex &out,
+                       case_sensitivity sensitivity) throws -> regex_compile_result;
 
 fn execute_regex(compiled_regex &compiled, StringView subject,
                  ArrayList<regex_span> &spans, String &error_message,
@@ -1376,8 +1382,8 @@ fn execute_regex(compiled_regex &compiled, StringView subject,
 fn free_regex(compiled_regex &compiled) wontthrow -> void;
 
 /* Compiles a basic search pattern with no capture for line-at-a-time grep. */
-fn compile_search_regex(StringView pattern, case_sensitivity sensitivity,
-                        compiled_regex &out) throws -> regex_compile_result;
+fn compile_search_regex(StringView pattern, compiled_regex &out,
+                        case_sensitivity sensitivity) throws -> regex_compile_result;
 
 fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool;
 fn regex_matches_null_terminated(compiled_regex &compiled,
@@ -1465,9 +1471,9 @@ struct resource_limit
 };
 
 /* False when the platform carries no such limit. */
-fn get_resource_limit(resource_kind kind, resource_limit &out) wontthrow
+fn get_resource_limit(resource_limit &out, resource_kind kind) wontthrow
     -> bool;
-fn set_resource_limit(resource_kind kind, const resource_limit &limit) wontthrow
+fn set_resource_limit(const resource_limit &limit, resource_kind kind) wontthrow
     -> bool;
 
 /* On POSIX the number is the descriptor, and on Windows it maps to the C
@@ -1681,6 +1687,12 @@ enum class network_socket_protocol : u8
   Unix,
 };
 
+enum class network_socket_process_mode : u8
+{
+  WithoutProcesses,
+  WithProcesses,
+};
+
 enum class network_unix_socket_type : u8
 {
   Stream,
@@ -1727,7 +1739,7 @@ struct network_socket_entry
 };
 
 fn has_network_socket_listing() wontthrow -> bool;
-fn network_sockets(bool should_include_process_ids) throws
+fn network_sockets(network_socket_process_mode process_mode) throws
     -> ArrayList<network_socket_entry>;
 
 enum class connect_probe_result : u8
@@ -1836,8 +1848,15 @@ fn format_local_time(StringView format, i64 epoch) throws -> String;
 
 fn terminal_size(u32 &columns, u32 &rows,
                  descriptor output = KOSH_STDOUT) wontthrow -> bool;
-fn terminal_settings(descriptor terminal, bool should_encode,
-                     bool should_report_all, Allocator allocator) throws
+enum class terminal_settings_output_mode : u8
+{
+  Normal,
+  Encoded,
+  All,
+};
+
+fn terminal_settings(descriptor terminal, Allocator allocator,
+                     terminal_settings_output_mode mode) throws
     -> Maybe<String>;
 
 enum class terminal_settings_apply_kind : u8
@@ -1893,11 +1912,12 @@ struct measured_result
   perf_counts perf{};
 };
 
-fn run_measured(const ArrayList<String> &argv, measured_output output,
-                const Maybe<descriptor> &inherited_handle = {}) throws
+fn run_measured(const ArrayList<String> &argv,
+                const Maybe<descriptor> &inherited_handle = {},
+                measured_output output = measured_output::Inherit) throws
     -> Maybe<measured_result>;
-fn get_priority(priority_target target, i64 id) wontthrow -> Maybe<i32>;
-fn set_priority(priority_target target, i64 id, i32 priority) wontthrow -> bool;
+fn get_priority(i64 id, priority_target target) wontthrow -> Maybe<i32>;
+fn set_priority(i64 id, i32 priority, priority_target target) wontthrow -> bool;
 fn run_nice(const ArrayList<String> &argv, i32 increment) throws -> Maybe<i32>;
 fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
              descriptor error, StringView home) throws -> Maybe<i32>;
@@ -1909,10 +1929,11 @@ fn write_system_log(StringView tag, StringView priority, StringView message,
    has no executable format. */
 fn execute_program(
     ExecContext &ec,
+    StringView source = {}, i64 process_group_id = 0,
     script_fallback_policy fallback = script_fallback_policy::Reject,
-    process_group_mode process_group = process_group_mode::Inherit,
-    StringView source = {}, terminal_handoff handoff = terminal_handoff::Keep,
-    i64 process_group_id = 0) throws -> process;
+    terminal_handoff handoff = terminal_handoff::Keep,
+    process_group_mode process_group = process_group_mode::Inherit) throws
+    -> process;
 
 fn shell_has_controlling_terminal() wontthrow -> bool;
 
@@ -1951,6 +1972,12 @@ struct process_substitution_launch
   bool should_evaluate_child{false};
 };
 
+enum class process_substitution_direction : u8
+{
+  CommandReads,
+  CommandWrites,
+};
+
 struct subshell_bootstrap
 {
   subshell_bootstrap() = default;
@@ -1973,21 +2000,20 @@ private:
   fn close_owned_processes() wontthrow -> void;
 };
 
-fn launch_process_substitution(StringView source, bool command_writes_pipe,
-                               mimic_mood mood, bool source_traces_enabled,
-                               const subshell_bootstrap *bootstrap = nullptr,
-                               StringView shell_name = {},
-                               i32 previous_exit_status = 0,
-                               i64 shell_process_id = 0,
-                               usize subshell_depth = 0) throws
+fn launch_process_substitution(
+    StringView source, bool source_traces_enabled,
+    const subshell_bootstrap *bootstrap, StringView shell_name,
+    i32 previous_exit_status, i64 shell_process_id, usize subshell_depth,
+    process_substitution_direction direction, mimic_mood mood) throws
     -> process_substitution_launch;
 fn release_unused_process_substitution(opaque *cleanup) wontthrow -> void;
 
 fn try_fork_compound_stage(
     Maybe<descriptor> in_fd, Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
     SourceLocation location = {}, StringView source = {},
-    process_group_mode process_group = process_group_mode::Inherit,
-    i64 process_group_id = 0) throws -> Maybe<process>;
+    i64 process_group_id = 0,
+    process_group_mode process_group = process_group_mode::Inherit) throws
+    -> Maybe<process>;
 
 fn try_fork_job_process() throws -> Maybe<process>;
 fn can_fork_evaluator() wontthrow -> bool;
@@ -2000,12 +2026,13 @@ struct compound_stage_launch
 
 fn launch_compound_stage(
     StringView source, Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
-    Maybe<descriptor> err_fd, mimic_mood mood, SourceLocation location = {},
-    StringView diagnostic_source = {},
-    process_group_mode process_group = process_group_mode::Inherit,
-    i64 process_group_id = 0, const subshell_bootstrap *bootstrap = nullptr,
+    Maybe<descriptor> err_fd, SourceLocation location = {},
+    StringView diagnostic_source = {}, i64 process_group_id = 0,
+    const subshell_bootstrap *bootstrap = nullptr,
     StringView shell_name = {}, i32 previous_exit_status = 0,
-    i64 shell_process_id = 0, usize subshell_depth = 0) throws
+    i64 shell_process_id = 0, usize subshell_depth = 0,
+    mimic_mood mood = static_cast<mimic_mood>(0),
+    process_group_mode process_group = process_group_mode::Inherit) throws
     -> compound_stage_launch;
 
 fn register_platform_flags(FlagList &flags) throws -> void;

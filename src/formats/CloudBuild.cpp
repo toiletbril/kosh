@@ -16,7 +16,8 @@ fn parse_cloud_build_format(const parser_format_input &input,
 {
   static const StringView KEYS[] = {"script"};
   parser_format_extract_yaml_keys(document, input.source, KEYS, 1,
-                                  mimic_mood::Posix);
+                                  mimic_mood::Posix,
+                                  yaml_shell_selection::Nearby);
 }
 
 } // namespace koshka

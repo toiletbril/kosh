@@ -44,10 +44,11 @@ class ExecContext
 {
 public:
   static fn make_from(const SourceLocation &location, StringView source,
-                      ArrayList<String> &&args, mimic_mood mood,
+                      ArrayList<String> &&args,
                       bool are_koshkit_utilities_reachable,
                       bool should_check_hash, ProgramResolver &program_resolver,
-                      ArrayList<SourceLocation> &&arg_locations) throws
+                      ArrayList<SourceLocation> &&arg_locations,
+                      mimic_mood mood) throws
       -> ExecContext;
 
   /* Build directly from an already resolved builtin kind or program path,

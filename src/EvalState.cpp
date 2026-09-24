@@ -36,11 +36,11 @@ fn EvalContext::set_shopt_option(StringView name, bool is_enabled) throws
   ASSERT(index.has_value(), "unknown shopt option");
   let const mask = u64{1} << *index;
   let const was_enabled = is_shopt_enabled(name);
-  m_shopt_option_overrides |= mask;
+  m_runtime.shopt_option_overrides |= mask;
   if (is_enabled)
-    m_shopt_option_values |= mask;
+    m_runtime.shopt_option_values |= mask;
   else
-    m_shopt_option_values &= ~mask;
+    m_runtime.shopt_option_values &= ~mask;
 
   if (name == EXTDEBUG_SHOPT_OPTION && is_enabled && !was_enabled &&
       bash_dynamic_variables_enabled())
@@ -157,8 +157,8 @@ fn EvalContext::request_loop_control(control_flow::Kind kind, i64 level,
     level = static_cast<i64>(m_loop_depth);
   LOG(All, "loop control requested, level %lld of depth %zu", (long long) level,
       m_loop_depth);
-  m_control_flow = control_flow{kind, level, location, m_current_source,
-                                String{m_current_origin}};
+  m_control_flow = control_flow{kind, level, location, source_store().m_current_source,
+                                String{source_store().m_current_origin}};
 }
 
 fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
@@ -178,14 +178,14 @@ fn EvalContext::request_return(i64 status, SourceLocation location) throws
   LOG(Debug, "return requested, status %lld", (long long) status);
   trap_store().m_status_before_return = m_last_exit_status;
   m_control_flow = control_flow{control_flow::Kind::Return, status, location,
-                                m_current_source, String{m_current_origin}};
+                                source_store().m_current_source, String{source_store().m_current_origin}};
 }
 
 fn EvalContext::request_exit(i64 status, SourceLocation location) throws -> void
 {
   LOG(Debug, "exit requested, status %lld", (long long) status);
   m_control_flow = control_flow{control_flow::Kind::Exit, status, location,
-                                m_current_source, String{m_current_origin}};
+                                source_store().m_current_source, String{source_store().m_current_origin}};
 }
 
 pure fn EvalContext::has_pending_control_flow() const wontthrow -> bool
@@ -222,38 +222,37 @@ fn EvalContext::set_current_source(const String *source,
                                    String origin) wontthrow -> void
 {
   reset_runtime_diagnostic_highlight_cache();
-  m_current_source = source;
-  m_current_source_generation = scan_source_generation(source);
-  m_current_origin = steal(origin);
+  source_store().set_current_source(source, steal(origin),
+                                    scan_source_generation(source));
 }
 
 pure fn EvalContext::current_source() const wontthrow -> const String *
 {
-  return m_current_source;
+  return source_store().get_current_source();
 }
 
 pure fn EvalContext::current_origin() const wontthrow -> const String &
 {
-  return m_current_origin;
+  return source_store().get_current_origin();
 }
 
 fn EvalContext::set_current_history_event_number(Maybe<usize> number) wontthrow
     -> void
 {
-  m_current_history_event_number = steal(number);
+  source_store().set_current_history_event_number(steal(number));
 }
 
 pure fn EvalContext::current_history_event_number() const wontthrow
     -> Maybe<usize>
 {
-  return m_current_history_event_number;
+  return source_store().get_current_history_event_number();
 }
 
 fn EvalContext::push_root_source_frame(const String *parent_source,
                                        SourceLocation call_site,
                                        bool is_only_root_source) throws -> void
 {
-  m_source_frames.push(source_frame{
+  source_store().m_source_frames.push(source_frame{
       String{heap_allocator(), StringView{"the command line"}},
       call_site,
       parent_source, source_generation_for(parent_source),
@@ -264,7 +263,7 @@ fn EvalContext::push_root_source_frame(const String *parent_source,
 
 fn EvalContext::pop_root_source_frame() wontthrow -> void
 {
-  if (!m_source_frames.is_empty()) m_source_frames.pop_back();
+  if (!source_store().m_source_frames.is_empty()) source_store().m_source_frames.pop_back();
 }
 
 fn EvalContext::print_source_backtrace(Maybe<SourceLocation> error_location,
@@ -274,8 +273,8 @@ fn EvalContext::print_source_backtrace(Maybe<SourceLocation> error_location,
   if (!m_should_print_source_traces) return;
 
   if (should_defer_for_source_file) {
-    for (usize i = m_source_frames.count(); i > 0; i--) {
-      let &frame = m_source_frames[i - 1];
+    for (usize i = source_store().m_source_frames.count(); i > 0; i--) {
+      let &frame = source_store().m_source_frames[i - 1];
       if (!frame.should_defer_trace) continue;
       if (error_location.has_value()) {
         let const error_source_name = error_location->get_filename();
@@ -318,7 +317,7 @@ fn EvalContext::print_source_backtrace(Maybe<SourceLocation> error_location,
   };
 
   let has_traceable_source_frame = false;
-  for (let const &frame : m_source_frames)
+  for (let const &frame : source_store().m_source_frames)
     if (borrowed_frame_source(frame) != nullptr &&
         (!frame.is_cli_root || !frame.is_only_root_source))
     {
@@ -327,17 +326,17 @@ fn EvalContext::print_source_backtrace(Maybe<SourceLocation> error_location,
     }
   if (!has_traceable_source_frame) return;
 
-  for (usize i = m_source_frames.count(); i > 0; i--) {
-    let &frame = m_source_frames[i - 1];
+  for (usize i = source_store().m_source_frames.count(); i > 0; i--) {
+    let &frame = source_store().m_source_frames[i - 1];
     if (!do_frame_render(frame) || frame.was_printed) {
       continue;
     }
 
     let is_repeated_frame = false;
-    for (usize other_index = m_source_frames.count(); other_index > i;
+    for (usize other_index = source_store().m_source_frames.count(); other_index > i;
          other_index--)
     {
-      let const &other = m_source_frames[other_index - 1];
+      let const &other = source_store().m_source_frames[other_index - 1];
       if (!do_frame_render(other) || !do_frame_identity_match(frame, other)) {
         continue;
       }
@@ -358,7 +357,7 @@ fn EvalContext::print_source_backtrace(Maybe<SourceLocation> error_location,
 
 fn EvalContext::set_current_location(SourceLocation location) wontthrow -> void
 {
-  m_current_location = location;
+  source_store().set_current_location(location);
 }
 
 /* TODO: these caps are hand-tuned below the observed native overflow point.
@@ -384,68 +383,71 @@ static fn guard_located_depth(usize current_depth, usize cap,
 
 fn EvalContext::enter_source(const SourceLocation &location) throws -> void
 {
-  guard_located_depth(m_source_depth, MAX_SOURCE_DEPTH, "source", location);
-  m_source_depth++;
+  guard_located_depth(source_store().source_depth(), MAX_SOURCE_DEPTH,
+                      "source", location);
+  source_store().set_source_depth(source_store().source_depth() + 1);
 }
 
 fn EvalContext::leave_source() wontthrow -> void
 {
-  ASSERT(m_source_depth > 0);
-  m_source_depth--;
+  ASSERT(source_store().source_depth() > 0);
+  source_store().set_source_depth(source_store().source_depth() - 1);
 }
 
 fn EvalContext::enter_function_call(const SourceLocation &location) throws
     -> void
 {
-  guard_located_depth(m_function_call_depth, MAX_FUNCTION_CALL_DEPTH,
+  guard_located_depth(function_store().call_depth(), MAX_FUNCTION_CALL_DEPTH,
                       "function call", location);
-  m_function_call_depth++;
-  LOG(Debug, "entered function call depth %zu", m_function_call_depth);
+  function_store().call_depth()++;
+  LOG(Debug, "entered function call depth %zu", function_store().call_depth());
 }
 
 fn EvalContext::leave_function_call() wontthrow -> void
 {
-  ASSERT(m_function_call_depth > 0);
-  m_function_call_depth--;
+  ASSERT(function_store().call_depth() > 0);
+  function_store().call_depth()--;
   lower_trap_depths_to_current();
 }
 
 fn EvalContext::enter_substitution() throws -> void
 {
-  if (m_substitution_depth >= MAX_SUBSTITUTION_DEPTH) {
-    LOG(Debug, "substitution depth %zu exceeds cap %zu", m_substitution_depth,
-        MAX_SUBSTITUTION_DEPTH);
+  if (expansion_store().substitution_depth() >= MAX_SUBSTITUTION_DEPTH) {
+    LOG(Debug, "substitution depth %zu exceeds cap %zu",
+        expansion_store().substitution_depth(), MAX_SUBSTITUTION_DEPTH);
     throw Error{"Command substitution nested too deeply"};
   }
-  m_substitution_depth++;
+  expansion_store().substitution_depth()++;
 }
 
 fn EvalContext::leave_substitution() wontthrow -> void
 {
-  ASSERT(m_substitution_depth > 0);
-  m_substitution_depth--;
+  ASSERT(expansion_store().substitution_depth() > 0);
+  expansion_store().substitution_depth()--;
   lower_trap_depths_to_current();
 }
 
 pure fn EvalContext::get_substitution_depth() const wontthrow -> usize
 {
-  return m_substitution_depth;
+  return expansion_store().substitution_depth();
 }
 
 fn EvalContext::enter_parameter_expansion() throws -> void
 {
-  if (m_parameter_expansion_depth >= MAX_PARAMETER_EXPANSION_DEPTH) {
+  if (expansion_store().parameter_expansion_depth() >=
+      MAX_PARAMETER_EXPANSION_DEPTH) {
     LOG(Debug, "parameter expansion depth %zu exceeds cap %zu",
-        m_parameter_expansion_depth, MAX_PARAMETER_EXPANSION_DEPTH);
+        expansion_store().parameter_expansion_depth(),
+        MAX_PARAMETER_EXPANSION_DEPTH);
     throw Error{"Parameter expansion nested too deeply"};
   }
-  m_parameter_expansion_depth++;
+  expansion_store().parameter_expansion_depth()++;
 }
 
 fn EvalContext::leave_parameter_expansion() wontthrow -> void
 {
-  ASSERT(m_parameter_expansion_depth > 0);
-  m_parameter_expansion_depth--;
+  ASSERT(expansion_store().parameter_expansion_depth() > 0);
+  expansion_store().parameter_expansion_depth()--;
 }
 
 fn EvalContext::set_error_exit(bool enabled) wontthrow -> void
@@ -591,24 +593,26 @@ static constexpr usize MAX_LOOP_REDIRECT_FDS = 16;
 fn EvalContext::mark_loop_redirect_fds() const wontthrow
     -> loop_redirect_fd_mark
 {
-  return {m_loop_redirect_fds.count()};
+  return {expansion_store().loop_redirect_fds().count()};
 }
 
 fn EvalContext::cleanup_loop_redirect_fds(loop_redirect_fd_mark mark) wontthrow
     -> void
 {
-  for (usize i = m_loop_redirect_fds.count(); i > mark.count; i--)
-    os::close_fd(m_loop_redirect_fds[i - 1].fd);
+  for (usize i = expansion_store().loop_redirect_fds().count();
+       i > mark.count; i--)
+    os::close_fd(expansion_store().loop_redirect_fds()[i - 1].fd);
 
-  while (m_loop_redirect_fds.count() > mark.count)
-    m_loop_redirect_fds.remove(m_loop_redirect_fds.count() - 1);
+  while (expansion_store().loop_redirect_fds().count() > mark.count)
+    expansion_store().loop_redirect_fds().remove(
+        expansion_store().loop_redirect_fds().count() - 1);
 }
 
 fn EvalContext::find_loop_redirect_fd(i32 target_fd, const String &path,
                                       os::file_open_mode mode) const wontthrow
     -> Maybe<os::descriptor>
 {
-  for (let const &entry : m_loop_redirect_fds) {
+  for (let const &entry : expansion_store().loop_redirect_fds()) {
     if (entry.target_fd == target_fd && entry.mode == mode &&
         entry.path == path)
     {
@@ -623,9 +627,11 @@ fn EvalContext::retain_loop_redirect_fd(i32 target_fd, const String &path,
                                         os::file_open_mode mode,
                                         os::descriptor fd) throws -> bool
 {
-  if (m_loop_redirect_fds.count() >= MAX_LOOP_REDIRECT_FDS) return false;
+  if (expansion_store().loop_redirect_fds().count() >=
+      MAX_LOOP_REDIRECT_FDS)
+    return false;
 
-  m_loop_redirect_fds.push(loop_redirect_fd{
+  expansion_store().loop_redirect_fds().push(loop_redirect_fd{
       target_fd, mode, String{heap_allocator(), path.view()},
         fd
   });
@@ -654,22 +660,22 @@ pure fn EvalContext::terminal_exec_allowed() const wontthrow -> bool
 
 pure fn EvalContext::getopts_char_index() const wontthrow -> usize
 {
-  return m_getopts_char_index;
+  return expansion_store().getopts_char_index();
 }
 
 fn EvalContext::set_getopts_char_index(usize index) wontthrow -> void
 {
-  m_getopts_char_index = index;
+  expansion_store().set_getopts_char_index(index);
 }
 
 pure fn EvalContext::getopts_last_optind() const wontthrow -> i64
 {
-  return m_getopts_last_optind;
+  return expansion_store().getopts_last_optind();
 }
 
 fn EvalContext::set_getopts_last_optind(i64 optind) wontthrow -> void
 {
-  m_getopts_last_optind = optind;
+  expansion_store().set_getopts_last_optind(optind);
 }
 
 fn EvalContext::suggest_similar_variable_name(StringView name) const throws
@@ -678,7 +684,7 @@ fn EvalContext::suggest_similar_variable_name(StringView name) const throws
   if (name.is_empty()) return None;
 
   let suggestion = utils::NameSuggestion{name};
-  m_shell_variables.for_each(
+  m_variable_store.shell_variables().for_each(
       [&suggestion](StringView candidate, const String &)
           throws -> void { suggestion.consider(candidate); });
   indexed_arrays().for_each(
@@ -711,8 +717,9 @@ fn EvalContext::suggest_similar_variable_name(StringView name) const throws
 fn EvalContext::sorted_variable_assignments() const throws -> ArrayList<String>
 {
   let assignments = ArrayList<String>{heap_allocator()};
-  assignments.reserve(m_shell_variables.count());
-  m_shell_variables.for_each([&](StringView name, const String &value) {
+  assignments.reserve(m_variable_store.shell_variables().count());
+  m_variable_store.shell_variables().for_each(
+      [&](StringView name, const String &value) {
     let entry = String{heap_allocator(), name};
     entry.push('=');
     entry.append(value);
@@ -731,8 +738,8 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
     throw Error{"Could not preserve the current working directory"};
 
   let snapshot = eval_state_snapshot{
-      m_shell_variables,
-      m_special_variable_definition_locations,
+      m_variable_store.shell_variables(),
+      m_variable_store.special_variable_definition_locations(),
       indexed_arrays(),
       completion_store().specs(),
       completion_store().default_spec(),
@@ -740,8 +747,8 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       associative_values(),
       sparse_array_values(),
       sparse_array_names(),
-      m_shopt_option_overrides,
-      m_shopt_option_values,
+      m_runtime.shopt_option_overrides,
+      m_runtime.shopt_option_values,
       function_store().definitions(),
       m_aliases,
       positional_params(),
@@ -770,8 +777,8 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       m_program_resolver,
       m_init_moods_sourcing,
       m_initialized_moods,
-      m_disabled_bash_special_arrays,
-      m_unset_dynamic_readers,
+      variable_store().disabled_bash_special_arrays(),
+      variable_store().unset_dynamic_readers(),
       m_was_mood_set_explicitly,
       m_mood_mutation_revision,
       m_warning_mutation_revision,
@@ -784,8 +791,8 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       m_local_scopes,
       m_local_scope_depth,
       m_job_table.take_snapshot(),
-      m_getopts_char_index,
-      m_getopts_last_optind,
+      expansion_store().getopts_char_index(),
+      expansion_store().getopts_last_optind(),
       m_terminal_exec_allowed,
       m_coprocess_read_fd,
       m_coprocess_write_fd};
@@ -795,8 +802,8 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
 fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 {
   LOG(Debug, "restoring the evaluator state after a subshell or substitution");
-  m_shell_variables = steal(snapshot.shell_variables);
-  m_special_variable_definition_locations =
+  m_variable_store.shell_variables() = steal(snapshot.shell_variables);
+  m_variable_store.special_variable_definition_locations() =
       steal(snapshot.special_variable_definition_locations);
   indexed_arrays() = steal(snapshot.indexed_arrays);
   completion_store().specs() = steal(snapshot.completion_specs);
@@ -805,8 +812,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   associative_values() = steal(snapshot.associative_values);
   sparse_array_values() = steal(snapshot.sparse_array_values);
   sparse_array_names() = steal(snapshot.sparse_array_names);
-  m_shopt_option_overrides = snapshot.shopt_option_overrides;
-  m_shopt_option_values = snapshot.shopt_option_values;
+  m_runtime.shopt_option_overrides = snapshot.shopt_option_overrides;
+  m_runtime.shopt_option_values = snapshot.shopt_option_values;
   function_store().definitions() = steal(snapshot.functions);
   m_aliases = steal(snapshot.aliases);
   positional_params() = steal(snapshot.positional_params);
@@ -835,8 +842,9 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_program_resolver = steal(snapshot.program_resolver);
   m_init_moods_sourcing = snapshot.init_moods_sourcing;
   m_initialized_moods = snapshot.initialized_moods;
-  m_disabled_bash_special_arrays = snapshot.disabled_bash_special_arrays;
-  m_unset_dynamic_readers = snapshot.unset_dynamic_readers;
+  variable_store().disabled_bash_special_arrays() =
+      snapshot.disabled_bash_special_arrays;
+  variable_store().unset_dynamic_readers() = snapshot.unset_dynamic_readers;
   m_was_mood_set_explicitly = snapshot.was_mood_set_explicitly;
   m_mood_mutation_revision = snapshot.mood_mutation_revision;
   m_warning_mutation_revision = snapshot.warning_mutation_revision;
@@ -850,8 +858,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_local_scopes = steal(snapshot.local_scopes);
   m_local_scope_depth = snapshot.local_scope_depth;
   m_job_table.restore_snapshot(steal(snapshot.job_state));
-  m_getopts_char_index = snapshot.getopts_char_index;
-  m_getopts_last_optind = snapshot.getopts_last_optind;
+  expansion_store().set_getopts_char_index(snapshot.getopts_char_index);
+  expansion_store().set_getopts_last_optind(snapshot.getopts_last_optind);
   m_terminal_exec_allowed = snapshot.terminal_exec_allowed;
   m_coprocess_read_fd = snapshot.coprocess_read_fd;
   m_coprocess_write_fd = snapshot.coprocess_write_fd;
@@ -898,7 +906,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
     m_environment_undo_log.pop_back();
   }
 
-  if (let const *ifs = m_shell_variables.find(StringView{"IFS", 3});
+  if (let const *ifs =
+          m_variable_store.shell_variables().find(StringView{"IFS", 3});
       ifs != nullptr)
     set_field_separators(ifs->view());
   else
@@ -1244,14 +1253,15 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
   append_subshell_bootstrap_u64(body, m_random_state);
   append_subshell_bootstrap_i64(body, m_shell_start_time);
   append_subshell_bootstrap_i64(body, m_seconds_base);
-  append_subshell_bootstrap_u64(body, static_cast<u64>(m_getopts_char_index));
-  append_subshell_bootstrap_i64(body, m_getopts_last_optind);
+  append_subshell_bootstrap_u64(
+      body, static_cast<u64>(expansion_store().getopts_char_index()));
+  append_subshell_bootstrap_i64(body, expansion_store().getopts_last_optind());
   append_subshell_bootstrap_i32(body, m_job_table.m_next_job_id);
   append_subshell_bootstrap_runtime(body, RuntimeState::capture(*this));
-  append_subshell_bootstrap_u64(body, m_shopt_option_overrides);
-  append_subshell_bootstrap_u64(body, m_shopt_option_values);
-  body.push(static_cast<char>(m_disabled_bash_special_arrays));
-  body.push(static_cast<char>(m_unset_dynamic_readers));
+  append_subshell_bootstrap_u64(body, m_runtime.shopt_option_overrides);
+  append_subshell_bootstrap_u64(body, m_runtime.shopt_option_values);
+  body.push(static_cast<char>(variable_store().disabled_bash_special_arrays()));
+  body.push(static_cast<char>(variable_store().unset_dynamic_readers()));
   body.push(static_cast<char>(m_is_restricted_shell));
   body.push(static_cast<char>(bash_argument_arrays() != nullptr));
   if (bash_argument_arrays() != nullptr) {
@@ -1267,11 +1277,12 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
     append_subshell_bootstrap_u32(body, 0);
     append_subshell_bootstrap_u32(body, 0);
   }
-  append_subshell_bootstrap_u64(body, static_cast<u64>(m_function_call_depth));
+  append_subshell_bootstrap_u64(
+      body, static_cast<u64>(function_store().call_depth()));
   append_subshell_bootstrap_u64(body, static_cast<u64>(m_local_scope_depth));
   append_subshell_bootstrap_u32(
-      body, static_cast<u32>(m_function_call_names.count()));
-  for (let const &name : m_function_call_names)
+      body, static_cast<u32>(function_store().call_names().count()));
+  for (let const &name : function_store().call_names())
     append_subshell_bootstrap_text(body, name.view());
 
   let completion_names = ArrayList<String>{heap_allocator()};
@@ -1633,8 +1644,8 @@ fn EvalContext::apply_subshell_bootstrap(
   replay_runtime.set_option(shell_option_id::Verbose, false);
   replay_runtime.set_option(shell_option_id::Xtrace, false);
   replay_runtime.restore(*this);
-  m_disabled_bash_special_arrays = disabled_bash_special_arrays;
-  m_unset_dynamic_readers = unset_dynamic_readers;
+  variable_store().disabled_bash_special_arrays() = disabled_bash_special_arrays;
+  variable_store().unset_dynamic_readers() = unset_dynamic_readers;
   {
     trap_store().m_is_replaying_inherited_state = true;
     defer { trap_store().m_is_replaying_inherited_state = false; };
@@ -1653,15 +1664,15 @@ fn EvalContext::apply_subshell_bootstrap(
   m_shell_start_time = shell_start_time;
   m_seconds_base = seconds_base;
   trap_store().m_startup_ignored_signals = startup_ignored_signals;
-  m_getopts_char_index = getopts_char_index;
-  m_getopts_last_optind = getopts_last_optind;
-  m_shopt_option_overrides = shopt_option_overrides;
-  m_shopt_option_values = shopt_option_values;
+  expansion_store().set_getopts_char_index(getopts_char_index);
+  expansion_store().set_getopts_last_optind(getopts_last_optind);
+  m_runtime.shopt_option_overrides = shopt_option_overrides;
+  m_runtime.shopt_option_values = shopt_option_values;
   reset_bash_argument_arrays();
   if (has_bash_argument_arrays)
     install_bash_argument_arrays(steal(bash_argument_values),
                                  steal(bash_argument_frame_counts));
-  m_function_call_depth = static_cast<usize>(function_call_depth);
+  function_store().call_depth() = static_cast<usize>(function_call_depth);
   lower_trap_depths_to_current();
   for (usize scope = 0; scope < static_cast<usize>(local_scope_depth); scope++)
     enter_function_scope();

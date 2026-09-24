@@ -27,6 +27,12 @@ namespace koshka {
 
 static constexpr usize MAX_MIMICRY_DEPTH = 16;
 
+enum class mimicked_error_status_mode : u8
+{
+  Default,
+  Posix,
+};
+
 static fn mimicked_error_is_interrupt(const std::exception_ptr &error) throws
     -> bool
 {
@@ -42,7 +48,7 @@ static fn mimicked_error_is_interrupt(const std::exception_ptr &error) throws
 }
 
 static fn mimicked_error_status(const std::exception_ptr &error,
-                                bool is_posix) throws -> i32
+                                mimicked_error_status_mode mode) throws -> i32
 {
   ASSERT(error != nullptr);
 
@@ -51,7 +57,10 @@ static fn mimicked_error_status(const std::exception_ptr &error,
   } catch (const ErrorBase &caught_error) {
     let const status = caught_error.command_status();
     return static_cast<i32>(
-        status == 1 && is_posix && caught_error.is_script_fatal() ? 2 : status);
+        status == 1 && mode == mimicked_error_status_mode::Posix &&
+                caught_error.is_script_fatal()
+            ? 2
+            : status);
   } catch (...) {
     return 1;
   }
@@ -88,49 +97,50 @@ fn EvalContext::run_program_fallback(ExecContext &ec, mimic_mood mode,
   let fallback_context = EvalContext{false, false, false, false};
   fallback_context.set_current_source(
       current_source(), String{heap_allocator(), current_origin().view()});
-  fallback_context.m_mimicry_depth = m_mimicry_depth;
-  fallback_context.m_retained_source_generation = m_retained_source_generation;
+  fallback_context.source_store().set_mimicry_depth(
+      source_store().mimicry_depth());
+  fallback_context.source_store().m_retained_source_generation = source_store().m_retained_source_generation;
   fallback_context.set_shell_executable_path(String{shell_executable_path()});
   fallback_context.set_koshkit(koshkit());
   fallback_context.set_mimicry(mimicry());
   fallback_context.set_warning_level(warning_level());
   fallback_context.set_diagnostics_disabled(diagnostics_disabled());
   fallback_context.set_source_traces_enabled(should_print_source_traces());
-  fallback_context.m_source_frames.reserve(m_source_frames.count());
-  for (let const &frame : m_source_frames) {
-    fallback_context.m_source_frames.push(source_frame{
+  fallback_context.source_store().m_source_frames.reserve(source_store().m_source_frames.count());
+  for (let const &frame : source_store().m_source_frames) {
+    fallback_context.source_store().m_source_frames.push(source_frame{
         String{frame.origin.view()}, frame.call_site, frame.parent_source,
         frame.parent_source_generation, String{frame.source_path.view()},
         frame.is_cli_root, frame.is_only_root_source});
-    fallback_context.m_source_frames.back().function_call_depth =
+    fallback_context.source_store().m_source_frames.back().function_call_depth =
         frame.function_call_depth;
-    fallback_context.m_source_frames.back().was_printed = frame.was_printed;
-    fallback_context.m_source_frames.back().should_defer_trace =
+    fallback_context.source_store().m_source_frames.back().was_printed = frame.was_printed;
+    fallback_context.source_store().m_source_frames.back().should_defer_trace =
         frame.should_defer_trace;
-    fallback_context.m_source_frames.back().has_deferred_trace =
+    fallback_context.source_store().m_source_frames.back().has_deferred_trace =
         frame.has_deferred_trace;
-    fallback_context.m_source_frames.back().deferred_trace_location =
+    fallback_context.source_store().m_source_frames.back().deferred_trace_location =
         frame.deferred_trace_location;
   }
   defer
   {
     let const shared_frame_count =
-        m_source_frames.count() < fallback_context.m_source_frames.count()
-            ? m_source_frames.count()
-            : fallback_context.m_source_frames.count();
+        source_store().m_source_frames.count() < fallback_context.source_store().m_source_frames.count()
+            ? source_store().m_source_frames.count()
+            : fallback_context.source_store().m_source_frames.count();
     for (usize frame_index = 0; frame_index < shared_frame_count; frame_index++)
     {
-      m_source_frames[frame_index].was_printed =
-          m_source_frames[frame_index].was_printed ||
-          fallback_context.m_source_frames[frame_index].was_printed;
-      m_source_frames[frame_index].has_deferred_trace =
-          m_source_frames[frame_index].has_deferred_trace ||
-          fallback_context.m_source_frames[frame_index].has_deferred_trace;
-      if (fallback_context.m_source_frames[frame_index]
+      source_store().m_source_frames[frame_index].was_printed =
+          source_store().m_source_frames[frame_index].was_printed ||
+          fallback_context.source_store().m_source_frames[frame_index].was_printed;
+      source_store().m_source_frames[frame_index].has_deferred_trace =
+          source_store().m_source_frames[frame_index].has_deferred_trace ||
+          fallback_context.source_store().m_source_frames[frame_index].has_deferred_trace;
+      if (fallback_context.source_store().m_source_frames[frame_index]
               .deferred_trace_location.has_value())
       {
-        m_source_frames[frame_index].deferred_trace_location =
-            fallback_context.m_source_frames[frame_index]
+        source_store().m_source_frames[frame_index].deferred_trace_location =
+            fallback_context.source_store().m_source_frames[frame_index]
                 .deferred_trace_location;
       }
     }
@@ -144,7 +154,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   let const isolated = isolation == script_isolation::Isolated;
   defer { ec.close_fds(); };
 
-  if (m_mimicry_depth >= MAX_MIMICRY_DEPTH)
+  if (source_store().mimicry_depth() >= MAX_MIMICRY_DEPTH)
     throw ErrorWithLocation{ec.source_location(),
                             "Unable to mimic '" + ec.program() +
                                 "' because the script nesting is too deep"};
@@ -197,21 +207,21 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
 
   let const previous_runtime = m_runtime;
   let const was_restricted_shell = m_is_restricted_shell;
-  let const previous_script_run = m_is_script_run;
+  let const previous_script_run = source_store().is_script_run();
   let previous_shell_name = String{m_shell_name};
-  let const previous_source = m_current_source;
-  let const previous_origin = m_current_origin;
-  let const previous_location = m_current_location;
+  let const previous_source = source_store().m_current_source;
+  let const previous_origin = source_store().m_current_origin;
+  let const previous_location = source_store().m_current_location;
   let isolated_snapshot = Maybe<eval_state_snapshot>{};
   if (isolated) isolated_snapshot = snapshot_state();
 
   bool should_restore_isolated_state = isolated;
   let const do_restore_auxiliary_state = [&]() throws {
     set_current_source(previous_source, previous_origin);
-    m_current_location = previous_location;
+    source_store().m_current_location = previous_location;
     previous_runtime.restore(*this);
     m_is_restricted_shell = was_restricted_shell;
-    m_is_script_run = previous_script_run;
+    source_store().set_script_run(previous_script_run);
     m_shell_name = steal(previous_shell_name);
   };
   defer
@@ -229,7 +239,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   m_runtime.mood = mode;
   LOG(Debug, "mimicking the script '%s'%s", ec.program().c_str(),
       isolated ? " in an isolated subshell" : "");
-  m_is_script_run = true;
+  source_store().set_script_run(true);
 
   /* A mimicked script runs with the strictness of the mood it mimics, so a bash
      or sh script clears nounset, pipefail, and failglob while a kosh script
@@ -242,15 +252,16 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
       is_mimic_strict ? "kosh" : "lax");
 
   let const script_filename = ec.program_path().view();
-  m_source_frames.push(source_frame{String{ec.program().view()},
+  source_store().m_source_frames.push(source_frame{String{ec.program().view()},
                                     ec.source_location(), current_source(),
                                     source_generation_for(current_source()),
                                     String{script_filename}, false, false});
-  m_source_frames.back().should_defer_trace = true;
-  m_source_frames.back().function_call_depth = m_function_call_names.count();
+  source_store().m_source_frames.back().should_defer_trace = true;
+  source_store().m_source_frames.back().function_call_depth =
+      function_store().call_names().count();
   defer
   {
-    let &frame = m_source_frames.back();
+    let &frame = source_store().m_source_frames.back();
     if (frame.has_deferred_trace) {
       try {
         print_source_backtrace(frame.deferred_trace_location, false);
@@ -258,7 +269,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
         LOG(Debug, "rendering a deferred source trace failed");
       }
     }
-    m_source_frames.pop_back();
+    source_store().m_source_frames.pop_back();
   };
   let parser = Parser{
       Lexer{contents->view(), *parse_arena(), false, script_filename, mood()}
@@ -315,7 +326,9 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     i32 final_status = last_exit_status();
     bool was_error_rendered = false;
     if (error && !is_interrupt) {
-      final_status = mimicked_error_status(error, is_posix_mode());
+      final_status = mimicked_error_status(
+          error, is_posix_mode() ? mimicked_error_status_mode::Posix
+                                 : mimicked_error_status_mode::Default);
       set_last_exit_status(final_status);
       do_render_error(error);
       was_error_rendered = true;
@@ -336,7 +349,9 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
           error = std::current_exception();
           is_interrupt = mimicked_error_is_interrupt(error);
           if (!is_interrupt)
-            final_status = mimicked_error_status(error, is_posix_mode());
+            final_status = mimicked_error_status(
+                error, is_posix_mode() ? mimicked_error_status_mode::Posix
+                                       : mimicked_error_status_mode::Default);
         }
       }
     }
@@ -354,12 +369,12 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
                                    ? ec.args()[0].view()
                                    : ec.program_path().view()};
   set_current_source(&*contents, String{ec.program().view()});
-  m_current_location = SourceLocation{};
-  m_mimicry_depth++;
+  source_store().m_current_location = SourceLocation{};
+  source_store().mimicry_depth()++;
   bool should_leave_mimicry = true;
   defer
   {
-    if (should_leave_mimicry) m_mimicry_depth--;
+    if (should_leave_mimicry) source_store().mimicry_depth()--;
   };
 
   let const do_evaluate_script = [&]() throws {
@@ -389,7 +404,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
       error = std::current_exception();
     }
     let const is_interrupt = do_finish_script(error, false);
-    m_mimicry_depth--;
+    source_store().mimicry_depth()--;
     should_leave_mimicry = false;
     do_restore_fds();
     if (error) {
@@ -417,7 +432,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   }
   let const is_interrupt = do_finish_script(error, true);
   leave_subshell();
-  m_mimicry_depth--;
+  source_store().mimicry_depth()--;
   should_leave_mimicry = false;
   do_restore_fds();
 
@@ -448,12 +463,12 @@ pure fn EvalContext::shopt_default_is_on(StringView name) wontthrow -> bool
 }
 
 fn EvalContext::run_source(StringView source, StringView origin,
-                           return_handling handling,
                            Maybe<SourceLocation> call_site,
                            Maybe<StringView> filename,
-                           bool should_record_history,
                            Maybe<i32> *status_before_return,
-                           const FunctionBodyHandle *cached_body) throws -> i32
+                           const FunctionBodyHandle *cached_body,
+                           return_handling handling,
+                           history_recording history) throws -> i32
 {
   if (cached_body != nullptr && (cached_body->get_body() == nullptr ||
                                  cached_body->get_source() == nullptr))
@@ -477,14 +492,14 @@ fn EvalContext::run_source(StringView source, StringView origin,
 
   LOG(Debug, "running source '%.*s' of %zu bytes at depth %zu",
       static_cast<int>(origin.length), origin.data, source.length,
-      m_source_depth);
+      source_store().source_depth());
 
   /* Bound the source and eval nesting so a file that sources itself errors here
      rather than exhausting memory. */
   enter_source(call_site ? *call_site : SourceLocation{0, 0});
   defer { leave_source(); };
 
-  let const parent_source = call_site ? m_current_source : nullptr;
+  let const parent_source = call_site ? source_store().m_current_source : nullptr;
   let const frame_is_sourced_file =
       consume_return && filename.has_value() && !filename->is_empty();
 
@@ -495,7 +510,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
   if (frame_is_sourced_file) saved_debug_action = save_untraced_debug_trap();
   defer { restore_untraced_debug_trap(steal(saved_debug_action)); };
 
-  m_source_frames.push(source_frame{
+  source_store().m_source_frames.push(source_frame{
       String{origin},
       call_site ? *call_site : SourceLocation{0, 0},
       parent_source, source_generation_for(parent_source),
@@ -503,13 +518,18 @@ fn EvalContext::run_source(StringView source, StringView origin,
       : String{heap_allocator()},
       false, false
   });
-  m_source_frames.back().should_defer_trace = frame_is_sourced_file;
-  m_source_frames.back().function_call_depth = m_function_call_names.count();
-  if (reject_return) m_rejected_return_source_frames++;
+  source_store().m_source_frames.back().should_defer_trace = frame_is_sourced_file;
+  source_store().m_source_frames.back().function_call_depth =
+      function_store().call_names().count();
+  if (reject_return)
+    source_store().set_rejected_return_source_frames(
+        source_store().rejected_return_source_frames() + 1);
   defer
   {
-    if (reject_return) m_rejected_return_source_frames--;
-    let &frame = m_source_frames.back();
+    if (reject_return)
+      source_store().set_rejected_return_source_frames(
+          source_store().rejected_return_source_frames() - 1);
+    let &frame = source_store().m_source_frames.back();
     if (frame.has_deferred_trace) {
       try {
         print_source_backtrace(frame.deferred_trace_location, false);
@@ -517,7 +537,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
         LOG(Debug, "rendering a deferred source trace failed");
       }
     }
-    m_source_frames.pop_back();
+    source_store().m_source_frames.pop_back();
   };
 
   try {
@@ -534,8 +554,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
 
       let const parsed_ast = parser.construct_ast();
       ASSERT(parsed_ast != nullptr);
-      m_retained_source_asts.reserve(m_retained_source_asts.count() + 1);
-      m_retained_sources.reserve(m_retained_sources.count() + 1);
+      source_store().m_retained_source_asts.reserve(source_store().m_retained_source_asts.count() + 1);
+      source_store().m_retained_sources.reserve(source_store().m_retained_sources.count() + 1);
 
       /* Keep a copy of the source alive for as long as the AST, so a
          control-flow jump made inside it can point a caret at the right text
@@ -548,34 +568,34 @@ fn EvalContext::run_source(StringView source, StringView origin,
         heap_allocator().free_array(owned_source, 1);
         throw;
       }
-      m_retained_sources.push(owned_source);
-      m_retained_source_asts.push(parsed_ast);
+      source_store().m_retained_sources.push(owned_source);
+      source_store().m_retained_source_asts.push(parsed_ast);
       ast = parsed_ast;
       retained_source = owned_source;
     }
     source = retained_source->view();
 
-    let const previous_history_recording_root = m_history_recording_root;
-    let const previous_history_recording_source = m_history_recording_source;
-    if (should_record_history) {
-      m_history_recording_root = ast;
-      m_history_recording_source = source;
+    let const previous_history_recording_root = source_store().m_history_recording_root;
+    let const previous_history_recording_source = source_store().m_history_recording_source;
+    if (history == history_recording::Enabled) {
+      source_store().m_history_recording_root = ast;
+      source_store().m_history_recording_source = source;
     }
     defer
     {
-      m_history_recording_root = previous_history_recording_root;
-      m_history_recording_source = previous_history_recording_source;
+      source_store().m_history_recording_root = previous_history_recording_root;
+      source_store().m_history_recording_source = previous_history_recording_source;
     };
 
-    let const previous_source = m_current_source;
-    let const previous_origin = m_current_origin;
-    let const previous_location = m_current_location;
+    let const previous_source = source_store().m_current_source;
+    let const previous_origin = source_store().m_current_origin;
+    let const previous_location = source_store().m_current_location;
     set_current_source(retained_source, String{origin});
-    m_current_location = SourceLocation{};
+    source_store().m_current_location = SourceLocation{};
     defer
     {
       set_current_source(previous_source, previous_origin);
-      m_current_location = previous_location;
+      source_store().m_current_location = previous_location;
     };
 
     ast->evaluate(*this);
@@ -649,23 +669,24 @@ fn EvalContext::resolve_source_path(StringView path,
 fn EvalContext::clear_retained_sources() wontthrow -> void
 {
   LOG(All, "dropping %zu retained sources and %zu retained asts",
-      m_retained_sources.count(), m_retained_source_asts.count());
+      source_store().m_retained_sources.count(), source_store().m_retained_source_asts.count());
 
 #if !defined NDEBUG
-  for (let const &frame : m_source_frames) {
+  for (let const &frame : source_store().m_source_frames) {
     if (frame.parent_source == nullptr) continue;
-    for (let const *retained : m_retained_sources) {
+    for (let const *retained : source_store().m_retained_sources) {
       ASSERT(retained != frame.parent_source,
              "a live source frame still borrows a dropped source");
     }
   }
 #endif
 
-  m_retained_source_asts.clear();
+  source_store().m_retained_source_asts.clear();
 
   /* A stashed source view or location may index a buffer freed just below, so
      both drop to the unlocated rendering. */
-  for (process_substitution &sub : m_pending_process_substitutions) {
+  for (process_substitution &sub :
+       expansion_store().pending_process_substitutions()) {
     sub.source = StringView{};
     sub.location = SourceLocation{};
   }
@@ -675,11 +696,11 @@ fn EvalContext::clear_retained_sources() wontthrow -> void
     pending_control_flow().location = SourceLocation{};
   }
 
-  for (String *source : m_retained_sources) {
+  for (String *source : source_store().m_retained_sources) {
     source->~String();
     heap_allocator().free_array(source, 1);
   }
-  m_retained_sources.clear();
+  source_store().m_retained_sources.clear();
 
   /* A just-freed buffer can be reissued at the same address and length, so the
      caches keyed on that are dropped to keep them from serving a stale index.
@@ -687,15 +708,15 @@ fn EvalContext::clear_retained_sources() wontthrow -> void
   utils::invalidate_line_number_cache();
   reset_runtime_diagnostic_highlight_cache();
 
-  m_current_source = nullptr;
-  m_current_source_generation = EXTERNAL_SOURCE_GENERATION;
-  m_current_origin.clear();
-  m_retained_source_generation++;
+  source_store().m_current_source = nullptr;
+  source_store().m_current_source_generation = EXTERNAL_SOURCE_GENERATION;
+  source_store().m_current_origin.clear();
+  source_store().m_retained_source_generation++;
 }
 
 pure fn EvalContext::get_retained_source_generation() const wontthrow -> u64
 {
-  return m_retained_source_generation;
+  return source_store().m_retained_source_generation;
 }
 
 pure fn
@@ -703,8 +724,8 @@ EvalContext::scan_source_generation(const String *source) const wontthrow -> u64
 {
   if (source == nullptr) return EXTERNAL_SOURCE_GENERATION;
 
-  for (let const *retained : m_retained_sources) {
-    if (retained == source) return m_retained_source_generation;
+  for (let const *retained : source_store().m_retained_sources) {
+    if (retained == source) return source_store().m_retained_source_generation;
   }
 
   return EXTERNAL_SOURCE_GENERATION;
@@ -713,7 +734,7 @@ EvalContext::scan_source_generation(const String *source) const wontthrow -> u64
 pure fn EvalContext::source_generation_for(const String *source) const wontthrow
     -> u64
 {
-  if (source == m_current_source) return m_current_source_generation;
+  if (source == source_store().m_current_source) return source_store().m_current_source_generation;
 
   return scan_source_generation(source);
 }
@@ -722,7 +743,7 @@ pure fn EvalContext::borrowed_frame_source(
     const source_frame &frame) const wontthrow -> const String *
 {
   if (frame.parent_source_generation != EXTERNAL_SOURCE_GENERATION &&
-      frame.parent_source_generation != m_retained_source_generation)
+      frame.parent_source_generation != source_store().m_retained_source_generation)
   {
     return nullptr;
   }
@@ -732,7 +753,7 @@ pure fn EvalContext::borrowed_frame_source(
 
 fn EvalContext::retain_ast(Expression *ast) throws -> void
 {
-  m_retained_source_asts.push(ast);
+  source_store().m_retained_source_asts.push(ast);
 }
 
 fn EvalContext::expand_heredoc_body(

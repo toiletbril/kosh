@@ -77,6 +77,12 @@ enum class parser_format_codec : u8
   Continued,
 };
 
+enum class yaml_shell_selection : u8
+{
+  Nearby,
+  Workflow,
+};
+
 struct parser_format_json_key
 {
   StringView name;
@@ -225,18 +231,19 @@ pure fn parser_format_ascii_equal(StringView left, StringView right) wontthrow
     -> bool;
 fn parser_format_add_fragment(
     parsed_format_document &document, StringView host_source, usize host_start,
-    usize host_end, mimic_mood mood,
+    usize host_end, usize indent_length = 0,
+    Maybe<String> prepared_analysis_source = None,
     parser_format_codec codec = parser_format_codec::Direct,
-    usize indent_length = 0,
-    Maybe<String> prepared_analysis_source = None) throws -> void;
+    mimic_mood mood = mimic_mood::Posix) throws -> void;
 fn parser_format_add_indented_fragment(parsed_format_document &document,
                                        StringView host_source, usize host_start,
                                        usize host_end, usize indent_length,
                                        mimic_mood mood) throws -> void;
 fn parser_format_extract_yaml_keys(
     parsed_format_document &document, StringView source, const StringView *keys,
-    usize key_count, mimic_mood default_mood,
-    bool should_select_workflow_shell = false) throws -> void;
+    usize key_count, mimic_mood default_mood = mimic_mood::Posix,
+    yaml_shell_selection selection = yaml_shell_selection::Nearby) throws
+    -> void;
 fn parser_format_extract_json_keys(parsed_format_document &document,
                                    StringView source,
                                    const parser_format_json_key *keys,

@@ -126,9 +126,9 @@ fn parse_dockerfile_format(const parser_format_input &input,
                   continuation[continuation.length - 1] == '\\';
     }
     let const fragment_count = document.fragments.count();
-    parser_format_add_fragment(document, input.source,
-                               line_start + content_position, shell_end, mood,
-                               parser_format_codec::Continued, 4);
+    parser_format_add_fragment(
+        document, input.source, line_start + content_position, shell_end, 4,
+        None, parser_format_codec::Continued, mood);
     if (document.fragments.count() != fragment_count)
       document.fragments.back().continuation_byte = ' ';
   }

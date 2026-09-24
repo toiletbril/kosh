@@ -105,8 +105,8 @@ pure fn state_name(os::network_socket_state state) wontthrow -> StringView
   unreachable("unknown network socket state");
 }
 
-fn endpoint(StringView address, u16 port, os::network_address_family family,
-            Allocator allocator) throws -> String
+fn endpoint(StringView address, u16 port, Allocator allocator,
+            os::network_address_family family) throws -> String
 {
   let result = String{allocator};
   if (family == os::network_address_family::IPv6) result += "[";
@@ -142,7 +142,10 @@ fn append_network_socket_report(String &output,
                                 Allocator allocator, bool should_color) throws
     -> bool
 {
-  let sockets = os::network_sockets(options.should_show_processes);
+  let sockets = os::network_sockets(
+      options.should_show_processes
+          ? os::network_socket_process_mode::WithProcesses
+          : os::network_socket_process_mode::WithoutProcesses);
   sockets.sort([](const os::network_socket_entry &left,
                   const os::network_socket_entry &right) {
     if (left.protocol != right.protocol) return left.protocol < right.protocol;
@@ -227,11 +230,11 @@ fn append_network_socket_report(String &output,
     row.send_queue = String::from(socket.send_queue_bytes, allocator);
     row.local = is_unix ? unix_endpoint(socket.local_address.view(),
                                         socket.identity, allocator)
-                        : endpoint(socket.local_address.view(),
-                                   socket.local_port, socket.family, allocator);
+                        : endpoint(socket.local_address.view(), socket.local_port,
+                                   allocator, socket.family);
     row.peer = is_unix ? unix_endpoint({}, socket.peer_identity, allocator)
                        : endpoint(socket.peer_address.view(), socket.peer_port,
-                                  socket.family, allocator);
+                                  allocator, socket.family);
     row.process_id = socket.process_id == 0
                          ? String{allocator, "-"}
                          : String::from(socket.process_id, allocator);

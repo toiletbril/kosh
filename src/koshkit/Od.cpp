@@ -33,8 +33,8 @@ REGISTER_KOSHKIT_UTIL_FLAGS(Od);
 namespace koshka::koshkit {
 
 static fn append_od_padded(String &output, u64 magnitude, bool is_negative,
-                           usize width_columns, int_base base,
-                           char padding) throws -> void
+                           usize width_columns, char padding,
+                           int_base base) throws -> void
 {
   let const digits =
       String::from_in_base(magnitude, is_negative, base, output.allocator());
@@ -74,7 +74,7 @@ static fn append_od_character(String &output, u8 byte) throws -> void
     return;
   }
 
-  append_od_padded(output, byte, false, 3, int_base::octal, '0');
+  append_od_padded(output, byte, false, 3, '0', int_base::octal);
 }
 
 static fn od_base(char radix) wontthrow -> int_base
@@ -422,8 +422,8 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
 
     for (usize format_index = 0; format_index < format_count; format_index++) {
       if (should_print_address && format_index == 0) {
-        append_od_padded(output, first + row_start, false, 7, address_base,
-                         '0');
+        append_od_padded(output, first + row_start, false, 7, '0',
+                         address_base);
       } else {
         output += "       ";
       }
@@ -464,8 +464,8 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
 
           output += ' ';
           append_od_padded(output, value, is_negative, format.width_columns,
-                           format.base,
-                           format.base == int_base::decimal ? ' ' : '0');
+                           format.base == int_base::decimal ? ' ' : '0',
+                           format.base);
         }
       }
 
@@ -474,7 +474,7 @@ fn Od::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (should_print_address) {
-    append_od_padded(output, first + bytes.length, false, 7, address_base, '0');
+    append_od_padded(output, first + bytes.length, false, 7, '0', address_base);
     output += '\n';
   }
   ec.print_to_stdout(output);

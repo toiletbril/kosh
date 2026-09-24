@@ -50,6 +50,24 @@ namespace koshka::koshkit {
 
 namespace {
 
+enum class eviliso_detail_mode : u8
+{
+  Summary,
+  All,
+};
+
+enum class eviliso_collection_mode : u8
+{
+  Skip,
+  Collect,
+};
+
+enum class eviliso_remote_rows_mode : u8
+{
+  Hide,
+  Show,
+};
+
 struct namespace_process
 {
   namespace_process(i64 process_id, StringView name, bool is_self,
@@ -141,9 +159,8 @@ fn namespace_identifier(StringView target, Allocator allocator) throws
 }
 
 fn append_namespace_report(String &output, bool should_color,
-                           bool should_show_detail,
-                           ArrayList<namespace_process> processes) throws
-    -> void
+                           ArrayList<namespace_process> processes,
+                           eviliso_detail_mode detail) throws -> void
 {
   constexpr StringView names[] = {"cgroup", "ipc",  "mnt",  "net",
                                   "pid",    "time", "user", "uts"};
@@ -220,7 +237,7 @@ fn append_namespace_report(String &output, bool should_color,
                    colors::ansi::BOLD_CYAN);
   table.add_column("ID", report_table_alignment::Right,
                    colors::ansi::BOLD_CYAN);
-  if (should_show_detail) {
+  if (detail == eviliso_detail_mode::All) {
     table.add_column("PID", report_table_alignment::Right,
                      colors::ansi::BOLD_CYAN);
     table.add_column("NAME", report_table_alignment::Left,
@@ -234,7 +251,7 @@ fn append_namespace_report(String &output, bool should_color,
 
   let cells = ArrayList<report_table_cell_view>{allocator};
   cells.reserve(5);
-  if (should_show_detail) {
+  if (detail == eviliso_detail_mode::All) {
     for (let const &relation : relations) {
       let process_id = String::from(relation.process_id, allocator);
       cells.clear();
@@ -579,7 +596,7 @@ fn parse_cgroup_identity(StringView path, Allocator allocator) throws
 }
 
 fn collect_process_cgroup_snapshot(Allocator allocator,
-                                   bool should_collect_cgroups) throws
+                                   eviliso_collection_mode collection) throws
     -> ArrayList<process_cgroup_snapshot>
 {
   let candidates =
@@ -597,7 +614,7 @@ fn collect_process_cgroup_snapshot(Allocator allocator,
     record.command = process.command_line.is_empty()
                          ? String{allocator, "-"}
                          : String{allocator, process.command_line.view()};
-    if (should_collect_cgroups) {
+    if (collection == eviliso_collection_mode::Collect) {
       let suffix = String::from(process.pid, allocator);
       suffix += "/cgroup";
       let const contents =
@@ -705,9 +722,8 @@ pure fn process_snapshot_status_name(process_snapshot_status status)
 }
 
 fn append_cgroup_report(String &output, bool should_color,
-                        bool should_show_detail,
-                        const ArrayList<process_cgroup_snapshot> &snapshot)
-    throws -> void
+                        const ArrayList<process_cgroup_snapshot> &snapshot,
+                        eviliso_detail_mode detail) throws -> void
 {
   let const allocator = snapshot.allocator();
   let table = ReportTable{allocator};
@@ -735,7 +751,7 @@ fn append_cgroup_report(String &output, bool should_color,
         "available", allocator});
   }
 
-  if (should_show_detail) {
+  if (detail == eviliso_detail_mode::All) {
     for (let const &process : snapshot) {
       if (process.process_id == self_process_id) continue;
       for (let const &membership : process.memberships) {
@@ -787,7 +803,7 @@ fn append_cgroup_report(String &output, bool should_color,
                     colors::ansi::BOLD_CYAN);
   report.add_column("ROLE", report_table_alignment::Left,
                     colors::ansi::BOLD_CYAN);
-  if (should_show_detail)
+  if (detail == eviliso_detail_mode::All)
     report.add_column("STATUS", report_table_alignment::Left,
                       colors::ansi::BOLD_CYAN);
   let cells = ArrayList<report_table_cell_view>{allocator};
@@ -800,7 +816,7 @@ fn append_cgroup_report(String &output, bool should_color,
     cells.push({row.process_id.view(), colors::ansi::BOLD_GREEN});
     cells.push({row.name.view(), colors::ansi::RESET});
     cells.push({row.role, colors::ansi::BOLD_MAGENTA});
-    if (should_show_detail)
+    if (detail == eviliso_detail_mode::All)
       cells.push({row.status, row.status == "available"
                                   ? colors::ansi::BOLD_GREEN
                                   : colors::ansi::BOLD_YELLOW});
@@ -854,9 +870,8 @@ struct session_report_row
   String login_time;
 };
 
-fn append_session_report(String &output, bool should_color,
-                         bool should_show_detail, Allocator allocator) throws
-    -> void
+fn append_session_report(String &output, bool should_color, Allocator allocator,
+                         eviliso_detail_mode detail) throws -> void
 {
   let sessions = eviliso_sessions();
   sessions.sort([](const os::user_session &left,
@@ -869,7 +884,7 @@ fn append_session_report(String &output, bool should_color,
   let rows = ArrayList<session_report_row>{allocator};
   for (let const &session : sessions) {
     let login_time = String{allocator};
-    if (should_show_detail) {
+    if (detail == eviliso_detail_mode::All) {
       login_time = session.login_time == 0
                        ? String{allocator, "unavailable"}
                        : String{allocator,
@@ -888,7 +903,7 @@ fn append_session_report(String &output, bool should_color,
                    colors::ansi::BOLD_CYAN);
   table.add_column("TERMINAL", report_table_alignment::Left,
                    colors::ansi::BOLD_CYAN);
-  if (should_show_detail) {
+  if (detail == eviliso_detail_mode::All) {
     table.add_column("LOGIN TIME", report_table_alignment::Left,
                      colors::ansi::BOLD_CYAN);
   }
@@ -896,7 +911,7 @@ fn append_session_report(String &output, bool should_color,
     let cells = ArrayList<report_table_cell_view>{allocator};
     cells.push({row.user.view(), colors::ansi::BOLD_GREEN});
     cells.push({row.terminal.view(), colors::ansi::RESET});
-    if (should_show_detail) {
+    if (detail == eviliso_detail_mode::All) {
       cells.push({row.login_time.view(), colors::ansi::RESET});
     }
     table.add_row(cells);
@@ -933,9 +948,8 @@ pure fn is_remote_socket(const os::network_socket_entry &socket) wontthrow
          !socket.peer_address.is_empty() && socket.peer_port != 0;
 }
 
-fn remote_endpoint(StringView address, u16 port,
-                   os::network_address_family family,
-                   Allocator allocator) throws -> String
+fn remote_endpoint(StringView address, u16 port, Allocator allocator,
+                   os::network_address_family family) throws -> String
 {
   let result = String{allocator};
   if (family == os::network_address_family::IPv6) result += "[";
@@ -982,11 +996,11 @@ fn remote_table_text(StringView text, usize maximum_cells,
   return result;
 }
 
-fn append_remote_report(String &output, bool should_color,
-                        bool should_show_rows, bool should_show_detail,
-                        const ArrayList<process_cgroup_snapshot> &snapshot,
-                        Allocator allocator)
-    throws -> void
+fn append_remote_report(
+    String &output, bool should_color,
+    const ArrayList<process_cgroup_snapshot> &snapshot, Allocator allocator,
+    eviliso_remote_rows_mode rows_mode, eviliso_detail_mode detail) throws
+    -> void
 {
   let table = ReportTable{allocator};
   if (!os::has_network_socket_listing()) {
@@ -995,7 +1009,10 @@ fn append_remote_report(String &output, bool should_color,
     return;
   }
 
-  let sockets = os::network_sockets(should_show_detail);
+  let sockets = os::network_sockets(
+      detail == eviliso_detail_mode::All
+          ? os::network_socket_process_mode::WithProcesses
+          : os::network_socket_process_mode::WithoutProcesses);
   sockets.sort([](const os::network_socket_entry &left,
                   const os::network_socket_entry &right) {
     if (left.peer_address != right.peer_address) {
@@ -1052,7 +1069,7 @@ fn append_remote_report(String &output, bool should_color,
             String::from(socket_count, allocator).view(),
             colors::ansi::BOLD_CYAN);
   append_titled_report_table(output, "Socket summary", table, should_color);
-  if (!should_show_rows) return;
+  if (rows_mode == eviliso_remote_rows_mode::Hide) return;
 
   struct remote_peer_row
   {
@@ -1160,15 +1177,15 @@ fn append_remote_report(String &output, bool should_color,
         socket.protocol == os::network_socket_protocol::Udp ? "UDP" : "TCP";
     row.state = remote_state_name(socket.state);
     row.local = remote_endpoint(socket.local_address.view(), socket.local_port,
-                                socket.family, allocator);
+                                allocator, socket.family);
     row.peer = remote_endpoint(socket.peer_address.view(), socket.peer_port,
-                               socket.family, allocator);
+                               allocator, socket.family);
     row.socket_id = socket.identity == 0
                         ? String{allocator, "-"}
                         : String::from(socket.identity, allocator);
     row.receive_queue_bytes = socket.receive_queue_bytes;
     row.send_queue_bytes = socket.send_queue_bytes;
-    if (should_show_detail) {
+    if (detail == eviliso_detail_mode::All) {
       row.process_id = socket.process_id == 0
                            ? String{allocator, "-"}
                            : String::from(socket.process_id, allocator);
@@ -1305,7 +1322,7 @@ fn append_remote_report(String &output, bool should_color,
                         colors::ansi::BOLD_CYAN);
   peer_table.add_column("PEER", report_table_alignment::Left,
                         colors::ansi::BOLD_CYAN);
-  if (should_show_detail) {
+  if (detail == eviliso_detail_mode::All) {
     peer_table.add_column("SOCKET", report_table_alignment::Right,
                           colors::ansi::BOLD_CYAN);
     peer_table.add_column("PID", report_table_alignment::Right,
@@ -1340,7 +1357,7 @@ fn append_remote_report(String &output, bool should_color,
     cells.push({send.view(), colors::ansi::GREEN});
     cells.push({row.local.view(), colors::ansi::BOLD_CYAN});
     cells.push({row.peer.view(), colors::ansi::CYAN});
-    if (should_show_detail) {
+    if (detail == eviliso_detail_mode::All) {
       cells.push({row.socket_id.view(), colors::ansi::YELLOW});
       cells.push({row.process_id.view(), colors::ansi::YELLOW});
       cells.push({row.owner_id.view(), colors::ansi::RESET});
@@ -1359,9 +1376,9 @@ fn append_remote_report(String &output, bool should_color,
 }
 
 fn append_runtime_evidence_report(
-    String &output, bool should_color, bool should_show_detail,
-    const ArrayList<process_cgroup_snapshot> &snapshot,
-    Allocator allocator) throws -> void
+    String &output, bool should_color,
+    const ArrayList<process_cgroup_snapshot> &snapshot, Allocator allocator,
+    eviliso_detail_mode detail) throws -> void
 {
   struct runtime_report_row
   {
@@ -1390,7 +1407,8 @@ fn append_runtime_evidence_report(
       for (let const &row : rows) {
         if (row.runtime != evidence.runtime || row.evidence != evidence.path)
           continue;
-        if (!should_show_detail || row.process_id_value == process.process_id) {
+        if (detail != eviliso_detail_mode::All ||
+            row.process_id_value == process.process_id) {
           is_duplicate = true;
           break;
         }
@@ -1444,7 +1462,7 @@ fn append_runtime_evidence_report(
                    colors::ansi::BOLD_CYAN);
   table.add_column("SOURCE", report_table_alignment::Left,
                    colors::ansi::BOLD_CYAN);
-  if (should_show_detail) {
+  if (detail == eviliso_detail_mode::All) {
     table.add_column("PID", report_table_alignment::Right,
                      colors::ansi::BOLD_CYAN);
     table.add_column("NAME", report_table_alignment::Left,
@@ -1458,7 +1476,7 @@ fn append_runtime_evidence_report(
     let cells = ArrayList<report_table_cell_view>{allocator};
     cells.push({row.runtime.view(), colors::ansi::BOLD_GREEN});
     cells.push({row.source.view(), colors::ansi::RESET});
-    if (should_show_detail) {
+    if (detail == eviliso_detail_mode::All) {
       cells.push({row.process_id.view(), colors::ansi::YELLOW});
       cells.push({row.name.view(), colors::ansi::RESET});
       cells.push({row.role.view(), colors::ansi::BOLD_MAGENTA});
@@ -1471,9 +1489,9 @@ fn append_runtime_evidence_report(
 }
 
 fn append_container_report(
-    String &output, bool should_color, bool should_show_detail,
-    const ArrayList<process_cgroup_snapshot> &snapshot,
-    Allocator allocator) throws -> void
+    String &output, bool should_color,
+    const ArrayList<process_cgroup_snapshot> &snapshot, Allocator allocator,
+    eviliso_detail_mode detail) throws -> void
 {
   struct container_summary_row
   {
@@ -1539,7 +1557,7 @@ fn append_container_report(
         }
       }
 
-      if (!should_show_detail) continue;
+      if (detail != eviliso_detail_mode::All) continue;
       bool is_detail_duplicate = false;
       for (usize known_index = 0; known_index < index; known_index++) {
         let const &known = process.evidence[known_index];
@@ -1583,7 +1601,7 @@ fn append_container_report(
                    colors::ansi::BOLD_CYAN);
   table.add_column("CONTAINER", report_table_alignment::Left,
                    colors::ansi::BOLD_CYAN);
-  if (!should_show_detail) {
+  if (detail != eviliso_detail_mode::All) {
     table.add_column("PROCESSES", report_table_alignment::Right,
                      colors::ansi::BOLD_CYAN);
     for (let const &row : summary_rows) {
@@ -1653,9 +1671,9 @@ fn read_kubernetes_metadata(StringView name, Allocator allocator) throws
 }
 
 fn append_kubernetes_report(
-    String &output, bool should_color, bool should_show_detail,
-    const ArrayList<process_cgroup_snapshot> &snapshot,
-    Allocator allocator) throws -> void
+    String &output, bool should_color,
+    const ArrayList<process_cgroup_snapshot> &snapshot, Allocator allocator,
+    eviliso_detail_mode detail) throws -> void
 {
   let const self_process_id = os::get_current_process_id();
   let kubernetes_host = String{allocator};
@@ -1779,7 +1797,7 @@ fn append_kubernetes_report(
                             colors::ansi::BOLD_CYAN);
   workload_table.add_column("CONTAINER", report_table_alignment::Left,
                             colors::ansi::BOLD_CYAN);
-  if (!should_show_detail) {
+  if (detail != eviliso_detail_mode::All) {
     workload_table.add_column("PROCESSES", report_table_alignment::Right,
                               colors::ansi::BOLD_CYAN);
     for (let const &row : rows) {
@@ -1875,7 +1893,9 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   let const show_cgroups = !any_selector || FLAG_EVILISO_CGROUPS.is_enabled();
   let const show_sessions = !any_selector || FLAG_EVILISO_SESSIONS.is_enabled();
   let const show_remote = !any_selector || FLAG_EVILISO_REMOTE.is_enabled();
-  let const should_show_remote_detail = FLAG_EVILISO_ALL.is_enabled();
+  let const detail = FLAG_EVILISO_ALL.is_enabled()
+                         ? eviliso_detail_mode::All
+                         : eviliso_detail_mode::Summary;
   let const show_runtime =
       !any_selector || FLAG_EVILISO_RUNTIME.is_enabled();
   let const show_kubernetes =
@@ -1887,13 +1907,15 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{cxt.scratch_allocator()};
   let process_cgroups =
       ArrayList<process_cgroup_snapshot>{cxt.scratch_allocator()};
-  let const should_collect_cgroups =
-      show_cgroups || should_show_remote_detail || show_runtime ||
-      show_kubernetes || show_container;
-  if (show_namespaces || should_collect_cgroups)
+  let const collection =
+      show_cgroups || detail == eviliso_detail_mode::All || show_runtime ||
+              show_kubernetes || show_container
+          ? eviliso_collection_mode::Collect
+          : eviliso_collection_mode::Skip;
+  if (show_namespaces || collection == eviliso_collection_mode::Collect)
   {
     process_cgroups = collect_process_cgroup_snapshot(cxt.scratch_allocator(),
-                                                      should_collect_cgroups);
+                                                      collection);
   }
   if (show_namespaces) {
     let namespace_processes = ArrayList<namespace_process>{
@@ -1913,32 +1935,27 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
             process.process_id == self_process_id, cxt.scratch_allocator()});
       }
     }
-    append_namespace_report(output, should_color,
-                            FLAG_EVILISO_ALL.is_enabled(),
-                            steal(namespace_processes));
+    append_namespace_report(output, should_color, steal(namespace_processes),
+                            detail);
   }
   if (show_cgroups)
-    append_cgroup_report(output, should_color, FLAG_EVILISO_ALL.is_enabled(),
-                         process_cgroups);
+    append_cgroup_report(output, should_color, process_cgroups, detail);
   if (show_sessions)
-    append_session_report(output, should_color, FLAG_EVILISO_ALL.is_enabled(),
-                          cxt.scratch_allocator());
+    append_session_report(output, should_color, cxt.scratch_allocator(),
+                          detail);
   if (show_remote)
-    append_remote_report(output, should_color, true,
-                         should_show_remote_detail, process_cgroups,
-                         cxt.scratch_allocator());
+    append_remote_report(output, should_color, process_cgroups,
+                         cxt.scratch_allocator(),
+                         eviliso_remote_rows_mode::Show, detail);
   if (show_runtime)
-    append_runtime_evidence_report(output, should_color,
-                                   FLAG_EVILISO_ALL.is_enabled(),
-                                   process_cgroups, output.allocator());
+    append_runtime_evidence_report(output, should_color, process_cgroups,
+                                   output.allocator(), detail);
   if (show_container)
-    append_container_report(output, should_color,
-                            FLAG_EVILISO_ALL.is_enabled(), process_cgroups,
-                            output.allocator());
+    append_container_report(output, should_color, process_cgroups,
+                            output.allocator(), detail);
   if (show_kubernetes)
-    append_kubernetes_report(output, should_color,
-                             FLAG_EVILISO_ALL.is_enabled(), process_cgroups,
-                             output.allocator());
+    append_kubernetes_report(output, should_color, process_cgroups,
+                             output.allocator(), detail);
   ec.print_to_stdout(output);
   return 0;
 }

@@ -696,7 +696,7 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
   defer { resolver.end_explicit_completion(); };
   let result = completion::complete(
       document->shell_source(), *cursor, m_context, base_directory,
-      completion::completion_mode::Listing, &document_function_names, true);
+      &document_function_names, true, completion::completion_mode::Listing);
   let response = String{"["};
   let text_edit_prefix = String{heap_allocator()};
 
@@ -804,15 +804,15 @@ fn Server::format_document(const JsonValue *id, const JsonValue *params) throws
   let errors = ArrayList<String>{heap_allocator()};
   let formatted = Maybe<String>{};
   if (!document->format.is_host_format) {
-    formatted = format_shell_source(document->normalized_source.view(),
-                                    document->mood, m_ast_arena, errors, nullptr,
-                                    m_context.function_arena());
+    formatted = format_shell_source(
+        document->normalized_source.view(), m_ast_arena, errors, nullptr,
+        m_context.function_arena(), document->mood);
   } else {
     let replacements = ArrayList<parser_format_replacement>{heap_allocator()};
     for (let const &fragment : document->format.fragments) {
       let const formatted_fragment = format_shell_source(
-          fragment.shell_source.view(), fragment.mood, m_ast_arena, errors,
-          nullptr, m_context.function_arena());
+          fragment.shell_source.view(), m_ast_arena, errors, nullptr,
+          m_context.function_arena(), fragment.mood);
       if (!formatted_fragment.has_value()) break;
       let encoded = parser_format_encode(fragment, formatted_fragment->view());
       if (!encoded.has_value()) break;
@@ -1756,7 +1756,7 @@ fn Server::variable_hover_text(
     text.append(binder_description(nearest.binder));
   } else if (nearest.is_array) {
     text.append("\nThe value is a list, and the elements are not folded.");
-  } else if (nearest.is_append) {
+  } else if (nearest.update_mode == assignment_update_mode::Append) {
     text.append("\nThe value appends to what came before.");
   } else if (nearest.literal_value.has_value()) {
     text.append("\nValue: ");

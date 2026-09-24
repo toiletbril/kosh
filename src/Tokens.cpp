@@ -429,10 +429,10 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments,
 
     subscript.append(segment.text.substring_of_length(0, *close));
     const StringView after = segment.text.substring(*close + 1);
-    bool is_append = false;
+    let update_mode = assignment_update_mode::Replace;
     usize value_start = 0;
     if (after.starts_with("+=")) {
-      is_append = true;
+      update_mode = assignment_update_mode::Append;
       value_start = 2;
     } else if (after.starts_with("=")) {
       value_start = 1;
@@ -457,7 +457,7 @@ array_element_assignment_split(const ArrayList<WordSegment> &segments,
     for (usize j = i + 1; j < segments.count(); j++)
       value.segments.push(segments[j]);
 
-    return word_assignment_split{steal(key), steal(value), is_append};
+    return word_assignment_split{steal(key), steal(value), update_mode};
   }
 
   return koshka::None;
@@ -485,8 +485,13 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
 
   ASSERT(*equals_position <= first.text.count());
 
-  const bool is_append = first.text[*equals_position - 1] == '+';
-  const usize name_length = is_append ? *equals_position - 1 : *equals_position;
+  let const update_mode =
+      first.text[*equals_position - 1] == '+'
+          ? assignment_update_mode::Append
+          : assignment_update_mode::Replace;
+  const usize name_length = update_mode == assignment_update_mode::Append
+                                ? *equals_position - 1
+                                : *equals_position;
   if (name_length == 0) return koshka::None;
 
   usize name_cursor = 1;
@@ -516,7 +521,7 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
   for (usize i = 1; i < segments.count(); i++)
     value.segments.push(segments[i]);
 
-  return word_assignment_split{steal(name), steal(value), is_append};
+  return word_assignment_split{steal(name), steal(value), update_mode};
 }
 
 /* The name characters ahead of the first literal =, gathered across the
@@ -556,10 +561,14 @@ cold fn Word::get_quoted_assignment_split() const throws
   if (equals_segment == segments.count()) return koshka::None;
 
   let const prefix_view = prefix.view();
-  let const is_append =
-      !prefix_view.is_empty() && prefix_view[prefix_view.length - 1] == '+';
+  let const update_mode =
+      !prefix_view.is_empty() && prefix_view[prefix_view.length - 1] == '+'
+          ? assignment_update_mode::Append
+          : assignment_update_mode::Replace;
   let const name_length =
-      is_append ? prefix_view.length - 1 : prefix_view.length;
+      update_mode == assignment_update_mode::Append
+          ? prefix_view.length - 1
+          : prefix_view.length;
   if (name_length == 0) return koshka::None;
 
   if (!lexer::is_variable_name_start(prefix_view[0])) return koshka::None;
@@ -593,7 +602,7 @@ cold fn Word::get_quoted_assignment_split() const throws
 
   return word_assignment_split{
       String{prefix_view.substring_of_length(0, name_length)}, steal(value),
-      is_append};
+      update_mode};
 }
 
 cold fn SegmentText::grow_owned(usize needed) throws -> void
@@ -683,22 +692,25 @@ TOKEN_DECLS(RightParen, ")");
 TOKEN_DECLS(RightBracket, "}");
 
 Assignment::Assignment(SourceLocation location, String key, Word value,
-                       bool is_append)
+                       assignment_update_mode update_mode)
     : Token(steal(location), Token::Kind::Assignment), m_key(steal(key)),
-      m_value(steal(value)), m_is_append(is_append)
+      m_value(steal(value)), m_update_mode(update_mode)
 {}
 
 fn Assignment::raw_string() const throws -> String
 {
   let result = m_key.clone();
-  result += m_is_append ? "+=" : "=";
+  result += m_update_mode == assignment_update_mode::Append ? "+=" : "=";
   result += m_value.to_literal_string();
   return result;
 }
 
 pure fn Assignment::key() const wontthrow -> const String & { return m_key; }
 
-pure fn Assignment::is_append() const wontthrow -> bool { return m_is_append; }
+pure fn Assignment::get_update_mode() const wontthrow -> assignment_update_mode
+{
+  return m_update_mode;
+}
 
 pure fn Assignment::value_word() const wontthrow -> const Word &
 {

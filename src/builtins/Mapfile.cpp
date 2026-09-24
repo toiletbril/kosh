@@ -155,12 +155,13 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       callback.push(' ');
       append_shell_quoted_arg(callback, element.view(), true);
       unused(cxt.run_source(callback.view(), "mapfile callback",
-                            return_handling::Propagate,
-                            FLAG_MAPFILE_CALLBACK.value_location()));
+                            FLAG_MAPFILE_CALLBACK.value_location(), None,
+                            nullptr, nullptr, return_handling::Propagate));
     }
 
     if (has_callback) {
-      cxt.assign_array_element(array_name, subscript, element.view(), false);
+      cxt.assign_array_element(array_name, subscript, element.view(),
+                               assignment_update_mode::Replace);
     } else {
       lines.push(steal(element));
     }
@@ -180,7 +181,8 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           utils::int_to_text_into(origin + static_cast<i64>(element_index),
                                   index_text, sizeof(index_text));
       cxt.assign_array_element(array_name, subscript,
-                               lines[element_index].view(), false);
+                               lines[element_index].view(),
+                               assignment_update_mode::Replace);
     }
   } else {
     cxt.set_indexed_array(array_name, steal(lines));

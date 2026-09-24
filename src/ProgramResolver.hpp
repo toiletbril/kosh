@@ -28,6 +28,12 @@ namespace utils {
 class ProgramResolver
 {
 public:
+  enum class program_path_kind : u8
+  {
+    Full,
+    Bare,
+  };
+
   enum class Requirement : u8
   {
     Regular,
@@ -141,7 +147,7 @@ private:
       -> ArrayList<Path>;
   fn cache_resolved_path(StringView name, const Path &full_path,
                          os::program_extension extension,
-                         bool is_bare_result) throws -> void;
+                         program_path_kind kind) throws -> void;
   pure fn find_cached_program_path(
       const CacheEntry &entry,
       os::program_extension wanted_extension) const wontthrow -> const Path *;

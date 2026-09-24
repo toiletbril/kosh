@@ -817,10 +817,10 @@ fn complete_filesystem_names(StringView token, EvalContext &context,
 
 fn complete_filesystem_names_by_prefix(StringView token, EvalContext &context,
                                        const Path &base_directory,
-                                       bool should_list_directories_only) throws
+                                       completion_filesystem_mode mode) throws
     -> ArrayList<String>
 {
-  let const filter = should_list_directories_only
+  let const filter = mode == completion_filesystem_mode::Directories
                          ? filesystem_entry_filter::DirectoriesOnly
                          : filesystem_entry_filter::All;
   let collector = complete_filesystem_with<PrefixListCollector>(
@@ -1137,9 +1137,10 @@ static fn keep_hinted_extension(ArrayList<String> candidates,
 }
 
 fn complete(StringView line, usize cursor, EvalContext &context,
-            const Path &base_directory, completion_mode mode,
+            const Path &base_directory,
             const ArrayList<StringView> *extra_command_names,
-            bool should_complete_external_arguments_in_posix) throws
+            bool should_complete_external_arguments_in_posix,
+            completion_mode mode) throws
     -> completion_result
 {
   let const for_listing = mode == completion_mode::Listing;
@@ -1334,29 +1335,29 @@ fn complete(StringView line, usize cursor, EvalContext &context,
           complete_from_process_arguments(line, stage_token, token_start, mode);
       if (!from_stage.has_value())
         from_stage = complete_from_builtin_flags(line, stage_token, token_start,
-                                                 mode, context);
+                                                 context, mode);
       if (!from_stage.has_value())
-        from_stage = complete_from_spec(line, stage_token, cursor, mode,
-                                        context, descriptions);
+        from_stage = complete_from_spec(line, stage_token, cursor, context,
+                                        descriptions, mode);
       if (!from_stage.has_value())
         from_stage = complete_from_tools_with_targets(
-            line, stage_token, token_start, mode, context);
+            line, stage_token, token_start, context, mode);
     }
     if (!from_stage.has_value() &&
         (!is_posix_completion || should_complete_external_arguments_in_posix))
     {
       if (!from_stage.has_value())
         from_stage = complete_from_man_subcommands(line, stage_token,
-                                                   token_start, mode, context);
+                                                   token_start, context, mode);
       if (!from_stage.has_value())
-        from_stage = complete_from_manpage(line, stage_token, mode, context,
-                                           descriptions);
+        from_stage = complete_from_manpage(line, stage_token, context,
+                                           descriptions, mode);
       if (!from_stage.has_value())
         from_stage = complete_from_help_subcommands(
-            line, stage_token, token_start, mode, context, descriptions);
+            line, stage_token, token_start, context, descriptions, mode);
       if (!from_stage.has_value())
-        from_stage = complete_from_help(line, stage_token, token_start, mode,
-                                        context, descriptions);
+        from_stage = complete_from_help(line, stage_token, token_start, context,
+                                        descriptions, mode);
     }
     if (from_stage.has_value()) {
       candidates = steal(*from_stage);

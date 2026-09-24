@@ -289,9 +289,12 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     /* process_args passes a declare append through as name+=value, so a
        trailing plus on the name marks the append and is stripped before the
        attributes apply. */
-    let const is_append =
-        equals.has_value() && !name.is_empty() && name[name.count() - 1] == '+';
-    if (is_append) name = name.substring_of_length(0, name.count() - 1);
+    let const update_mode =
+        equals.has_value() && !name.is_empty() && name[name.count() - 1] == '+'
+            ? assignment_update_mode::Append
+            : assignment_update_mode::Replace;
+    if (update_mode == assignment_update_mode::Append)
+      name = name.substring_of_length(0, name.count() - 1);
 
     /* A subscripted operand such as a[0]=5 declares the base name's array and
        assigns the element, the way bash treats declare a[i]=v, so the
@@ -379,7 +382,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         static_cast<int>(name.length), name.data);
 
     if (has_subscript && equals.has_value()) {
-      cxt.assign_array_element(name, subscript, value, is_append);
+      cxt.assign_array_element(name, subscript, value, update_mode);
     } else if (should_make_associative) {
       LOG(All, "declare making '%.*s' an associative array",
           static_cast<int>(name.length), name.data);
@@ -399,7 +402,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         cxt.set_indexed_array(name, steal(values));
       }
     } else if (equals.has_value()) {
-      if (is_append) {
+      if (update_mode == assignment_update_mode::Append) {
         /* An integer name joins the appended expression as arithmetic. */
         let appended = String{cxt.scratch_allocator()};
         if (let const existing = cxt.get_variable_value(name))

@@ -38,7 +38,8 @@ fn parse_kubernetes_format(const parser_format_input &input,
   if (!has_explicit_shell) return;
 
   static const StringView KEYS[] = {"args"};
-  parser_format_extract_yaml_keys(document, input.source, KEYS, 1, mood);
+  parser_format_extract_yaml_keys(document, input.source, KEYS, 1, mood,
+                                  yaml_shell_selection::Nearby);
 }
 
 } // namespace koshka

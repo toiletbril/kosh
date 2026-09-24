@@ -202,8 +202,9 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     }
   }
   let program_args =
-      cxt.process_args(*argument_tokens, argument_lifetime::Transient,
-                       argument_context::Command, &program_arg_locations);
+      cxt.process_args(*argument_tokens, &program_arg_locations,
+                       argument_lifetime::Transient,
+                       argument_context::Command);
   defer { cxt.cleanup_process_substitutions(substitution_mark); };
   expand_command_aliases(cxt, program_args, program_arg_locations);
 
@@ -514,11 +515,12 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
       value_ref = steal(appended);
     }
   };
-  let const do_trace_assignment = [&](StringView name, bool is_append,
+  let const do_trace_assignment = [&](StringView name,
+                                      assignment_update_mode update_mode,
                                       StringView value) throws -> void {
     if (!cxt.should_echo_expanded()) return;
     let trace = String{cxt.scratch_allocator(), name};
-    trace += is_append ? "+=" : "=";
+    trace += update_mode == assignment_update_mode::Append ? "+=" : "=";
     append_shell_quoted_arg(trace, value);
     cxt.write_xtrace(trace.view());
   };
@@ -527,7 +529,8 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
           const ArrayList<String> &values) throws -> void {
     if (!cxt.should_echo_expanded()) return;
     let trace = String{cxt.scratch_allocator(), assignment.name.view()};
-    trace += assignment.is_append ? "+=(" : "=(";
+    trace += assignment.update_mode == assignment_update_mode::Append ? "+=("
+                                                                      : "=(";
     for (usize i = 0; i < values.count(); i++) {
       if (i > 0) trace.push(' ');
       append_shell_quoted_arg(trace, values[i].view());
@@ -540,8 +543,9 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
       [&](const tokens::Assignment &assignment) throws {
         let const name = assignment.key().view();
         let value = cxt.expand_word_for_assignment(assignment.value_word());
-        do_trace_assignment(name, assignment.is_append(), value.view());
-        if (assignment.is_append()) do_apply_append(name, value);
+        do_trace_assignment(name, assignment.get_update_mode(), value.view());
+        if (assignment.get_update_mode() == assignment_update_mode::Append)
+          do_apply_append(name, value);
         cxt.set_shell_variable(name, value);
         if (cxt.export_all()) {
           cxt.record_environment_change(name);
@@ -563,11 +567,12 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
         throw Error{"Unable to assign '" + assignment.name +
                     "' because it is read only"};
       ArrayList<String> values =
-          cxt.process_args(assignment.elements, argument_lifetime::Persistent,
+          cxt.process_args(assignment.elements, nullptr,
+                           argument_lifetime::Persistent,
                            argument_context::ArrayLiteral);
       do_trace_array_assignment(assignment, values);
       cxt.assign_indexed_array_elements(assignment.name, values,
-                                        assignment.is_append);
+                                        assignment.update_mode);
     }
     /* A value that ran a command substitution leaves the status of the last
        one. A line with no substitution resets to 0. */
@@ -663,9 +668,10 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
         } catch (const Error &e) {
           relocate_error(e, source_location());
         }
-        do_trace_assignment(name, assignment.is_append(),
+        do_trace_assignment(name, assignment.get_update_mode(),
                             expanded_value.view());
-        if (assignment.is_append()) do_apply_append(name, expanded_value);
+        if (assignment.get_update_mode() == assignment_update_mode::Append)
+          do_apply_append(name, expanded_value);
 
         /* A special builtin keeps the assignment outside the bash mood, so it
            commits to the store. The bash mood drops it after the command, so it
@@ -919,9 +925,9 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
     let const *source = cxt.current_source();
     resolved_ec = ExecContext::make_from(
         source_location(), source != nullptr ? source->view() : StringView{},
-        steal(program_args), cxt.mood(), cxt.koshkit_utilities_are_reachable(),
+        steal(program_args), cxt.koshkit_utilities_are_reachable(),
         cxt.is_shopt_enabled(shopt_option_id::Checkhash),
-        cxt.get_program_resolver(), steal(program_arg_locations));
+        cxt.get_program_resolver(), steal(program_arg_locations), cxt.mood());
   } catch (const CommandResolutionErrorWithLocation &e) {
     report_command_resolution_error(cxt, e);
     let const status = e.command_status();
@@ -1060,7 +1066,8 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
       if (should_mark_lowercase) cxt.mark_lowercase(assignment.name);
       if (should_mark_uppercase) cxt.mark_uppercase(assignment.name);
       ArrayList<String> values =
-          cxt.process_args(assignment.elements, argument_lifetime::Persistent,
+          cxt.process_args(assignment.elements, nullptr,
+                           argument_lifetime::Persistent,
                            argument_context::ArrayLiteral);
       do_trace_array_assignment(assignment, values);
       if (is_associative_request) {
@@ -1084,7 +1091,7 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
         }
       } else {
         cxt.assign_indexed_array_elements(assignment.name, values,
-                                          assignment.is_append);
+                                          assignment.update_mode);
       }
       if (is_export) cxt.mark_exported(assignment.name);
       if (is_readonly_request) cxt.mark_readonly(assignment.name);

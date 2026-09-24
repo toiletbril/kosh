@@ -3099,8 +3099,8 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     i32 status = 0;
     try {
       status = cxt.run_source(subshell_command.view(), "make",
-                              return_handling::Consume, ec.source_location(),
-                              StringView{"make"});
+                              ec.source_location(), StringView{"make"},
+                              nullptr, nullptr, return_handling::Consume);
       if (os::INTERRUPT_REQUESTED || status == 130) {
         os::INTERRUPT_REQUESTED = 0;
         let interrupt_error = InterruptErrorWithLocation{ec.source_location()};

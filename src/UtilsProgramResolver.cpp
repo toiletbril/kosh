@@ -75,18 +75,18 @@ static fn begin_directory_validation_epoch() wontthrow -> void;
 
 fn ProgramResolver::cache_resolved_path(StringView name, const Path &full_path,
                                         os::program_extension extension,
-                                        bool is_bare_result) throws -> void
+                                        program_path_kind kind) throws -> void
 {
   let &entry = m_execution_cache.get_or_create(name, CacheEntry{});
   for (usize position = 0; position < entry.paths.count(); position++) {
     let &cached = entry.paths[position];
     if (cached.extension != extension) continue;
     cached.path = full_path;
-    if (is_bare_result) entry.bare_path_position = position;
+    if (kind == program_path_kind::Bare) entry.bare_path_position = position;
     return;
   }
 
-  if (is_bare_result) {
+  if (kind == program_path_kind::Bare) {
     entry.bare_path_position = entry.paths.count();
   }
   entry.paths.push({full_path, extension});
@@ -238,10 +238,9 @@ static fn apply_directory_listing_order(cached_directory_listing &listing,
   return &listing.entries;
 }
 
-static fn read_directory_cached_after_status(const Path &directory,
-                                             directory_listing_order order,
-                                             const os::file_status &status,
-                                             bool has_status) throws
+static fn read_directory_cached_after_status(
+    const Path &directory, const os::file_status &status, bool has_status,
+    directory_listing_order order) throws
     -> const ArrayList<Path::directory_child> *
 {
   let const key = directory.view();
@@ -367,8 +366,8 @@ fn read_directory_cached(const Path &directory, directory_validation validation,
   os::file_status status{};
   let const has_status = os::stat_path_following(key, status);
 
-  return read_directory_cached_after_status(directory, order, status,
-                                            has_status);
+  return read_directory_cached_after_status(directory, status, has_status,
+                                            order);
 }
 
 fn directory_entry_kind(const Path &directory,
@@ -495,7 +494,8 @@ fn ProgramResolver::invalidate() throws -> void
 fn ProgramResolver::remember_path(StringView name, const Path &path) throws
     -> void
 {
-  cache_resolved_path(name, path, os::program_extension::None, true);
+  cache_resolved_path(name, path, os::program_extension::None,
+                      program_path_kind::Bare);
 }
 
 fn ProgramResolver::split_path_dirs(StringView path) throws -> ArrayList<String>
@@ -594,8 +594,8 @@ collect_directory_generations(const ArrayList<String> &directory_texts) throws
   generations.reserve(directories.count());
   for (usize index = 0; index < directories.count(); index++) {
     let const entries = read_directory_cached_after_status(
-        directories[index], directory_listing_order::Unsorted, statuses[index],
-        results[index].error_number == 0);
+        directories[index], statuses[index], results[index].error_number == 0,
+        directory_listing_order::Unsorted);
     generations.push(entries == nullptr
                          ? 0
                          : directory_listing_generation(directories[index]));
@@ -1149,8 +1149,11 @@ fn ProgramResolver::resolve_along_path(StringView program_name,
              cache_policy == CachePolicy::RememberUnchecked) &&
             is_runnable)
         {
-          cache_resolved_path(key, result.back(), extension,
-                              name_info.extension == os::program_extension::None);
+          cache_resolved_path(
+              key, result.back(), extension,
+              name_info.extension == os::program_extension::None
+                  ? program_path_kind::Bare
+                  : program_path_kind::Full);
         }
         return result;
       }

@@ -169,6 +169,8 @@ public:
                     option_mask(shell_option_id::Failglob) |
                     option_mask(shell_option_id::Hashall) |
                     option_mask(shell_option_id::Braceexpand)};
+  u64 shopt_option_overrides{0};
+  u64 shopt_option_values{0};
 
   pure fn is_diagnostics_disabled() const wontthrow -> bool;
   fn set_diagnostics_disabled(bool enabled) wontthrow -> void;
@@ -225,7 +227,7 @@ private:
   }
 };
 
-static_assert(sizeof(RuntimeState) == 16);
+static_assert(sizeof(RuntimeState) == 32);
 
 inline pure fn RuntimeState::is_diagnostics_disabled() const wontthrow -> bool
 {
@@ -429,6 +431,26 @@ public:
     return m_field_separators.view();
   }
 
+  fn shell_variables() wontthrow -> StringMap<String> &
+  {
+    return m_shell_variables;
+  }
+  pure fn shell_variables() const wontthrow
+      -> const StringMap<String> &
+  {
+    return m_shell_variables;
+  }
+  fn special_variable_definition_locations() wontthrow
+      -> StringMap<SourceLocation> &
+  {
+    return m_special_variable_definition_locations;
+  }
+  pure fn special_variable_definition_locations() const wontthrow
+      -> const StringMap<SourceLocation> &
+  {
+    return m_special_variable_definition_locations;
+  }
+
   hot pure fn is_field_separator(char c) const wontthrow -> bool
   {
     let const byte = static_cast<u8>(c);
@@ -535,10 +557,29 @@ public:
   {
     return m_bash_argument_frame_context;
   }
+  fn disabled_bash_special_arrays() wontthrow -> u8 &
+  {
+    return m_disabled_bash_special_arrays;
+  }
+  pure fn disabled_bash_special_arrays() const wontthrow -> u8
+  {
+    return m_disabled_bash_special_arrays;
+  }
+  fn unset_dynamic_readers() wontthrow -> u8 &
+  {
+    return m_unset_dynamic_readers;
+  }
+  pure fn unset_dynamic_readers() const wontthrow -> u8
+  {
+    return m_unset_dynamic_readers;
+  }
 
 private:
   String m_field_separators{" \t\n"};
   u64 m_field_separator_bits[4]{};
+  StringMap<String> m_shell_variables{heap_allocator()};
+  StringMap<SourceLocation> m_special_variable_definition_locations{
+      heap_allocator()};
   StringMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
   HashSet m_associative_names{heap_allocator()};
   StringMap<String> m_associative_values{heap_allocator()};
@@ -550,11 +591,30 @@ private:
   ArrayList<String> m_directory_stack{heap_allocator()};
   mutable BashArgumentArrayStorage *m_bash_argument_arrays{nullptr};
   BashArgumentFrameContext *m_bash_argument_frame_context{nullptr};
+  u8 m_disabled_bash_special_arrays{0};
+  u8 m_unset_dynamic_readers{0};
 };
 
 class CompletionStore
 {
 public:
+  fn register_spec(StringView command, completion_spec spec) throws -> void
+  {
+    m_specs.set(command, steal(spec));
+  }
+  fn register_default_spec(completion_spec spec) throws -> void
+  {
+    m_default_spec = steal(spec);
+  }
+  pure fn lookup_spec(StringView command) const wontthrow
+      -> const completion_spec *
+  {
+    return m_specs.find(command);
+  }
+  pure fn default_spec_ptr() const wontthrow -> const completion_spec *
+  {
+    return m_default_spec.has_value() ? &*m_default_spec : nullptr;
+  }
   fn specs() wontthrow -> StringMap<completion_spec> & { return m_specs; }
   pure fn specs() const wontthrow -> const StringMap<completion_spec> &
   {
@@ -588,10 +648,49 @@ public:
   }
   fn readonly() wontthrow -> HashSet & { return m_readonly; }
   pure fn readonly() const wontthrow -> const HashSet & { return m_readonly; }
+  fn call_depth() wontthrow -> usize & { return m_call_depth; }
+  pure fn call_depth() const wontthrow -> const usize & { return m_call_depth; }
+  fn call_names() wontthrow -> ArrayList<String> & { return m_call_names; }
+  pure fn call_names() const wontthrow -> const ArrayList<String> &
+  {
+    return m_call_names;
+  }
+  fn call_storages() wontthrow -> ArrayList<FunctionBodyHandle> &
+  {
+    return m_call_storages;
+  }
+  pure fn call_storages() const wontthrow
+      -> const ArrayList<FunctionBodyHandle> &
+  {
+    return m_call_storages;
+  }
+  fn call_locations() wontthrow -> ArrayList<SourceLocation> &
+  {
+    return m_call_locations;
+  }
+  pure fn call_locations() const wontthrow
+      -> const ArrayList<SourceLocation> &
+  {
+    return m_call_locations;
+  }
+  fn call_sources() wontthrow -> ArrayList<const String *> &
+  {
+    return m_call_sources;
+  }
+  pure fn call_sources() const wontthrow
+      -> const ArrayList<const String *> &
+  {
+    return m_call_sources;
+  }
 
 private:
   StringMap<FunctionBodyHandle> m_definitions{heap_allocator()};
   HashSet m_readonly{heap_allocator()};
+  usize m_call_depth{0};
+  ArrayList<String> m_call_names{heap_allocator()};
+  ArrayList<FunctionBodyHandle> m_call_storages{heap_allocator()};
+  ArrayList<SourceLocation> m_call_locations{heap_allocator()};
+  ArrayList<const String *> m_call_sources{heap_allocator()};
 };
 
 class TrapStore
@@ -638,6 +737,76 @@ private:
 class ExpansionStore
 {
 public:
+  fn scratch_arena() const wontthrow -> BumpArena & { return m_scratch_arena; }
+  fn scratch_allocator() const wontthrow -> Allocator
+  {
+    return bump_allocator(m_scratch_arena);
+  }
+  fn find_cached_regex(StringView key) wontthrow -> CompiledRegex *
+  {
+    return m_regex_cache.find(key);
+  }
+  fn clear_regex_cache() wontthrow -> void { m_regex_cache.clear(); }
+  fn store_regex(StringView key, CompiledRegex regex) throws -> CompiledRegex *
+  {
+    return m_regex_cache.set(key, steal(regex));
+  }
+  fn substitution_depth() wontthrow -> usize & { return m_substitution_depth; }
+  pure fn substitution_depth() const wontthrow -> usize
+  {
+    return m_substitution_depth;
+  }
+  fn parameter_expansion_depth() wontthrow -> usize &
+  {
+    return m_parameter_expansion_depth;
+  }
+  pure fn parameter_expansion_depth() const wontthrow -> usize
+  {
+    return m_parameter_expansion_depth;
+  }
+  fn set_glob_exempt_for_test(bool enabled) wontthrow
+  {
+    m_glob_exempt_for_test = enabled;
+  }
+  pure fn glob_exempt_for_test() const wontthrow -> bool
+  {
+    return m_glob_exempt_for_test;
+  }
+  fn pending_process_substitutions() wontthrow
+      -> ArrayList<process_substitution> &
+  {
+    return m_pending_process_substitutions;
+  }
+  pure fn pending_process_substitutions() const wontthrow
+      -> const ArrayList<process_substitution> &
+  {
+    return m_pending_process_substitutions;
+  }
+  fn loop_redirect_fds() wontthrow -> ArrayList<loop_redirect_fd> &
+  {
+    return m_loop_redirect_fds;
+  }
+  pure fn loop_redirect_fds() const wontthrow
+      -> const ArrayList<loop_redirect_fd> &
+  {
+    return m_loop_redirect_fds;
+  }
+  pure fn getopts_char_index() const wontthrow -> usize
+  {
+    return m_getopts_char_index;
+  }
+  fn set_getopts_char_index(usize index) wontthrow -> void
+  {
+    m_getopts_char_index = index;
+  }
+  pure fn getopts_last_optind() const wontthrow -> i64
+  {
+    return m_getopts_last_optind;
+  }
+  fn set_getopts_last_optind(i64 optind) wontthrow -> void
+  {
+    m_getopts_last_optind = optind;
+  }
   fn regex_cache() wontthrow -> StringMap<CompiledRegex> &
   {
     return m_regex_cache;
@@ -648,7 +817,106 @@ public:
   }
 
 private:
+  mutable BumpArena m_scratch_arena{};
+  usize m_substitution_depth{0};
+  usize m_parameter_expansion_depth{0};
+  usize m_getopts_char_index{1};
+  i64 m_getopts_last_optind{0};
+  bool m_glob_exempt_for_test{false};
+  ArrayList<process_substitution> m_pending_process_substitutions{
+      heap_allocator()};
+  ArrayList<loop_redirect_fd> m_loop_redirect_fds{heap_allocator()};
   StringMap<CompiledRegex> m_regex_cache{heap_allocator()};
+};
+
+class SourceStore
+{
+public:
+  fn set_current_source(const String *source, String origin,
+                       u64 source_generation) wontthrow -> void
+  {
+    m_current_source = source;
+    m_current_source_generation = source_generation;
+    m_current_origin = steal(origin);
+  }
+  pure fn get_current_source() const wontthrow -> const String *
+  {
+    return m_current_source;
+  }
+  pure fn get_current_origin() const wontthrow -> const String &
+  {
+    return m_current_origin;
+  }
+  fn set_current_history_event_number(Maybe<usize> number) wontthrow -> void
+  {
+    m_current_history_event_number = steal(number);
+  }
+  pure fn get_current_history_event_number() const wontthrow -> Maybe<usize>
+  {
+    return m_current_history_event_number;
+  }
+  fn begin_history_transaction(ArrayList<String> &commands) throws -> void
+  {
+    m_history_transaction_stack.push(&commands);
+  }
+  fn end_history_transaction() wontthrow -> void
+  {
+    ASSERT(!m_history_transaction_stack.is_empty());
+    m_history_transaction_stack.pop_back();
+  }
+  pure fn has_history_transaction() const wontthrow -> bool
+  {
+    return !m_history_transaction_stack.is_empty();
+  }
+  fn set_current_location(SourceLocation location) wontthrow -> void
+  {
+    m_current_location = location;
+  }
+  pure fn get_current_location() const wontthrow -> const SourceLocation &
+  {
+    return m_current_location;
+  }
+  fn set_source_depth(usize depth) wontthrow -> void { m_source_depth = depth; }
+  pure fn source_depth() const wontthrow -> usize { return m_source_depth; }
+  fn set_rejected_return_source_frames(usize count) wontthrow -> void
+  {
+    m_rejected_return_source_frames = count;
+  }
+  pure fn rejected_return_source_frames() const wontthrow -> usize
+  {
+    return m_rejected_return_source_frames;
+  }
+  fn set_script_run(bool is_script_run) wontthrow -> void
+  {
+    m_is_script_run = is_script_run;
+  }
+  pure fn is_script_run() const wontthrow -> bool
+  {
+    return m_is_script_run;
+  }
+  fn mimicry_depth() wontthrow -> usize & { return m_mimicry_depth; }
+  pure fn mimicry_depth() const wontthrow -> usize { return m_mimicry_depth; }
+  fn set_mimicry_depth(usize depth) wontthrow -> void
+  {
+    m_mimicry_depth = depth;
+  }
+
+  const String *m_current_source{nullptr};
+  String m_current_origin{heap_allocator()};
+  Maybe<usize> m_current_history_event_number{None};
+  const Expression *m_history_recording_root{nullptr};
+  StringView m_history_recording_source{};
+  ArrayList<ArrayList<String> *> m_history_transaction_stack{heap_allocator()};
+  SourceLocation m_current_location{};
+  ArrayList<source_frame> m_source_frames{heap_allocator()};
+  ArrayList<Expression *> m_retained_source_asts{heap_allocator()};
+  ArrayList<String *> m_retained_sources{heap_allocator()};
+  u64 m_retained_source_generation{0};
+  u64 m_current_source_generation{EXTERNAL_SOURCE_GENERATION};
+  usize m_source_depth{0};
+  usize m_rejected_return_source_frames{0};
+  bool m_is_script_run{false};
+  usize m_mimicry_depth{0};
 };
 
 class EvalContext
@@ -673,14 +941,15 @@ public:
      the token it expanded from. A token that splits into many fields
      contributes one location per field. */
   fn process_args(const ArrayList<const Token *> &args,
-                  argument_lifetime lifetime = argument_lifetime::Persistent,
-                  argument_context context = argument_context::Command,
                   ArrayList<SourceLocation> *expanded_locations =
-                      nullptr) throws -> ArrayList<String>;
+                      nullptr,
+                  argument_lifetime lifetime = argument_lifetime::Persistent,
+                  argument_context context = argument_context::Command) throws
+      -> ArrayList<String>;
 
   fn scratch_allocator() const wontthrow -> Allocator
   {
-    return bump_allocator(m_scratch_arena);
+    return expansion_store().scratch_allocator();
   }
   fn set_parse_arena(BumpArena *arena) wontthrow { m_parse_arena = arena; }
   pure fn parse_arena() const wontthrow -> BumpArena *
@@ -703,6 +972,11 @@ public:
   fn expansion_store() wontthrow -> ExpansionStore &
   {
     return m_expansion_store;
+  }
+  fn source_store() wontthrow -> SourceStore & { return m_source_store; }
+  pure fn source_store() const wontthrow -> const SourceStore &
+  {
+    return m_source_store;
   }
   pure fn expansion_store() const wontthrow -> const ExpansionStore &
   {
@@ -738,13 +1012,16 @@ public:
   }
   mustuse fn scratch_mark() const wontthrow -> BumpArena::Mark
   {
-    return m_scratch_arena.mark();
+    return expansion_store().scratch_arena().mark();
   }
   fn scratch_release(BumpArena::Mark saved) const wontthrow -> void
   {
-    m_scratch_arena.release(saved);
+    expansion_store().scratch_arena().release(saved);
   }
-  fn reset_scratch_arena() wontthrow -> void { m_scratch_arena.reset(); }
+  fn reset_scratch_arena() wontthrow -> void
+  {
+    expansion_store().scratch_arena().reset();
+  }
 
   fn set_shell_variable(StringView name, StringView value) throws -> void;
   pure fn special_variable_definition_location(StringView name) const wontthrow
@@ -794,7 +1071,8 @@ public:
      to a string key and an indexed name to an arithmetic index. The append form
      concatenates onto the current element. */
   fn assign_array_element(StringView name, StringView subscript,
-                          StringView value, bool is_append) throws -> void;
+                          StringView value,
+                          assignment_update_mode update_mode) throws -> void;
   fn read_array_element_arithmetic_text(StringView name,
                                         StringView subscript) throws -> String;
   fn indexed_arrays() wontthrow -> StringMap<ArrayList<String>> &
@@ -872,11 +1150,13 @@ public:
       -> bool
   {
     return bash_dynamic_variables_enabled() &&
-           (m_disabled_bash_special_arrays & bash_special_array_mask(id)) == 0;
+           (m_variable_store.disabled_bash_special_arrays() &
+            bash_special_array_mask(id)) == 0;
   }
   fn disable_bash_special_array(bash_special_array_id id) wontthrow -> void
   {
-    m_disabled_bash_special_arrays |= bash_special_array_mask(id);
+    m_variable_store.disabled_bash_special_arrays() |=
+        bash_special_array_mask(id);
   }
   pure fn is_bash_aliases_special(StringView name) const wontthrow -> bool
   {
@@ -927,7 +1207,8 @@ public:
      set index. */
   fn assign_indexed_array_elements(StringView name,
                                    const ArrayList<String> &elements,
-                                   bool is_append) throws -> void;
+                                   assignment_update_mode update_mode) throws
+      -> void;
 
   fn record_environment_change(StringView name) throws -> void;
 
@@ -981,7 +1262,7 @@ public:
   hot fn lookup_shell_variable(StringView name) const wontthrow
       -> const String *
   {
-    return m_shell_variables.find(name);
+    return m_variable_store.shell_variables().find(name);
   }
   fn get_history_limit(StringView name, usize fallback) const wontthrow -> usize
   {
@@ -994,7 +1275,7 @@ public:
 
   hot fn has_variable_name(StringView name) const throws -> bool
   {
-    return m_shell_variables.find(name) != nullptr ||
+    return m_variable_store.shell_variables().find(name) != nullptr ||
            indexed_arrays().find(name) != nullptr ||
            associative_names().contains(name) || is_exported(name) ||
            variable_requires_dynamic_lookup(name);
@@ -1244,7 +1525,8 @@ public:
      number orders every frame the DEBUG and ERR traps care about. */
   pure fn nesting_depth() const wontthrow -> usize
   {
-    return m_function_call_depth + m_subshell_depth + m_substitution_depth;
+    return function_store().call_depth() + m_subshell_depth +
+           expansion_store().substitution_depth();
   }
   pure fn should_run_debug_trap() const wontthrow -> bool
   {
@@ -1351,9 +1633,11 @@ public:
   pure fn trap_trigger_line_number() const wontthrow -> Maybe<usize>
   {
     if (trap_store().m_trap_action_depth == 0) return None;
-    if (m_source_frames.count() != trap_store().m_trap_action_source_frame_count)
+    if (source_store().m_source_frames.count() != trap_store().m_trap_action_source_frame_count)
       return None;
-    if (m_function_call_depth != trap_store().m_trap_action_function_depth) return None;
+    if (function_store().call_depth() !=
+        trap_store().m_trap_action_function_depth)
+      return None;
 
     return trap_store().m_trap_trigger_line_number;
   }
@@ -1475,13 +1759,17 @@ public:
       const String *fallback_source = nullptr) const throws -> usize;
   fn set_script_run(bool is_script_run) wontthrow -> void
   {
-    m_is_script_run = is_script_run;
+    source_store().set_script_run(is_script_run);
   }
-  pure fn is_script_run() const wontthrow -> bool { return m_is_script_run; }
+  pure fn is_script_run() const wontthrow -> bool
+  {
+    return source_store().is_script_run();
+  }
   pure fn in_function_scope() const wontthrow -> bool;
   pure fn is_sourcing() const wontthrow -> bool
   {
-    return m_source_depth > m_rejected_return_source_frames;
+    return source_store().source_depth() >
+           source_store().rejected_return_source_frames();
   }
   fn push_root_source_frame(const String *parent_source,
                             SourceLocation call_site,
@@ -1566,8 +1854,8 @@ public:
   pure fn history_recording_source_for(const Expression *root) const wontthrow
       -> Maybe<StringView>
   {
-    if (root != m_history_recording_root) return None;
-    return m_history_recording_source;
+    if (root != source_store().m_history_recording_root) return None;
+    return source_store().m_history_recording_source;
   }
   fn record_history_event(StringView command) throws -> bool;
   fn begin_history_transaction(ArrayList<String> &commands) throws -> void;
@@ -1608,7 +1896,7 @@ public:
      publication puts the saved value back. */
   pure fn get_current_location() const wontthrow -> SourceLocation
   {
-    return m_current_location;
+    return source_store().m_current_location;
   }
 
   fn set_shell_option_state(shell_option_id option, bool enabled) wontthrow
@@ -1750,11 +2038,11 @@ public:
      tripping failglob. */
   fn set_glob_exempt_for_test(bool enabled) wontthrow -> void
   {
-    m_glob_exempt_for_test = enabled;
+    expansion_store().set_glob_exempt_for_test(enabled);
   }
   pure fn glob_exempt_for_test() const wontthrow -> bool
   {
-    return m_glob_exempt_for_test;
+    return expansion_store().glob_exempt_for_test();
   }
   /* The compgen -G probe, glob matches with failglob suppressed and a plain
      name reported only when the file exists. */
@@ -2024,9 +2312,11 @@ public:
                          script_isolation isolation) throws -> i32;
   fn run_program_fallback(ExecContext &ec, mimic_mood mode,
                           script_isolation isolation) throws -> i32;
-  pure fn extglob_enabled() const wontthrow -> bool
+  pure fn get_extglob_mode() const wontthrow -> extglob_mode
   {
-    return m_runtime.mood != mimic_mood::Posix && is_shopt_enabled("extglob");
+    return m_runtime.mood != mimic_mood::Posix && is_shopt_enabled("extglob")
+               ? extglob_mode::Enabled
+               : extglob_mode::Disabled;
   }
 
   pure fn bash_dynamic_variables_enabled() const wontthrow -> bool
@@ -2046,8 +2336,8 @@ public:
     let const index = shopt_option_index(name);
     if (!index.has_value()) return false;
     let const mask = u64{1} << *index;
-    if ((m_shopt_option_overrides & mask) != 0)
-      return (m_shopt_option_values & mask) != 0;
+    if ((m_runtime.shopt_option_overrides & mask) != 0)
+      return (m_runtime.shopt_option_values & mask) != 0;
     if (name == "extglob") return m_runtime.mood == mimic_mood::Default;
     if (name == "expand_aliases")
       return m_runtime.mood != mimic_mood::Bash || shell_is_interactive();
@@ -2056,8 +2346,8 @@ public:
   pure fn is_shopt_enabled(shopt_option_id option) const wontthrow -> bool
   {
     let const mask = u64{1} << shopt_option_index(option);
-    if ((m_shopt_option_overrides & mask) != 0)
-      return (m_shopt_option_values & mask) != 0;
+    if ((m_runtime.shopt_option_overrides & mask) != 0)
+      return (m_runtime.shopt_option_values & mask) != 0;
     switch (option) {
     case shopt_option_id::Progcomp:
     case shopt_option_id::Sourcepath: return true;
@@ -2286,12 +2576,13 @@ public:
      consume_return is false for eval. A consumed return reports the status the
      chunk held before it through status_before_return. */
   fn run_source(StringView source, StringView origin = "a sourced command",
-                return_handling handling = return_handling::Consume,
                 Maybe<SourceLocation> call_site = None,
                 Maybe<StringView> filename = None,
-                bool should_record_history = false,
                 Maybe<i32> *status_before_return = nullptr,
-                const FunctionBodyHandle *cached_body = nullptr) throws -> i32;
+                const FunctionBodyHandle *cached_body = nullptr,
+                return_handling handling = return_handling::Consume,
+                history_recording history = history_recording::Disabled) throws
+      -> i32;
   fn resolve_source_path(StringView path,
                          bool should_expand_tilde = false) throws
       -> Maybe<Path>;
@@ -2438,18 +2729,12 @@ protected:
   /* The largest live AST arena footprint seen at the end of any command. */
   usize m_peak_ast_arena_bytes{0};
 
-  mutable BumpArena m_scratch_arena{};
   BumpArena *m_parse_arena{nullptr};
   BumpArena *m_function_arena{nullptr};
-  StringMap<String> m_shell_variables{heap_allocator()};
-  StringMap<SourceLocation> m_special_variable_definition_locations{
-      heap_allocator()};
   CompletionStore m_completion_store{};
   /* An indexed array element whose subscript is past the dense limit, held by
      its name and decimal index so a sparse far subscript does not pad a huge
      dense gap. The name still reads as indexed. */
-  u64 m_shopt_option_overrides{0};
-  u64 m_shopt_option_values{0};
   /* The compiled form of each [[ =~ ]] pattern, keyed by the pattern text, so a
      hot loop with a constant regex compiles it once and reuses it. */
   ExpansionStore m_expansion_store{};
@@ -2506,18 +2791,10 @@ protected:
 #if !defined NDEBUG
   mutable usize m_debug_variable_name_enumeration_count{0};
 #endif
-  ArrayList<process_substitution> m_pending_process_substitutions{
-      heap_allocator()};
-  ArrayList<loop_redirect_fd> m_loop_redirect_fds{heap_allocator()};
 
   /* The nesting depth of dot-source and eval runs, and of function calls, each
      bounded so a runaway recursion errors with a located message rather than
      growing the native stack until the process is killed. */
-  usize m_source_depth{0};
-  usize m_rejected_return_source_frames{0};
-  usize m_function_call_depth{0};
-  usize m_substitution_depth{0};
-  usize m_parameter_expansion_depth{0};
 
   /* Set once the startup files finish, so the per-command title is quiet while
      they run. */
@@ -2526,37 +2803,12 @@ protected:
   /* The pending non-local jump, Normal when none is pending. */
   control_flow m_control_flow{};
   /* The source and name of the text being evaluated, for caret formatting. */
-  const String *m_current_source{nullptr};
-  String m_current_origin{heap_allocator()};
-  Maybe<usize> m_current_history_event_number{None};
-  const Expression *m_history_recording_root{nullptr};
-  StringView m_history_recording_source{};
-  ArrayList<ArrayList<String> *> m_history_transaction_stack{heap_allocator()};
-
-  /* The location in m_current_source of the command being evaluated, read by
-     $LINENO for its line and by the runtime warnings for their caret. The whole
-     location is kept so the filename the lexer stamped rides into a warning. */
-  SourceLocation m_current_location{};
-
-  /* The chain of sourced-file, eval, and substitution frames from the
-     outermost down to the one running now, so an error deep in a nested source
-     prints every call site. Each frame carries the call site and its parent
-     text. */
-  ArrayList<source_frame> m_source_frames{heap_allocator()};
   bool m_should_print_source_traces{true};
   completion::shell_highlight_cache *m_diagnostic_highlight_cache{nullptr};
   completion::shell_highlight_cache *m_runtime_diagnostic_highlight_cache{
       nullptr};
 
-  ArrayList<Expression *> m_retained_source_asts{heap_allocator()};
-
-  /* The source text of each eval and dot run is retained for escaped locations.
-     The buffers are heap-owned pointers, not inline elements, so a
-     nested run_source that grows the list never moves an earlier buffer and
-     leaves m_current_source or a control_flow::source dangling. */
-  ArrayList<String *> m_retained_sources{heap_allocator()};
-  u64 m_retained_source_generation{0};
-  u64 m_current_source_generation{EXTERNAL_SOURCE_GENERATION};
+  SourceStore m_source_store{};
 
   /* The mood and the diagnostic and strictness toggles, grouped as one runtime
      state so a scope that swaps them saves and restores the whole set with one
@@ -2565,10 +2817,8 @@ protected:
   ProgramResolver m_program_resolver{};
   u8 m_init_moods_sourcing{0};
   u8 m_initialized_moods{0};
-  u8 m_disabled_bash_special_arrays{0};
   /* Each bit names a dynamic_reader_id whose reader an unset has taken
      away. */
-  u8 m_unset_dynamic_readers{0};
   bool m_was_mood_set_explicitly{false};
   u64 m_mood_mutation_revision{0};
   u64 m_warning_mutation_revision{0};
@@ -2579,15 +2829,11 @@ protected:
   u32 m_suppressed_warnings{0};
   /* The nesting of mimicked scripts, bounded so a script that mimics another
      cannot recurse without limit. */
-  usize m_mimicry_depth{0};
   /* This is the base $SECONDS counts from. */
   i64 m_shell_start_time{0};
   /* The offset an assignment to SECONDS puts on the elapsed count. */
   i64 m_seconds_base{0};
   mutable u64 m_random_state{0};
-  bool m_glob_exempt_for_test{false};
-  usize m_getopts_char_index{1};
-  i64 m_getopts_last_optind{0};
   TrapStore m_trap_store{};
   /* The deepest frame the DEBUG action still reaches without functrace. An
      install records the frame it ran in, and a command deeper than that frame
@@ -2625,13 +2871,6 @@ protected:
    */
   ArrayList<ArrayList<local_binding>> m_local_scopes{heap_allocator()};
   usize m_local_scope_depth{0};
-  ArrayList<String> m_function_call_names{heap_allocator()};
-  ArrayList<FunctionBodyHandle> m_function_call_storages{heap_allocator()};
-  /* The call-site location of each active function call, parallel to
-     m_function_call_names, read by BASH_LINENO. */
-  ArrayList<SourceLocation> m_function_call_locations{heap_allocator()};
-  ArrayList<const String *> m_function_call_sources{heap_allocator()};
-  bool m_is_script_run{false};
 
   JobTable m_job_table{heap_allocator()};
   bool m_shell_is_interactive;
@@ -2717,7 +2956,8 @@ protected:
 
   fn expand_word(const Word &word) throws -> ArrayList<glob_field>;
 
-  fn expand_path_once(const glob_field &field, bool should_expand_files) throws
+  fn expand_path_once(const glob_field &field,
+                      glob_expansion_mode expansion_mode) throws
       -> ArrayList<glob_field>;
   fn expand_path_recurse(ArrayList<glob_field> fields) throws
       -> ArrayList<glob_field>;

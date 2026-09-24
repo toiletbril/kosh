@@ -38,6 +38,12 @@ namespace koshka::koshkit {
 
 namespace {
 
+enum class stat_target : u8
+{
+  File,
+  Filesystem,
+};
+
 constexpr StringView DEFAULT_FILE_FORMAT =
     "  File: %N\n"
     "  Size: %-10s\tBlocks: %-10b IO Block: %-6o %F\n"
@@ -651,7 +657,7 @@ fn render_format(String &output, StringView format, file_subject *subject,
 }
 
 fn resolve_format(String &format, bool &should_append_newline,
-                  bool is_filesystem_mode, Allocator allocator) throws -> void
+                  Allocator allocator, stat_target target) throws -> void
 {
   if (FLAG_STAT_PRINTF.is_set()) {
     append_escapes(format, FLAG_STAT_PRINTF.value());
@@ -668,11 +674,12 @@ fn resolve_format(String &format, bool &should_append_newline,
   unused(allocator);
   should_append_newline = false;
   if (FLAG_STAT_TERSE.is_enabled()) {
-    format += is_filesystem_mode ? TERSE_FILESYSTEM_FORMAT : TERSE_FILE_FORMAT;
+    format += target == stat_target::Filesystem ? TERSE_FILESYSTEM_FORMAT
+                                                : TERSE_FILE_FORMAT;
     return;
   }
 
-  if (is_filesystem_mode) {
+  if (target == stat_target::Filesystem) {
     format += DEFAULT_FILESYSTEM_FORMAT;
   }
 }
@@ -699,20 +706,21 @@ fn Stat::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let const allocator = cxt.scratch_allocator();
-  let const is_filesystem_mode = FLAG_STAT_FILESYSTEM.is_enabled();
+  let const target = FLAG_STAT_FILESYSTEM.is_enabled()
+                         ? stat_target::Filesystem
+                         : stat_target::File;
   let const should_follow =
-      FLAG_STAT_DEREFERENCE.is_enabled() || is_filesystem_mode;
+      FLAG_STAT_DEREFERENCE.is_enabled() || target == stat_target::Filesystem;
 
   let selected_format = String{allocator};
   bool should_append_newline = false;
-  resolve_format(selected_format, should_append_newline, is_filesystem_mode,
-                 allocator);
+  resolve_format(selected_format, should_append_newline, allocator, target);
 
   let operand_paths = ArrayList<Path>{allocator};
   let file_statuses = ArrayList<os::file_status>{allocator};
   let batch = os::Batch{allocator};
   let results = ArrayList<os::batch_result>{allocator};
-  if (!is_filesystem_mode) {
+  if (target == stat_target::File) {
     operand_paths.reserve(operands.count());
     file_statuses.reserve(operands.count());
     batch.reserve(operands.count());
@@ -737,7 +745,7 @@ fn Stat::execute(const ExecContext &ec, EvalContext &cxt,
     let const &operand = operands[index];
     let output = String{allocator};
 
-    if (is_filesystem_mode) {
+    if (target == stat_target::Filesystem) {
       os::filesystem_status filesystem{};
       if (!os::stat_filesystem(operand.view(), filesystem)) {
         report_soft_koshkit_util_error(

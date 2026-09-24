@@ -86,19 +86,19 @@ fn EvalContext::register_function(StringView name,
   let info = function_definition_info{};
   info.body_start_position = body_start_position;
   info.header_length = name.length + StringView{" () \n"}.length;
-  if (m_current_source != nullptr && !definition_text.is_empty()) {
+  if (source_store().m_current_source != nullptr && !definition_text.is_empty()) {
     /* The body opens on the copy's second line, because the synthesized header
        occupies the first one. A body that opens on the defining file's first
        line therefore shifts back by one. */
     let const body_line = static_cast<isize>(
-        utils::line_number_at(m_current_source->view(), body_start_position));
+        utils::line_number_at(source_store().m_current_source->view(), body_start_position));
     info.line_offset = body_line - 2;
   }
 
-  if (m_current_source != nullptr &&
-      definition_location.position < m_current_source->count())
+  if (source_store().m_current_source != nullptr &&
+      definition_location.position < source_store().m_current_source->count())
   {
-    info.definition_line = utils::line_number_at(m_current_source->view(),
+    info.definition_line = utils::line_number_at(source_store().m_current_source->view(),
                                                  definition_location.position);
   }
 
@@ -124,12 +124,13 @@ pure fn EvalContext::resolve_render_source(
 {
   let resolved_source = resolved_render_source{};
   resolved_source.text =
-      fallback_source != nullptr ? fallback_source : m_current_source;
+      fallback_source != nullptr ? fallback_source : source_store().m_current_source;
 
-  if (m_function_call_names.is_empty()) return resolved_source;
+  if (function_store().call_names().is_empty()) return resolved_source;
 
-  for (usize depth = m_function_call_storages.count(); depth > 0; depth--) {
-    let const &storage = m_function_call_storages[depth - 1];
+  for (usize depth = function_store().call_storages().count(); depth > 0;
+       depth--) {
+    let const &storage = function_store().call_storages()[depth - 1];
     let const *info = storage.get_definition_info();
     if (info == nullptr) continue;
 
@@ -272,7 +273,8 @@ fn EvalContext::variable_names(Allocator result_allocator) const throws
     -> HashSet
 {
   let names = HashSet{result_allocator};
-  m_shell_variables.for_each([&](StringView name, const String &value) {
+  m_variable_store.shell_variables().for_each(
+      [&](StringView name, const String &value) {
     unused(value);
     names.add(name);
   });
@@ -365,10 +367,10 @@ fn EvalContext::run_named_trap(StringView condition,
   let const saved_action_source_frame_count = trap_store().m_trap_action_source_frame_count;
   let const saved_action_function_depth = trap_store().m_trap_action_function_depth;
   let const trigger_site =
-      trigger_location != nullptr ? *trigger_location : m_current_location;
+      trigger_location != nullptr ? *trigger_location : source_store().m_current_location;
   trap_store().m_trap_trigger_line_number = line_number_at_location(trigger_site);
-  trap_store().m_trap_action_source_frame_count = m_source_frames.count() + 1;
-  trap_store().m_trap_action_function_depth = m_function_call_depth;
+  trap_store().m_trap_action_source_frame_count = source_store().m_source_frames.count() + 1;
+  trap_store().m_trap_action_function_depth = function_store().call_depth();
   defer
   {
     trap_store().m_trap_trigger_line_number = saved_trigger_line_number;
@@ -410,8 +412,9 @@ fn EvalContext::run_named_trap(StringView condition,
 
   run_source(action->view(),
              "the " + String{heap_allocator(), condition} + " trap",
-             return_handling::Reject, trigger_site, None, false, nullptr,
-             cached_action.has_value() ? &cached_action : nullptr);
+             trigger_site, None, nullptr,
+             cached_action.has_value() ? &cached_action : nullptr,
+             return_handling::Reject);
 
   restore_trap_pipe_statuses(has_saved_pipe_statuses,
                              steal(saved_pipe_statuses));
@@ -697,9 +700,9 @@ fn EvalContext::run_pending_traps() throws -> void
             cached_trap_body(name->view(), action->view());
 
         run_source(action->view(), "the " + *name + " trap",
-                   return_handling::Reject, m_current_location, None, false,
-                   nullptr,
-                   cached_action.has_value() ? &cached_action : nullptr);
+                   source_store().m_current_location, None, nullptr,
+                   cached_action.has_value() ? &cached_action : nullptr,
+                   return_handling::Reject);
       }
 
     /* A return, a break, or an exit the action requested leaves the remaining
@@ -740,8 +743,8 @@ fn EvalContext::run_pending_traps() throws -> void
         if (has_pending_control_flow()) break;
 
         LOG(Info, "running the trap action for signal 'CHLD'");
-        run_source(action.view(), "the CHLD trap", return_handling::Reject,
-                   m_current_location, None, false, nullptr, cached_child_body);
+        run_source(action.view(), "the CHLD trap", source_store().m_current_location,
+                   None, nullptr, cached_child_body, return_handling::Reject);
       }
     }
   }
@@ -798,7 +801,8 @@ cold fn EvalContext::run_exit_trap(Maybe<i32> final_status) throws -> void
       action != nullptr)
     if (action->count() > 0) {
       LOG(Info, "running the EXIT trap action at shell exit");
-      run_source(action->view(), "the EXIT trap", return_handling::Reject);
+      run_source(action->view(), "the EXIT trap", None, None, nullptr, nullptr,
+                 return_handling::Reject);
     }
 
   restore_trap_pipe_statuses(has_saved_pipe_statuses,
@@ -858,7 +862,8 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> Maybe<i32>
       action != nullptr)
     if (action->count() > 0) {
       LOG(Info, "running the EXIT trap action the subshell set at its end");
-      run_source(action->view(), "the EXIT trap", return_handling::Reject);
+      run_source(action->view(), "the EXIT trap", None, None, nullptr, nullptr,
+                 return_handling::Reject);
 
       if (has_pending_control_flow() &&
           pending_control_flow().kind == control_flow::Kind::Exit)

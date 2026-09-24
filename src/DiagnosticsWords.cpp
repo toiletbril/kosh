@@ -94,7 +94,8 @@ fn note_arithmetic_target_record(AnalysisContext &actx, StringView expression,
                                  StringView target,
                                  const SourceLocation &location,
                                  Maybe<usize> expression_base_position,
-                                 bool is_conditional, bool is_append) throws
+                                 bool is_conditional,
+                                 assignment_update_mode update_mode) throws
     -> void
 {
   if (!expression_base_position.has_value()) return;
@@ -106,7 +107,7 @@ fn note_arithmetic_target_record(AnalysisContext &actx, StringView expression,
 
   actx.note_variable_occurrence(target, name_location,
                                 variable_occurrence_kind::Assignment,
-                                is_conditional, is_append);
+                                is_conditional, update_mode);
   actx.note_variable_binding_record(
       target, name_location, assignment_binder::Arithmetic, is_conditional);
 }
@@ -137,7 +138,7 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
     usize parenthesis_depth;
     usize bracket_depth;
     usize ternary_depth;
-    bool is_append;
+    assignment_update_mode update_mode;
     bool has_fixed_end;
   };
   let pending_writes = ArrayList<arithmetic_write>{heap_allocator()};
@@ -150,7 +151,7 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
     actx.note_variable_assignment(write.name, location, !is_conditional);
     note_arithmetic_target_record(actx, expression, write.name, location,
                                   expression_base_position, is_conditional,
-                                  write.is_append);
+                                  write.update_mode);
   };
   let const do_apply_fixed_writes = [&](usize end_position) throws -> void {
     while (!pending_writes.is_empty() && pending_writes.back().has_fixed_end &&
@@ -464,7 +465,9 @@ fn check_arithmetic_expression_lints(AnalysisContext &actx,
           }
           pending_writes.push(arithmetic_write{
               word, operator_end, parenthesis_depth, bracket_depth,
-              ternary_depth, is_compound_assignment,
+              ternary_depth,
+              is_compound_assignment ? assignment_update_mode::Append
+                                     : assignment_update_mode::Replace,
               is_step_target || is_prefix_step_target});
         }
         break;

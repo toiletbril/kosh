@@ -98,7 +98,8 @@ fn AssignCommand::analyze(AnalysisContext &actx,
 {
   ASSERT(m_assignment != nullptr);
 
-  if (actx.is_posix_sh_shebang && m_assignment->is_append()) {
+  if (actx.is_posix_sh_shebang &&
+      m_assignment->get_update_mode() == assignment_update_mode::Append) {
     actx.report_diagnostic(diagnostic_id::sc3024, source_location(),
                            {m_assignment->key().view()});
   }
@@ -111,7 +112,8 @@ fn AssignCommand::analyze(AnalysisContext &actx,
   check_assignment_value_shape(
       actx, assignment_lint_input{m_assignment->key().view(),
                                   raw_assignment.view(), source_location(),
-                                  m_assignment->is_append(), false, shape});
+                                  m_assignment->get_update_mode(), false,
+                                  shape});
   let const first_colon = raw_assignment.view().find_character(':');
   if (m_assignment->key().view() == "PATH" &&
       (raw_assignment.view().starts_with(StringView{"PATH=~/"}) ||
@@ -176,7 +178,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
     actx.note_variable_assignment_record(base, nullptr, source_location(),
                                          !is_unconditional ||
                                              actx.has_seen_runtime_definer,
-                                         m_assignment->is_append());
+                                         m_assignment->get_update_mode());
     actx.add_array_valued_name(base);
     LOG(All,
         "forgetting the constant for the array base '%.*s' after an element "
@@ -190,7 +192,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
   actx.note_variable_occurrence(
       name.view(), name_location, variable_occurrence_kind::Assignment,
       !is_unconditional || actx.has_seen_runtime_definer,
-      m_assignment->is_append());
+      m_assignment->get_update_mode());
   actx.note_variable_assignment(name.view(), source_location(),
                                 is_unconditional &&
                                     !actx.has_seen_runtime_definer);
@@ -199,9 +201,10 @@ fn AssignCommand::analyze(AnalysisContext &actx,
   actx.note_variable_assignment_record(
       name.view(), &m_assignment->value_word(), source_location(),
       !is_unconditional || actx.has_seen_runtime_definer,
-      m_assignment->is_append());
+      m_assignment->get_update_mode());
 
-  if (actx.function_scope_depth > 0 && !m_assignment->is_append() &&
+  if (actx.function_scope_depth > 0 &&
+      m_assignment->get_update_mode() != assignment_update_mode::Append &&
       actx.function_local_names.find(name.view()) == nullptr &&
       actx.global_assigned_names.find(name.view()) == nullptr &&
       !actx.inherited_global_assigned_names.contains(name.view()) &&
@@ -222,7 +225,7 @@ fn AssignCommand::analyze(AnalysisContext &actx,
      changed the name out of view, and NAME+=VALUE depends on the untracked
      prior value, so each forgets the name. */
   if (!is_unconditional || actx.has_seen_runtime_definer ||
-      m_assignment->is_append())
+      m_assignment->get_update_mode() == assignment_update_mode::Append)
   {
     LOG(All,
         "forgetting the constant for '%s', the assignment is conditional, "
@@ -279,7 +282,9 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
     if (cxt.should_echo_expanded()) {
       let trace = String{cxt.scratch_allocator(), m_assignment->key().view()};
-      trace += m_assignment->is_append() ? "+=" : "=";
+      trace += m_assignment->get_update_mode() == assignment_update_mode::Append
+                   ? "+="
+                   : "=";
       append_shell_quoted_arg(trace, value.view());
       cxt.write_xtrace(trace.view());
     }
@@ -292,7 +297,7 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       let const subscript = key_view.substring_of_length(
           *bracket + 1, key_view.length - *bracket - 2);
       cxt.assign_array_element(array_name, subscript, value.view(),
-                               m_assignment->is_append());
+                               m_assignment->get_update_mode());
       if (!value_ran_substitution) cxt.set_last_exit_status(0);
       cxt.publish_single_pipe_status(cxt.last_exit_status());
       return cxt.last_exit_status();
@@ -300,7 +305,7 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
     /* NAME+=VALUE prepends the current value of NAME, empty when unset. An
        integer name adds rather than concatenates. */
-    if (m_assignment->is_append()) {
+    if (m_assignment->get_update_mode() == assignment_update_mode::Append) {
       let appended =
           String{cxt.get_variable_value(m_assignment->key()).value_or("")};
       if (cxt.is_integer_variable(m_assignment->key()))
@@ -700,7 +705,7 @@ fn internal::resolve_redirection(const Redirection &redir, EvalContext &cxt,
   ArrayList<const Token *> target_tokens{cxt.scratch_allocator()};
   target_tokens.push(redir.target);
   const ArrayList<String> target =
-      cxt.process_args(target_tokens, argument_lifetime::Transient);
+      cxt.process_args(target_tokens, nullptr, argument_lifetime::Transient);
   if (target.count() != 1) {
     if (open_or_stage_failed != nullptr) *open_or_stage_failed = true;
     throw ErrorWithLocation{redir.target->source_location(),
@@ -806,7 +811,8 @@ fn internal::allocate_redirection_descriptor(
   let const allocated_text = String::from(allocated_fd, heap_allocator());
   if (target->has_subscript) {
     cxt.assign_array_element(target->name, target->subscript,
-                             allocated_text.view(), /*is_append=*/false);
+                             allocated_text.view(),
+                             assignment_update_mode::Replace);
   } else {
     cxt.set_shell_variable(target->name, allocated_text.view());
   }
@@ -1655,7 +1661,7 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
             cxt.assign_array_element(restore.target.name,
                                      restore.target.subscript,
                                      restore.previous_value.view(),
-                                     /*is_append=*/false);
+                                     assignment_update_mode::Replace);
           } else {
             cxt.set_shell_variable(restore.target.name,
                                    restore.previous_value.view());

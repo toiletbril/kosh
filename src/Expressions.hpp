@@ -142,7 +142,7 @@ struct variable_assignment_record
   u32 length{0};
   assignment_binder binder{assignment_binder::Assignment};
   bool is_conditional{false};
-  bool is_append{false};
+  assignment_update_mode update_mode{assignment_update_mode::Replace};
   bool is_array{false};
 };
 
@@ -599,7 +599,8 @@ public:
      array element or a NAME=(...) list. */
   fn note_variable_assignment_record(StringView name, const Word *value_word,
                                      const SourceLocation &location,
-                                     bool is_conditional, bool is_append) throws
+                                     bool is_conditional,
+                                     assignment_update_mode update_mode) throws
       -> void;
   /* A command that binds a name supplies no value word and no literal, so the
      binder is what a reader is told. */
@@ -610,7 +611,9 @@ public:
   fn note_variable_occurrence(StringView name, const SourceLocation &location,
                               variable_occurrence_kind kind,
                               bool is_unresolved = false,
-                              bool is_append = false) throws -> void;
+                              assignment_update_mode update_mode =
+                                  assignment_update_mode::Replace) throws
+      -> void;
   fn apply_called_function(StringView name,
                            const SourceLocation &call_location) throws -> void;
   fn note_function_body_record(StringView name, usize name_position,
@@ -717,10 +720,6 @@ public:
   virtual fn is_compound_command() const wontthrow -> bool;
   virtual fn is_dummy() const wontthrow -> bool;
 
-  /* The typed-node downcasts the optimizer rules use to match a node without
-     RTTI, since the build links with -fno-rtti. The base returns nullptr and a
-     node of the matching kind overrides its own hook to return this, so a rule
-     reads a typed pointer or skips the node. */
   virtual fn as_if_clause() const wontthrow -> const expressions::IfClause *;
   virtual fn as_while_loop() const wontthrow -> const expressions::WhileLoop *;
   virtual fn as_assign_command() const wontthrow
@@ -829,7 +828,10 @@ public:
   {
     return token->source_location();
   }
-  pure fn is_append() const wontthrow -> bool { return token->is_append(); }
+  pure fn get_update_mode() const wontthrow -> assignment_update_mode
+  {
+    return token->get_update_mode();
+  }
 };
 
 struct array_builtin_assignment
@@ -838,7 +840,7 @@ struct array_builtin_assignment
   ArrayList<const Token *> elements;
   SourceLocation location;
   u32 end_position;
-  bool is_append;
+  assignment_update_mode update_mode;
 };
 
 /* The bash assignment builtins that parse a NAME=(...) argument as an array
@@ -857,6 +859,18 @@ enum class assignment_builtin : u8
 pure fn classify_assignment_builtin(StringView name) wontthrow
     -> assignment_builtin;
 
+enum class time_format_mode : u8
+{
+  Default,
+  Posix,
+};
+
+enum class time_rss_mode : u8
+{
+  Omit,
+  Include,
+};
+
 class Command : public Expression
 {
 public:
@@ -871,11 +885,11 @@ public:
   fn set_negated() wontthrow -> void;
   pure fn is_negated() const wontthrow -> bool;
 
-  fn set_timed(bool posix_format, bool should_report_rss,
-               SourceLocation location) wontthrow -> void;
+  fn set_timed(SourceLocation location, time_format_mode format,
+               time_rss_mode rss) wontthrow -> void;
   pure fn is_timed() const wontthrow -> bool;
-  pure fn time_uses_posix_format() const wontthrow -> bool;
-  pure fn should_time_report_rss() const wontthrow -> bool;
+  pure fn get_time_format_mode() const wontthrow -> time_format_mode;
+  pure fn get_time_rss_mode() const wontthrow -> time_rss_mode;
   pure fn time_location() const wontthrow -> SourceLocation;
 
   virtual fn is_assignment() const wontthrow -> bool;
@@ -1283,11 +1297,17 @@ protected:
   mutable Maybe<usize> m_folded_branch{};
 };
 
+enum class loop_kind : u8
+{
+  While,
+  Until,
+};
+
 class WhileLoop : public CompoundCommand
 {
 public:
   WhileLoop(SourceLocation location, const Expression *condition,
-            const Expression *body, bool is_until);
+            const Expression *body, loop_kind kind);
   ~WhileLoop() override;
 
   fn to_string() const throws -> String override;

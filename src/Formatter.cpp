@@ -1704,10 +1704,10 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
   return writer.take();
 }
 
-fn validate_formatted_source(StringView source, mimic_mood mood,
-                             BumpArena &arena, ArrayList<String> &errors,
-                             String *ast_output,
-                             BumpArena *function_arena) throws -> bool
+fn validate_formatted_source(StringView source, BumpArena &arena,
+                             ArrayList<String> &errors, String *ast_output,
+                             BumpArena *function_arena,
+                             mimic_mood mood) throws -> bool
 {
   let const mark = arena.mark();
   let const function_mark = function_arena != nullptr
@@ -1731,9 +1731,10 @@ fn validate_formatted_source(StringView source, mimic_mood mood,
 
 } /* namespace */
 
-fn format_shell_source(StringView source, mimic_mood mood, BumpArena &arena,
+fn format_shell_source(StringView source, BumpArena &arena,
                        ArrayList<String> &errors, String *ast_output,
-                       BumpArena *function_arena) throws -> Maybe<String>
+                       BumpArena *function_arena, mimic_mood mood) throws
+    -> Maybe<String>
 {
   let normalized = String{heap_allocator()};
   let source_view = source;
@@ -1743,15 +1744,15 @@ fn format_shell_source(StringView source, mimic_mood mood, BumpArena &arena,
     source_view = normalized.view();
   }
 
-  if (!validate_formatted_source(source_view, mood, arena, errors, ast_output,
-                                 function_arena))
+  if (!validate_formatted_source(source_view, arena, errors, ast_output,
+                                 function_arena, mood))
     return None;
   let const pieces = scan_format_pieces(source_view);
   append_long_string_warnings(source_view, pieces, None, errors);
   let formatted = render_format_pieces(pieces);
   let formatted_errors = ArrayList<String>{heap_allocator()};
-  if (!validate_formatted_source(formatted.view(), mood, arena,
-                                 formatted_errors, nullptr, function_arena))
+  if (!validate_formatted_source(formatted.view(), arena, formatted_errors,
+                                 nullptr, function_arena, mood))
   {
     errors = steal(formatted_errors);
     return None;

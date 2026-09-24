@@ -32,6 +32,16 @@ namespace koshka {
 
 namespace koshkit {
 
+namespace {
+
+enum class cp_recursive_mode : u8
+{
+  SinglePath,
+  Recursive,
+};
+
+}
+
 static fn report_copy_error(const ExecContext &ec, EvalContext &cxt,
                             StringView utility_name,
                             const Error &error) throws -> void
@@ -94,10 +104,11 @@ static fn source_file_status(StringView source) throws -> Maybe<os::file_status>
 
 static fn copy_path(const ExecContext &ec, EvalContext &cxt,
                     StringView utility_name, StringView source,
-                    StringView destination, bool is_recursive,
+                    StringView destination,
                     bool should_force, bool should_preserve, bool is_verbose,
                     Allocator allocator,
-                    const os::file_status *known_lstat = nullptr) throws
+                    const os::file_status *known_lstat,
+                    cp_recursive_mode recursive_mode) throws
     -> bool
 {
   let const source_path = Path{source};
@@ -117,7 +128,7 @@ static fn copy_path(const ExecContext &ec, EvalContext &cxt,
           ? os::file_type_letter(known_lstat->mode) == 'l'
           : source_path.is_symbolic_link();
 
-  if (is_source_symlink && is_recursive) {
+  if (is_source_symlink && recursive_mode == cp_recursive_mode::Recursive) {
     if (let const target = os::read_symlink(source, allocator)) {
       /* Symlink creation fails when the path is already present, so an existing
          destination is removed first. */
@@ -159,7 +170,7 @@ static fn copy_path(const ExecContext &ec, EvalContext &cxt,
           ? os::file_type_letter(source_status->mode) == 'd'
           : source_path.is_directory();
   if (is_source_directory && !is_source_symlink) {
-    if (!is_recursive)
+    if (recursive_mode == cp_recursive_mode::SinglePath)
       throw Error{
           "'" + String{allocator, source}
             +
@@ -204,9 +215,10 @@ static fn copy_path(const ExecContext &ec, EvalContext &cxt,
       child_destination.append(entry.child.name.view());
       try {
         if (!copy_path(ec, cxt, utility_name, child_source.view(),
-                       child_destination.view(), is_recursive, should_force,
-                       should_preserve, is_verbose, allocator,
-                       entry.has_status ? &entry.status : nullptr))
+                       child_destination.view(), should_force, should_preserve,
+                       is_verbose, allocator,
+                       entry.has_status ? &entry.status : nullptr,
+                       recursive_mode))
           did_succeed = false;
       } catch (const BrokenPipeExit &) {
         throw;
@@ -295,8 +307,10 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());
 
-  let const is_recursive =
-      FLAG_CP_RECURSIVE_R.is_enabled() || FLAG_CP_RECURSIVE_UPPER.is_enabled();
+  let const recursive_mode =
+      FLAG_CP_RECURSIVE_R.is_enabled() || FLAG_CP_RECURSIVE_UPPER.is_enabled()
+          ? cp_recursive_mode::Recursive
+          : cp_recursive_mode::SinglePath;
   let const should_force = FLAG_CP_FORCE.is_enabled();
   let const should_preserve = FLAG_CP_PRESERVE.is_enabled();
   let const should_prompt = FLAG_CP_INTERACTIVE.is_enabled() &&
@@ -334,8 +348,8 @@ fn Cp::execute(const ExecContext &ec, EvalContext &cxt,
 
     try {
       if (!copy_path(ec, cxt, args[0].view(), source, target.view(),
-                     is_recursive, should_force, should_preserve, is_verbose,
-                     cxt.scratch_allocator()))
+                     should_force, should_preserve, is_verbose,
+                     cxt.scratch_allocator(), nullptr, recursive_mode))
         status = 1;
     } catch (const BrokenPipeExit &) {
       throw;

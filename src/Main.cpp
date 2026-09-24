@@ -928,8 +928,8 @@ fn kosh_main(int argc, char **argv) -> int
         file_names, FLAG_FORMAT.is_enabled(), context, ast_arena);
   if (FLAG_FORMAT.is_enabled())
     return koshka::run_format_operation(file_names, FLAG_APPLY.is_enabled(),
-                                        FLAG_LINT.is_enabled(), session_mood,
-                                        ast_arena, context);
+                                        FLAG_LINT.is_enabled(), ast_arena,
+                                        context, session_mood);
 
   /* A lint report must not follow the aliases, functions, and search path of
      whoever invoked it. */

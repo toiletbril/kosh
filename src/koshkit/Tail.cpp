@@ -35,6 +35,12 @@ enum class count_origin : u8
   FromStart
 };
 
+enum class tail_unit : u8
+{
+  Lines,
+  Bytes,
+};
+
 struct parsed_tail_count
 {
   count_origin origin;
@@ -76,7 +82,7 @@ struct regular_tail_state
   u64 start_offset{0};
   u64 remaining_newline_count{0};
   usize read_byte_count{0};
-  bool is_byte_mode{false};
+  tail_unit unit{tail_unit::Lines};
   bool has_boundary{false};
   bool is_done{false};
   bool has_error{false};
@@ -106,7 +112,7 @@ static fn read_regular_tails(ArrayList<regular_tail_state> &states,
       continue;
     }
 
-    if (state.is_byte_mode) {
+    if (state.unit == tail_unit::Bytes) {
       state.start_offset = state.file_size > state.remaining_newline_count
                                ? state.file_size - state.remaining_newline_count
                                : 0;
@@ -162,7 +168,7 @@ static fn read_regular_tails(ArrayList<regular_tail_state> &states,
       block.append(StringView{state.buffer.begin(), transferred});
       state.blocks.push({steal(block), block_offset});
 
-      if (!state.is_byte_mode) {
+      if (state.unit != tail_unit::Bytes) {
         for (usize position = transferred; position > 0; position--) {
           let const absolute = block_offset + position - 1;
           if (absolute + 1 == state.file_size &&
@@ -212,7 +218,7 @@ struct forward_tail_state
   u64 next_offset{0};
   u64 skipped_newlines{0};
   usize read_byte_count{0};
-  bool is_byte_mode{false};
+  tail_unit unit{tail_unit::Lines};
   bool is_done{false};
   bool has_error{false};
   ArrayList<char> buffer{heap_allocator()};
@@ -283,7 +289,7 @@ static fn read_regular_forward_tails(
       }
 
       usize append_start = 0;
-      if (!state.is_byte_mode && state.skipped_newlines != 0) {
+      if (state.unit != tail_unit::Bytes && state.skipped_newlines != 0) {
         for (usize position = 0; position < transferred; position++) {
           if (state.buffer[position] != '\n') continue;
           state.skipped_newlines--;
@@ -323,10 +329,11 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   /* -c takes precedence over -n when both are given, matching GNU tail. */
-  let const is_byte_mode = FLAG_TAIL_BYTES.is_set();
+  let const unit = FLAG_TAIL_BYTES.is_set() ? tail_unit::Bytes
+                                            : tail_unit::Lines;
   let parsed_count = Maybe<parsed_tail_count>{
       parsed_tail_count{count_origin::FromEnd, 10}};
-  if (is_byte_mode) {
+  if (unit == tail_unit::Bytes) {
     parsed_count = parse_tail_count(FLAG_TAIL_BYTES.value());
     if (!parsed_count.has_value()) {
       throw ErrorWithDetails{
@@ -419,7 +426,7 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       state.file_size = *file_size;
       state.next_end = *file_size;
       state.remaining_newline_count = static_cast<u64>(count);
-      state.is_byte_mode = is_byte_mode;
+      state.unit = unit;
       state.buffer = ArrayList<char>{allocator};
       state.blocks = ArrayList<tail_block>{allocator};
       state.buffer.reserve(TAIL_BLOCK_BYTE_COUNT);
@@ -459,8 +466,8 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       state.source_index = source_index;
       state.descriptor = *descriptor;
       state.file_size = *file_size;
-      state.is_byte_mode = is_byte_mode;
-      state.next_offset = is_byte_mode
+      state.unit = unit;
+      state.next_offset = unit == tail_unit::Bytes
                               ? (count == 0
                                      ? 0
                                      : (static_cast<u64>(count - 1) < *file_size
@@ -468,7 +475,9 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
                                             : *file_size))
                               : 0;
       state.skipped_newlines =
-          !is_byte_mode && count > 0 ? static_cast<u64>(count - 1) : 0;
+          unit != tail_unit::Bytes && count > 0
+              ? static_cast<u64>(count - 1)
+              : 0;
       state.buffer = ArrayList<char>{allocator};
       state.buffer.reserve(TAIL_BLOCK_BYTE_COUNT);
       forward_states.push(steal(state));
@@ -519,7 +528,7 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       output += " <==\n";
     }
 
-    if (is_byte_mode) {
+    if (unit == tail_unit::Bytes) {
       let const wanted_count = static_cast<usize>(count);
       let const text = content->view();
       let start = origin == count_origin::FromStart

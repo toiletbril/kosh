@@ -59,7 +59,7 @@ fn normalize_condition(StringView raw, Allocator allocator) throws -> String
 /* The sh mood behaves like dash. Dash knows EXIT and the real signals and
    reports DEBUG, ERR, and RETURN as a bad trap. Each of those three is also
    inert there, since every dispatch site holds them behind the mood. */
-fn is_valid_trap_condition(StringView condition, bool is_posix_mood) throws
+fn is_valid_trap_condition(StringView condition, mimic_mood mood) throws
     -> bool
 {
   static constexpr PackedStringKey SPECIAL_CONDITION_KEYS[] = {
@@ -71,7 +71,7 @@ fn is_valid_trap_condition(StringView condition, bool is_posix_mood) throws
   static constexpr StaticStringSet SPECIAL_CONDITIONS{SPECIAL_CONDITION_KEYS};
 
   if (SPECIAL_CONDITIONS.contains(condition))
-    return !is_posix_mood || condition == "EXIT";
+    return mood != mimic_mood::Posix || condition == "EXIT";
 
   if (condition.is_all_decimal_digits()) return false;
 
@@ -225,7 +225,7 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       for (usize i = operand_index; i < args.count(); i++) {
         let const condition =
             normalize_condition(args[i], cxt.scratch_allocator());
-        if (!is_valid_trap_condition(condition.view(), cxt.is_posix_mode())) {
+        if (!is_valid_trap_condition(condition.view(), cxt.mood())) {
           report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
                                     args[i] + ": invalid signal specification",
                                     "List the signal names with `trap -l`");
@@ -289,7 +289,7 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   if (action_index + 1 == args.count()) {
     let const condition =
         normalize_condition(args[action_index], cxt.scratch_allocator());
-    if (!is_valid_trap_condition(condition.view(), cxt.is_posix_mode())) {
+    if (!is_valid_trap_condition(condition.view(), cxt.mood())) {
       report_soft_builtin_error(ec, cxt, ec.arg_location_at(action_index),
                                 args[action_index] +
                                     ": invalid signal specification",
@@ -311,7 +311,7 @@ fn Trap::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   i32 status = 0;
   for (usize i = action_index + 1; i < args.count(); i++) {
     let const condition = normalize_condition(args[i], cxt.scratch_allocator());
-    if (!is_valid_trap_condition(condition.view(), cxt.is_posix_mode())) {
+    if (!is_valid_trap_condition(condition.view(), cxt.mood())) {
       report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
                                 args[i] + ": invalid signal specification",
                                 "List the signal names with `trap -l`");

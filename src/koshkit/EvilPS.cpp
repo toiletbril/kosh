@@ -77,6 +77,12 @@ enum class evilps_sort_key : u8
   Memory,
 };
 
+enum class evilps_resource_mode : u8
+{
+  Basic,
+  ResourceStats,
+};
+
 struct evilps_sort_spec
 {
   evilps_sort_key key;
@@ -214,19 +220,19 @@ fn update_cpu_history(ArrayList<tree_node> &nodes,
 
 fn compare_nodes(const tree_node &left, const tree_node &right,
                  Maybe<evilps_sort_key> sort_key,
-                 bool is_sampled) wontthrow -> bool
+                 report_sampling_mode sampling) wontthrow -> bool
 {
   if (sort_key.has_value()) {
     switch (*sort_key) {
     case evilps_sort_key::Cpu: {
-      if (is_sampled &&
+      if (sampling == report_sampling_mode::Rolling &&
           left.has_cpu_percentage != right.has_cpu_percentage)
       {
         return left.has_cpu_percentage;
       }
-      let const left_cpu = is_sampled ? left.cpu_percentage_hundredths
+      let const left_cpu = sampling == report_sampling_mode::Rolling ? left.cpu_percentage_hundredths
                                       : left.cpu_milliseconds;
-      let const right_cpu = is_sampled ? right.cpu_percentage_hundredths
+      let const right_cpu = sampling == report_sampling_mode::Rolling ? right.cpu_percentage_hundredths
                                        : right.cpu_milliseconds;
       if (left_cpu != right_cpu) return left_cpu > right_cpu;
       break;
@@ -251,19 +257,19 @@ fn compare_nodes(const tree_node &left, const tree_node &right,
 
 fn sort_nodes(ArrayList<tree_node> &nodes,
               Maybe<evilps_sort_key> sort_key,
-              bool is_sampled) throws -> void
+              report_sampling_mode sampling) throws -> void
 {
-  let const do_compare = [sort_key, is_sampled](const tree_node &left,
+  let const do_compare = [sort_key, sampling](const tree_node &left,
                                                 const tree_node &right) {
-    return compare_nodes(left, right, sort_key, is_sampled);
+    return compare_nodes(left, right, sort_key, sampling);
   };
   nodes.sort(do_compare);
 }
 
 fn append_cpu_value(String &output, const tree_node &node, Allocator allocator,
-                    bool is_sampled) throws -> void
+                    report_sampling_mode sampling) throws -> void
 {
-  if (is_sampled) {
+  if (sampling == report_sampling_mode::Rolling) {
     if (!node.has_cpu_percentage) {
       output += "-";
       return;
@@ -332,35 +338,10 @@ fn append_bounded_command(String &output, StringView command,
 }
 
 fn append_label(String &output, const tree_node &node, Allocator allocator,
-                bool should_color, bool should_human,
-                Maybe<evilps_sort_key> sort_key,
-                bool is_sampled, usize line_width_limit) throws -> void
+                bool should_color, Maybe<evilps_sort_key> sort_key,
+                usize line_width_limit,
+                report_sampling_mode sampling) throws -> void
 {
-  if (should_human) {
-    append_report_text(output,
-                       String::from(static_cast<u64>(node.pid), allocator).view(),
-                       colors::ansi::CYAN, should_color);
-    output += "  ";
-    append_report_text(
-        output, String::from(static_cast<u64>(node.parent_pid), allocator).view(),
-        colors::ansi::CYAN, should_color);
-    output += "  ";
-    append_cpu_value(output, node, allocator, is_sampled);
-    output += "  ";
-    output += format_human_size(node.resident_kib * 1024, allocator).view();
-    output += "  ";
-    append_report_text(output, node.name.view(), colors::ansi::BOLD_GREEN,
-                       should_color);
-    if ((FLAG_EVILPS_ALL.is_enabled() ||
-         FLAG_EVILPS_ARGUMENTS.is_enabled()) &&
-        !node.command_line.is_empty()) {
-      append_bounded_command(output, node.command_line.view(),
-                             line_width_limit, should_color);
-    }
-    output += "\n";
-    return;
-  }
-
   append_report_text(output, node.name.view(), colors::ansi::BOLD_GREEN,
                      should_color);
 
@@ -393,7 +374,7 @@ fn append_label(String &output, const tree_node &node, Allocator allocator,
     if (should_show_cpu) {
       append_report_text(output, "CPU", colors::ansi::BOLD_CYAN, should_color);
       output += " ";
-      append_cpu_value(output, node, allocator, is_sampled);
+      append_cpu_value(output, node, allocator, sampling);
     }
     if (should_show_cpu && should_show_memory) output += "  ";
     if (should_show_memory) {
@@ -417,10 +398,10 @@ fn render_process_relatives(String &output, ArrayList<tree_node> &nodes,
                             usize parent_position, const String &prefix,
                             usize depth, Allocator allocator,
                             bool should_color, usize output_limit,
-                            usize &rendered_count, bool should_human,
-                            Maybe<evilps_sort_key> sort_key, bool is_sampled,
+                            usize &rendered_count, Maybe<evilps_sort_key> sort_key,
                             usize line_width_limit,
-                            bool should_follow_parents) throws -> void
+                            bool should_follow_parents,
+                            report_sampling_mode sampling) throws -> void
 {
   if (depth > MAXIMUM_TREE_DEPTH || rendered_count >= output_limit) return;
 
@@ -471,26 +452,27 @@ fn render_process_relatives(String &output, ArrayList<tree_node> &nodes,
     append_report_text(output, prefix.view(), colors::ansi::CYAN, should_color);
     append_report_text(output, connector.branch, colors::ansi::CYAN,
                        should_color);
-    append_label(output, nodes[position], allocator, should_color, should_human,
-                 sort_key, is_sampled, line_width_limit);
+    append_label(output, nodes[position], allocator, should_color, sort_key,
+                 line_width_limit, sampling);
     rendered_count++;
 
     let relative_prefix = String{allocator, prefix.view()};
     relative_prefix += connector.continuation;
     render_process_relatives(output, nodes, position, relative_prefix, depth + 1,
                              allocator, should_color, output_limit,
-                             rendered_count, should_human, sort_key,
-                             is_sampled, line_width_limit,
-                             should_follow_parents);
+                             rendered_count, sort_key,
+                             line_width_limit, should_follow_parents, sampling);
   }
 }
 
-fn read_process_nodes(Allocator allocator, bool should_read_resources) throws
+fn read_process_nodes(Allocator allocator,
+                      evilps_resource_mode resource_mode) throws
     -> ArrayList<tree_node>
 {
   let const processes = os::enumerate_processes(
-      should_read_resources ? os::process_detail::ResourceStats
-                            : os::process_detail::Basic);
+      resource_mode == evilps_resource_mode::ResourceStats
+          ? os::process_detail::ResourceStats
+          : os::process_detail::Basic);
   ArrayList<tree_node> nodes{allocator};
   for (let const &process : processes) {
     tree_node node{};
@@ -513,7 +495,8 @@ fn mark_search_visibility(ArrayList<tree_node> &nodes, StringView search) throws
 {
   if (search.is_empty()) return;
 
-  let const parsed_pid = utils::parse_integer_in_base(search, int_base::decimal);
+  let const parsed_pid =
+      utils::parse_integer_in_base(search, nullptr, int_base::decimal);
   let const is_exact_pid =
       !parsed_pid.is_error() && parsed_pid.value() > 0;
   for (let &node : nodes) {
@@ -550,10 +533,10 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
                            usize output_limit, bool should_color,
                            u32 viewport_rows,
                            usize scroll_offset, StringView search,
-                           bool should_human,
-                           Maybe<evilps_sort_key> sort_key, bool is_sampled,
+                           Maybe<evilps_sort_key> sort_key,
                            usize line_width_limit,
-                           usize &visible_line_count) throws -> i32
+                           usize &visible_line_count,
+                           report_sampling_mode sampling) throws -> i32
 {
   if (nodes.is_empty()) {
     report_soft_koshkit_error(ec, cxt,
@@ -562,13 +545,14 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     return 1;
   }
 
-  sort_nodes(nodes, sort_key, is_sampled);
+  sort_nodes(nodes, sort_key, sampling);
   mark_search_visibility(nodes, search);
 
   i64 root_pid = 1;
   if (!operands.is_empty()) {
     let const parsed =
-        utils::parse_integer_in_base(operands[0].view(), int_base::decimal);
+        utils::parse_integer_in_base(operands[0].view(), nullptr,
+                                     int_base::decimal);
     if (parsed.is_error()) {
       report_soft_koshkit_util_error(
           ec, cxt, operand_locations[0], "evilps",
@@ -589,18 +573,7 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
   }
 
   usize rendered_count = 0;
-  let const root_indentation = should_human ? StringView{"  "} : StringView{};
-
-  if (should_human) {
-    if (!output.is_empty()) {
-      while (!output.is_empty() && output.back() == '\n')
-        output.truncate(output.length() - 1);
-      output += "\n\n";
-    }
-    append_report_text(output, "Processes", colors::ansi::BOLD_BLUE,
-                       should_color);
-    output += "\n  PID  PPID  CPU  MEM  COMMAND\n";
-  }
+  let const root_indentation = StringView{};
 
   if (root_position < nodes.count() &&
       (!sort_key.has_value() || !operands.is_empty()) &&
@@ -609,12 +582,12 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
       nodes[root_position].was_rendered = true;
       output += root_indentation;
       append_label(output, nodes[root_position], allocator, should_color,
-                   should_human, sort_key, is_sampled, line_width_limit);
+                   sort_key, line_width_limit, sampling);
       rendered_count++;
       render_process_relatives(
           output, nodes, root_position, String{allocator, root_indentation},
           0, allocator, should_color, output_limit, rendered_count,
-          should_human, sort_key, is_sampled, line_width_limit, false);
+          sort_key, line_width_limit, false, sampling);
     }
     visible_line_count = 1;
     if (viewport_rows != 0) {
@@ -662,13 +635,13 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     if (sort_key.has_value()) {
       nodes[position].was_rendered = true;
       output += root_indentation;
-      append_label(output, nodes[position], allocator, should_color,
-                   should_human, sort_key, is_sampled, line_width_limit);
+      append_label(output, nodes[position], allocator, should_color, sort_key,
+                   line_width_limit, sampling);
       rendered_count++;
       render_process_relatives(
           output, nodes, position, String{allocator, root_indentation}, 0,
           allocator, should_color, output_limit, rendered_count,
-          should_human, sort_key, is_sampled, line_width_limit, true);
+          sort_key, line_width_limit, true, sampling);
       continue;
     }
 
@@ -687,13 +660,13 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
 
     nodes[position].was_rendered = true;
     output += root_indentation;
-    append_label(output, nodes[position], allocator, should_color,
-                 should_human, sort_key, is_sampled, line_width_limit);
+    append_label(output, nodes[position], allocator, should_color, sort_key,
+                 line_width_limit, sampling);
     rendered_count++;
     render_process_relatives(
         output, nodes, position, String{allocator, root_indentation}, 0,
         allocator, should_color, output_limit, rendered_count,
-        should_human, sort_key, is_sampled, line_width_limit, false);
+        sort_key, line_width_limit, false, sampling);
   }
 
   visible_line_count = rendered_count;
@@ -727,7 +700,8 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
 
 fn poll_live_input(os::descriptor input_fd, String &input, String &search,
                    usize &scroll_offset, Maybe<evilps_sort_key> &sort_key,
-                   bool &should_sample_cpu, bool &should_read_resources) wontthrow
+                   bool &should_sample_cpu,
+                   evilps_resource_mode &resource_mode) wontthrow
     -> bool
 {
   if (os::wait_for_fd_readable(input_fd, 0) <= 0) return true;
@@ -769,7 +743,7 @@ fn poll_live_input(os::descriptor input_fd, String &input, String &search,
       if (sort_key.has_value() && *sort_key == evilps_sort_key::Cpu)
         should_sample_cpu = true;
       if (sort_key.has_value() && *sort_key == evilps_sort_key::Memory)
-        should_read_resources = true;
+        resource_mode = evilps_resource_mode::ResourceStats;
       continue;
     }
     if (byte == '/') {
@@ -825,7 +799,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
   if (!operands.is_empty() && operands[0].length() > 1 && operands[0][0] == '-')
   {
     let const parsed = utils::parse_integer_in_base(
-        operands[0].view().substring(1), int_base::decimal);
+        operands[0].view().substring(1), nullptr, int_base::decimal);
     if (parsed.is_error() || parsed.value() <= 0 ||
         static_cast<u64>(parsed.value()) > SIZE_MAX)
     {
@@ -858,9 +832,12 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
   bool should_sample_cpu =
       FLAG_EVILPS_ALL.is_enabled() || FLAG_EVILPS_CPU.is_enabled() ||
       (sort_key.has_value() && *sort_key == evilps_sort_key::Cpu);
-  bool should_read_resources =
+  let const should_collect_resources =
       should_sample_cpu || FLAG_EVILPS_MEMORY.is_enabled() ||
       (sort_key.has_value() && *sort_key == evilps_sort_key::Memory);
+  evilps_resource_mode resource_mode =
+      should_collect_resources ? evilps_resource_mode::ResourceStats
+                               : evilps_resource_mode::Basic;
   let const should_color = koshkit_should_color();
 
   f64 live_interval_seconds = 0.5;
@@ -914,7 +891,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     let const window_nanoseconds =
         static_cast<u64>(cumulative_interval_seconds * 1000000000.0);
     let history = ArrayList<live_process_cpu_row>{live_allocator};
-    let nodes = read_process_nodes(live_allocator, should_read_resources);
+    let nodes = read_process_nodes(live_allocator, resource_mode);
     u64 last_sample_nanoseconds = os::monotonic_nanos();
     u64 last_refresh_nanoseconds =
         last_sample_nanoseconds > refresh_interval_nanoseconds
@@ -976,7 +953,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
             live_line_width_limit = terminal_columns;
           unused(terminal_rows);
         }
-        nodes = read_process_nodes(live_allocator, should_read_resources);
+        nodes = read_process_nodes(live_allocator, resource_mode);
         if (should_sample_cpu)
           update_cpu_history(nodes, history, now, window_nanoseconds);
         last_sample_nanoseconds = now;
@@ -985,7 +962,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
         if (is_terminal && !poll_live_input(
                                 ec.in_fd.value_or(KOSH_STDIN), live_input,
                                 live_search, scroll_offset, sort_key,
-                                should_sample_cpu, should_read_resources))
+                                should_sample_cpu, resource_mode))
           return 0;
         continue;
       }
@@ -1027,8 +1004,9 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
           ec, cxt, frame_allocator, frame, nodes, operands, operand_locations,
           output_limit, should_color,
           is_terminal && terminal_rows > 2 ? terminal_rows - 1 : 0,
-          scroll_offset, live_search.view(), false, sort_key, true,
-          live_line_width_limit, visible_line_count);
+          scroll_offset, live_search.view(), sort_key,
+          live_line_width_limit, visible_line_count,
+          report_sampling_mode::Rolling);
       if (status != 0) return status;
       ec.print_to_stdout(frame);
       if (visible_line_count > terminal_rows && terminal_rows > 1) {
@@ -1042,13 +1020,13 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
       if (is_terminal && !poll_live_input(
                               ec.in_fd.value_or(KOSH_STDIN), live_input,
                               live_search, scroll_offset, sort_key,
-                              should_sample_cpu, should_read_resources))
+                              should_sample_cpu, resource_mode))
         return 0;
     }
   }
 
-  let nodes = read_process_nodes(allocator, should_read_resources);
-  bool is_sampled = false;
+  let nodes = read_process_nodes(allocator, resource_mode);
+  report_sampling_mode sampling = report_sampling_mode::Instant;
   if (FLAG_EVILPS_CUMULATIVE.is_enabled()) {
     let history = ArrayList<live_process_cpu_row>{allocator};
     let const before_nanoseconds = os::monotonic_nanos();
@@ -1061,20 +1039,20 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
       os::INTERRUPT_REQUESTED = 0;
       return 130;
     }
-    nodes = read_process_nodes(allocator, should_read_resources);
+    nodes = read_process_nodes(allocator, resource_mode);
     let const after_nanoseconds = os::monotonic_nanos();
     if (should_sample_cpu)
       update_cpu_history(nodes, history, after_nanoseconds,
                          static_cast<u64>(cumulative_interval_seconds *
                                           1000000000.0));
-    is_sampled = true;
+    sampling = report_sampling_mode::Rolling;
   }
 
   let output = String{allocator};
   let const status = render_process_snapshot(
       ec, cxt, allocator, output, nodes, operands, operand_locations,
-      output_limit, should_color, 0, 0, StringView{}, false, sort_key,
-      is_sampled, line_width_limit, output_limit);
+      output_limit, should_color, 0, 0, StringView{}, sort_key,
+      line_width_limit, output_limit, sampling);
   if (status == 0) ec.print_to_stdout(output);
   return status;
 }

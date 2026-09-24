@@ -995,31 +995,31 @@ fn verify_filesystem_integrity(StringView path,
 
 #if defined __APPLE__
 
-static fn sync_native_descriptor(descriptor fd, bool is_data_only) wontthrow
+static fn sync_native_descriptor(descriptor fd, sync_mode mode) wontthrow
     -> bool
 {
-  unused(is_data_only);
+  unused(mode);
   return ::fsync(fd) == 0;
 }
 
 #else
 
-static fn sync_native_descriptor(descriptor fd, bool is_data_only) wontthrow
+static fn sync_native_descriptor(descriptor fd, sync_mode mode) wontthrow
     -> bool
 {
-  return (is_data_only ? ::fdatasync(fd) : ::fsync(fd)) == 0;
+  return (mode == sync_mode::DataOnly ? ::fdatasync(fd) : ::fsync(fd)) == 0;
 }
 
 #endif
 
-fn sync_path(StringView path, bool is_data_only) wontthrow -> bool
+fn sync_path(StringView path, sync_mode mode) wontthrow -> bool
 {
   const String path_string{path};
   let const path_fd = ::open(path_string.c_str(), O_RDONLY | O_CLOEXEC);
   if (path_fd < 0) return false;
   defer { ::close(path_fd); };
 
-  return sync_native_descriptor(path_fd, is_data_only);
+  return sync_native_descriptor(path_fd, mode);
 }
 
 namespace batch_internal {

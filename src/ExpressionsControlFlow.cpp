@@ -88,12 +88,13 @@ fn CompoundCommand::evaluate_async(EvalContext &cxt) const throws -> i64
   let const should_launch_fresh_evaluator = !os::can_fork_evaluator();
   if (should_launch_fresh_evaluator) bootstrap = cxt.make_subshell_bootstrap();
   let const launch = os::launch_compound_stage(
-      command_text, None, None, None, cxt.mood(), source_location(),
+      command_text, None, None, None, source_location(),
       source != nullptr ? source->view() : StringView{},
-      os::process_group_mode::NewBackground, 0,
+      0,
       should_launch_fresh_evaluator ? &bootstrap : nullptr, cxt.shell_name(),
       cxt.last_exit_status(), os::get_shell_process_id(),
-      cxt.get_subshell_depth() + 1);
+      cxt.get_subshell_depth() + 1, cxt.mood(),
+      os::process_group_mode::NewBackground);
   let const child = launch.child;
 
   if (launch.should_evaluate_child) {
@@ -396,10 +397,10 @@ pure fn IfClause::folded_branch_index() const wontthrow -> usize
 fn IfClause::as_if_clause() const wontthrow -> const IfClause * { return this; }
 
 WhileLoop::WhileLoop(SourceLocation location, const Expression *condition,
-                     const Expression *body, bool is_until)
+                     const Expression *body, loop_kind kind)
     : CompoundCommand(steal(location)), m_condition(condition), m_body(body)
 {
-  set_execution_flag(ExecutionFlag::UntilLoop, is_until);
+  set_execution_flag(ExecutionFlag::UntilLoop, kind == loop_kind::Until);
 }
 
 WhileLoop::~WhileLoop() = default;
@@ -1100,7 +1101,7 @@ fn CaseClause::evaluate_status_impl(EvalContext &cxt) const throws
 
   LOG(Debug, "the case subject expanded to '%s'", subject.c_str());
 
-  let const is_extglob_enabled = cxt.extglob_enabled();
+  let const extglob = cxt.get_extglob_mode();
 
   let const do_arm_matches = [&](const case_item &item) throws -> bool {
     for (let const pattern_token : item.patterns) {
@@ -1133,8 +1134,7 @@ fn CaseClause::evaluate_status_impl(EvalContext &cxt) const throws
         for (usize k = 0; k < pattern.count(); k++)
           pattern_active.push(true);
       }
-      if (utils::glob_matches(pattern, subject, pattern_active, 0,
-                              is_extglob_enabled))
+      if (utils::glob_matches(pattern, subject, pattern_active, 0, extglob))
         return true;
     }
     return false;
@@ -1515,12 +1515,12 @@ fn CoprocCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
   if (should_launch_fresh_evaluator) bootstrap = cxt.make_subshell_bootstrap();
 
   let const launch = os::launch_compound_stage(
-      command_text, toward_child->in, away_from_child->out, None, cxt.mood(),
-      source_location(), source != nullptr ? source->view() : StringView{},
-      os::process_group_mode::NewBackground, 0,
+      command_text, toward_child->in, away_from_child->out, None,
+      source_location(), source != nullptr ? source->view() : StringView{}, 0,
       should_launch_fresh_evaluator ? &bootstrap : nullptr, cxt.shell_name(),
       cxt.last_exit_status(), os::get_shell_process_id(),
-      cxt.get_subshell_depth() + 1);
+      cxt.get_subshell_depth() + 1, cxt.mood(),
+      os::process_group_mode::NewBackground);
   let const child = launch.child;
 
   if (launch.should_evaluate_child) {

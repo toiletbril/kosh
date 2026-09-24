@@ -117,9 +117,8 @@ fn Env::execute(const ExecContext &ec, EvalContext &cxt,
     let const *source = cxt.current_source();
     sub = ExecContext::make_from(
         ec.source_location(), source != nullptr ? source->view() : StringView{},
-        steal(env_args), cxt.mood(), cxt.koshkit(),
-        cxt.is_shopt_enabled("checkhash"), environment_resolver,
-        steal(env_arg_locations));
+        steal(env_args), cxt.koshkit(), cxt.is_shopt_enabled("checkhash"),
+        environment_resolver, steal(env_arg_locations), cxt.mood());
   } catch (const CommandResolutionErrorWithLocation &resolution_error) {
     const String *source = cxt.current_source();
     show_message(resolution_error.to_string(

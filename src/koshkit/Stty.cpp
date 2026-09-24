@@ -54,10 +54,14 @@ fn Stty::execute(const ExecContext &ec, EvalContext &cxt,
   }
   let const should_report =
       settings.is_empty() || should_report_all || should_encode;
+  let const output_mode =
+      should_encode ? os::terminal_settings_output_mode::Encoded
+      : should_report_all ? os::terminal_settings_output_mode::All
+                          : os::terminal_settings_output_mode::Normal;
   let const terminal = ec.in_fd.value_or(KOSH_STDIN);
   if (should_report) {
-    let const output = os::terminal_settings(
-        terminal, should_encode, should_report_all, cxt.scratch_allocator());
+    let const output =
+        os::terminal_settings(terminal, cxt.scratch_allocator(), output_mode);
     if (!output.has_value()) {
       report_soft_koshkit_util_error(ec, cxt, args[0].view(),
                                      "standard input is not a terminal");

@@ -51,8 +51,8 @@ fn process_has_id(process p, i64 id) wontthrow -> bool
    pid, so a child is forked to give the caller the same pid and status. */
 cold fn spawn_failure_child(SourceLocation location, const Path &program_path,
                             int spawn_error, StringView source,
-                            process_group_mode process_group,
-                            i64 process_group_id) throws -> process
+                            i64 process_group_id,
+                            process_group_mode process_group) throws -> process
 {
   LOG(Debug, "forking a child to report the spawn failure for '%s'",
       program_path.c_str());
@@ -86,10 +86,10 @@ cold fn spawn_failure_child(SourceLocation location, const Path &program_path,
   return child_pid;
 }
 
-hot fn execute_program(ExecContext &ec, script_fallback_policy fallback,
-                       process_group_mode process_group, StringView source,
-                       terminal_handoff handoff, i64 process_group_id) throws
-    -> process
+hot fn execute_program(ExecContext &ec, StringView source, i64 process_group_id,
+                       script_fallback_policy fallback,
+                       terminal_handoff handoff,
+                       process_group_mode process_group) throws -> process
 {
   let const allow_script_fallback = fallback == script_fallback_policy::Allow;
   let const new_process_group = process_group != process_group_mode::Inherit;
@@ -289,8 +289,8 @@ hot fn execute_program(ExecContext &ec, script_fallback_policy fallback,
 
   if (spawn_error != 0)
     return spawn_failure_child(ec.source_location(), ec.program_path(),
-                               spawn_error, source, process_group,
-                               process_group_id);
+                               spawn_error, source, process_group_id,
+                               process_group);
 
   return child_pid;
 }
@@ -428,8 +428,9 @@ fn reclaim_controlling_terminal() wontthrow -> void
 static fn fork_compound_stage(
     Maybe<descriptor> in_fd, Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
     SourceLocation location = {}, StringView source = {},
-    process_group_mode process_group = process_group_mode::Inherit,
-    i64 process_group_id = 0) throws -> process
+    i64 process_group_id = 0,
+    process_group_mode process_group = process_group_mode::Inherit) throws
+    -> process
 {
   LOG(Debug, "forking a compound pipeline stage");
 
@@ -514,12 +515,12 @@ static fn fork_job_process() throws -> process
 
 fn try_fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
                            Maybe<descriptor> err_fd, SourceLocation location,
-                           StringView source, process_group_mode process_group,
-                           i64 process_group_id) throws -> Maybe<process>
+                           StringView source, i64 process_group_id,
+                           process_group_mode process_group) throws -> Maybe<process>
 {
   return fork_compound_stage(steal(in_fd), steal(out_fd), steal(err_fd),
-                             steal(location), source, process_group,
-                             process_group_id);
+                             steal(location), source, process_group_id,
+                             process_group);
 }
 
 fn try_fork_job_process() throws -> Maybe<process>
@@ -529,12 +530,11 @@ fn try_fork_job_process() throws -> Maybe<process>
 
 fn can_fork_evaluator() wontthrow -> bool { return true; }
 
-fn launch_process_substitution(StringView source, bool command_writes_pipe,
-                               mimic_mood mood, bool source_traces_enabled,
-                               const subshell_bootstrap *bootstrap,
-                               StringView shell_name, i32 previous_exit_status,
-                               i64 shell_process_id,
-                               usize subshell_depth) throws
+fn launch_process_substitution(
+    StringView source, bool source_traces_enabled,
+    const subshell_bootstrap *bootstrap, StringView shell_name,
+    i32 previous_exit_status, i64 shell_process_id, usize subshell_depth,
+    process_substitution_direction direction, mimic_mood mood) throws
     -> process_substitution_launch
 {
   unused(source);
@@ -545,6 +545,9 @@ fn launch_process_substitution(StringView source, bool command_writes_pipe,
   unused(previous_exit_status);
   unused(shell_process_id);
   unused(subshell_depth);
+
+  let const command_writes_pipe =
+      direction == process_substitution_direction::CommandWrites;
 
   let const pipe = make_pipe();
   if (!pipe.has_value())
@@ -594,12 +597,13 @@ fn release_unused_process_substitution(opaque *cleanup) wontthrow -> void
 
 fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
                          Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
-                         mimic_mood mood, SourceLocation location,
-                         StringView diagnostic_source,
-                         process_group_mode process_group, i64 process_group_id,
+                         SourceLocation location, StringView diagnostic_source,
+                         i64 process_group_id,
                          const subshell_bootstrap *bootstrap,
                          StringView shell_name, i32 previous_exit_status,
-                         i64 shell_process_id, usize subshell_depth) throws
+                         i64 shell_process_id, usize subshell_depth,
+                         mimic_mood mood, process_group_mode process_group)
+    throws
     -> compound_stage_launch
 {
   unused(source);
@@ -611,7 +615,7 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
   unused(subshell_depth);
   const process child = fork_compound_stage(
       steal(in_fd), steal(out_fd), steal(err_fd), steal(location),
-      diagnostic_source, process_group, process_group_id);
+      diagnostic_source, process_group_id, process_group);
   return compound_stage_launch{
       .child = child,
       .should_evaluate_child = child == 0,
@@ -1354,8 +1358,8 @@ fn wait_for_measured_child(pid_t child_pid, i64 &status_out,
 
 } /* namespace */
 
-fn run_measured(const ArrayList<String> &argv, measured_output output,
-                const Maybe<descriptor> &) throws -> Maybe<measured_result>
+fn run_measured(const ArrayList<String> &argv, const Maybe<descriptor> &,
+                measured_output output) throws -> Maybe<measured_result>
 {
   if (argv.is_empty()) return None;
 
@@ -1401,7 +1405,7 @@ static pure fn native_priority_target(priority_target target) wontthrow -> int
   unreachable();
 }
 
-fn get_priority(priority_target target, i64 id) wontthrow -> Maybe<i32>
+fn get_priority(i64 id, priority_target target) wontthrow -> Maybe<i32>
 {
   errno = 0;
   let const priority =
@@ -1410,7 +1414,7 @@ fn get_priority(priority_target target, i64 id) wontthrow -> Maybe<i32>
   return priority;
 }
 
-fn set_priority(priority_target target, i64 id, i32 priority) wontthrow -> bool
+fn set_priority(i64 id, i32 priority, priority_target target) wontthrow -> bool
 {
   return setpriority(native_priority_target(target), static_cast<id_t>(id),
                      priority) == 0;

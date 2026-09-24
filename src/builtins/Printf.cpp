@@ -108,10 +108,10 @@ fn parse_printf_number(const String &arg) throws -> printf_number
       arg.view().substring_of_length(number_start, number_end - number_start);
   let is_out_of_range = false;
   let const parsed =
-      is_hexadecimal ? utils::parse_integer_in_base(number_text, int_base::hex,
-                                                    &is_out_of_range)
-      : is_octal ? utils::parse_integer_in_base(number_text, int_base::octal,
-                                                &is_out_of_range)
+      is_hexadecimal ? utils::parse_integer_in_base(number_text, &is_out_of_range,
+                                                    int_base::hex)
+      : is_octal ? utils::parse_integer_in_base(number_text, &is_out_of_range,
+                                                int_base::octal)
                  : utils::parse_decimal_i64(number_text, &is_out_of_range);
   let const has_digits = number_end > digit_start;
   return {parsed.is_error() ? 0 : parsed.value(),
@@ -557,7 +557,8 @@ fn Printf::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       let const array_name = target.substring_of_length(0, *open_bracket);
       let const subscript = target.substring_of_length(
           *open_bracket + 1, target.length - *open_bracket - 2);
-      cxt.assign_array_element(array_name, subscript, out.view(), false);
+      cxt.assign_array_element(array_name, subscript, out.view(),
+                               assignment_update_mode::Replace);
       return exit_status;
     }
     cxt.set_shell_variable(target, out.view());

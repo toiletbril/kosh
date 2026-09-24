@@ -397,7 +397,7 @@ public:
       ASSERT(context != nullptr);
       let const text = value.to_string(context->scratch_allocator());
       context->assign_array_element(target.name, *target.subscript, text.view(),
-                                    false);
+                                    assignment_update_mode::Replace);
       return;
     }
     write_variable(target.name, value);
@@ -2102,7 +2102,8 @@ fn EvalContext::evaluate_arithmetic(
   defer { scratch_release(scratch); };
   let const is_exact = is_extended_arithmetic_enabled();
   let const value = evaluate_arithmetic_value(this, expression, expression_base,
-                                              is_exact, m_scratch_arena);
+                                              is_exact,
+                                              expansion_store().scratch_arena());
   return is_exact ? value.checked_i64() : value.wrapped_i64();
 }
 
@@ -2114,7 +2115,8 @@ fn EvalContext::evaluate_arithmetic_text(
   defer { scratch_release(scratch); };
   let const is_exact = is_extended_arithmetic_enabled();
   let const value = evaluate_arithmetic_value(this, expression, expression_base,
-                                              is_exact, m_scratch_arena);
+                                              is_exact,
+                                              expansion_store().scratch_arena());
   return value.to_string(heap_allocator());
 }
 
@@ -2128,7 +2130,8 @@ fn EvalContext::evaluate_calculator_arithmetic_text(
   let const base =
       expression_base != nullptr ? expression_base : &synthetic_base;
   let const value = evaluate_arithmetic_value(this, expression, base, true,
-                                              m_scratch_arena, true);
+                                              expansion_store().scratch_arena(),
+                                              true);
   return value.to_string(heap_allocator());
 }
 
@@ -2139,7 +2142,8 @@ fn EvalContext::evaluate_bc_arithmetic_text(StringView expression,
   defer { scratch_release(scratch); };
   const SourceLocation expression_base{0, 0};
   let const value = evaluate_arithmetic_value(
-      this, expression, &expression_base, true, m_scratch_arena, true, scale);
+      this, expression, &expression_base, true,
+      expansion_store().scratch_arena(), true, scale);
   return value.to_string(heap_allocator());
 }
 
@@ -2150,7 +2154,7 @@ fn EvalContext::evaluate_arithmetic_nonzero(
   defer { scratch_release(scratch); };
   let const is_exact = is_extended_arithmetic_enabled();
   return !evaluate_arithmetic_value(this, expression, expression_base, is_exact,
-                                    m_scratch_arena)
+                                    expansion_store().scratch_arena())
               .is_zero();
 }
 
@@ -2161,9 +2165,11 @@ fn EvalContext::compare_arithmetic(StringView left, StringView right) throws
   defer { scratch_release(scratch); };
   let const is_exact = is_extended_arithmetic_enabled();
   let const left_value =
-      evaluate_arithmetic_value(this, left, nullptr, is_exact, m_scratch_arena);
+      evaluate_arithmetic_value(this, left, nullptr, is_exact,
+                                expansion_store().scratch_arena());
   let const right_value = evaluate_arithmetic_value(this, right, nullptr,
-                                                    is_exact, m_scratch_arena);
+                                                    is_exact,
+                                                    expansion_store().scratch_arena());
   return left_value.compare(right_value, scratch_allocator());
 }
 
@@ -2212,7 +2218,7 @@ fn EvalContext::evaluate_arithmetic_cached_text(
     const WordSegment &segment) throws -> String
 {
   let const source_location =
-      segment.get_source_location(m_current_location.source_name_index);
+      segment.get_source_location(source_store().m_current_location.source_name_index);
   let cache_arena = segment.is_substitution_cache_in_function_arena
                         ? function_arena()
                         : parse_arena();
@@ -2240,7 +2246,7 @@ fn EvalContext::evaluate_arithmetic_cached_text(
       this, segment.text.view(), cache.arith->tokens, cache.arith->is_tokenized,
       cache.arith->is_simple,
       source_location.has_value() ? &*source_location : nullptr, is_exact,
-      m_scratch_arena);
+      expansion_store().scratch_arena());
   let result = value.to_string(heap_allocator());
   if (is_exact && cache.arith->is_tokenized && cache.arith->is_simple) {
     let is_constant = true;
@@ -2268,7 +2274,7 @@ fn EvalContext::evaluate_arithmetic_cached(const WordSegment &segment) throws
     -> i64
 {
   let const source_location =
-      segment.get_source_location(m_current_location.source_name_index);
+      segment.get_source_location(source_store().m_current_location.source_name_index);
 
   let cache_arena = segment.is_substitution_cache_in_function_arena
                         ? function_arena()
@@ -2302,7 +2308,7 @@ fn EvalContext::evaluate_arithmetic_cached_clause(
   let const is_exact = is_extended_arithmetic_enabled();
   let const value = evaluate_arithmetic_cached_value(
       this, expression, tokens, is_tokenized, is_simple, source_location,
-      is_exact, m_scratch_arena);
+      is_exact, expansion_store().scratch_arena());
   return is_exact ? value.checked_i64() : value.wrapped_i64();
 }
 
@@ -2315,7 +2321,7 @@ fn EvalContext::evaluate_arithmetic_cached_clause_nonzero(
   let const is_exact = is_extended_arithmetic_enabled();
   return !evaluate_arithmetic_cached_value(
               this, expression, tokens, is_tokenized, is_simple,
-              source_location, is_exact, m_scratch_arena)
+              source_location, is_exact, expansion_store().scratch_arena())
               .is_zero();
 }
 

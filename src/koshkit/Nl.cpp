@@ -91,8 +91,8 @@ enum class nl_number_format : uchar
 };
 
 static fn append_nl_number(String &output, i64 number, usize width,
-                           nl_number_format format, StringView separator) throws
-    -> void
+                           StringView separator,
+                           nl_number_format format) throws -> void
 {
   let const digits = String::from(number, output.allocator());
   let const padding = width > digits.length() ? width - digits.length() : 0;
@@ -280,7 +280,7 @@ fn Nl::execute(const ExecContext &ec, EvalContext &cxt,
                          blank_group))
     {
       append_nl_number(output, number, static_cast<usize>(width_value),
-                       *number_format, separator);
+                       separator, *number_format);
       if (increment > static_cast<u64>(INT64_MAX - number))
         number = INT64_MAX;
       else

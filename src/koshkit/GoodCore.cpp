@@ -65,7 +65,7 @@ fn run_tool(const Path &tool, ArrayList<String> arguments,
   for (let &argument : arguments)
     command.push(steal(argument));
 
-  let const result = os::run_measured(command, output);
+  let const result = os::run_measured(command, {}, output);
   return result.has_value() && result->exit_status == 0;
 }
 
@@ -220,7 +220,7 @@ fn collect_core_libraries(EvalContext &cxt, StringView core, StringView binary,
 
 fn remove_stage(const Path &stage, Allocator allocator) throws -> void
 {
-  unused(remove_path(stage.view(), removal_mode::Recursive, allocator));
+  unused(remove_path(stage.view(), allocator, removal_mode::Recursive));
 }
 
 } // namespace
@@ -284,8 +284,8 @@ fn GoodCore::execute(
 
   i64 process_id = 0;
   if (has_pid) {
-    let const parsed = utils::parse_integer_in_base(FLAG_GOODCORE_PID.value(),
-                                                    int_base::decimal);
+    let const parsed = utils::parse_integer_in_base(
+        FLAG_GOODCORE_PID.value(), nullptr, int_base::decimal);
     if (parsed.is_error() || parsed.value() <= 0) {
       KOSHKIT_REPORT_ERROR_AT(FLAG_GOODCORE_PID.value_location(),
                               "invalid process id",

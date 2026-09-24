@@ -23,6 +23,8 @@ namespace koshka {
 
 namespace utils {
 
+using extglob_mode = koshka::extglob_mode;
+
 struct opaque_shell_word_range
 {
   usize decoded_start;
@@ -267,14 +269,20 @@ enum class time_report_layout : u8
   Posix,
 };
 
+enum class time_report_rss : u8
+{
+  Omit,
+  Include,
+};
+
 /* The bash conversions are honored, %%, a literal percent, %[p][l]R, %[p][l]U,
    and %[p][l]S for the real, user, and system seconds, and %P for the cpu busy
    percent, where p is a precision from zero to six and l selects the minutes
    form. */
-fn format_time_report(time_report_layout layout, bool should_report_rss,
-                      const Maybe<String> &time_format, double real_seconds,
+fn format_time_report(const Maybe<String> &time_format, double real_seconds,
                       double user_seconds, double system_seconds,
-                      u64 peak_rss_bytes) throws -> String;
+                      u64 peak_rss_bytes, time_report_layout layout,
+                      time_report_rss rss) throws -> String;
 
 /* The zero-based line number the byte at position falls on. The newline table
    is cached on the source pointer and length, holding one source at a time. */
@@ -292,8 +300,8 @@ fn line_number_at(StringView source, usize position) throws -> usize;
 /* Dropped when the host frees a retained source, so a later source at the same
    address with the same length does not read a stale table. */
 fn invalidate_line_number_cache() wontthrow -> void;
-fn parse_integer_in_base(StringView text, int_base base,
-                         bool *out_of_range = nullptr) throws -> ErrorOr<i64>;
+fn parse_integer_in_base(StringView text, bool *out_of_range,
+                         int_base base) throws -> ErrorOr<i64>;
 fn parse_integer_in_base_u64(StringView text, int_base base) throws
     -> ErrorOr<u64>;
 
@@ -484,7 +492,8 @@ fn kosh_identity(StringView fallback_path) throws -> Maybe<StringView>;
    bash extended-glob groups ?(..), *(..), +(..), @(..), and !(..) are
    recognized, otherwise they are plain bytes. */
 fn glob_matches(StringView glob, StringView str, const Bitset &glob_active,
-                usize mask_offset, bool extglob = false) throws -> bool;
+                usize mask_offset,
+                extglob_mode mode = extglob_mode::Disabled) throws -> bool;
 
 fn set_quit_context(const EvalContext *context) wontthrow -> void;
 fn print_memory_report() wontthrow -> void;

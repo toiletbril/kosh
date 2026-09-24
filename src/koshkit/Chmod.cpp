@@ -28,9 +28,16 @@ REGISTER_KOSHKIT_UTIL_FLAGS(Chmod);
 
 namespace koshka::koshkit {
 
+enum class chmod_traversal_mode : u8
+{
+  SinglePath,
+  Recursive,
+};
+
 static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
-                      StringView expression, bool should_recurse,
-                      const os::file_status *known_status = nullptr) throws
+                      StringView expression,
+                      const os::file_status *known_status,
+                      chmod_traversal_mode traversal_mode) throws
     -> bool
 {
   os::file_status status{};
@@ -57,7 +64,8 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
   }
 
   if (os::INTERRUPT_REQUESTED) return did_succeed;
-  if (!should_recurse || os::file_type_letter(status.mode) != 'd')
+  if (traversal_mode != chmod_traversal_mode::Recursive ||
+      os::file_type_letter(status.mode) != 'd')
     return did_succeed;
 
   let const directory_scratch = cxt.scratch_mark();
@@ -88,7 +96,8 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
                 os::file_type_letter(child_entry.status.mode) != 'l'
             ? &child_entry.status
             : nullptr;
-    if (!change_mode(ec, cxt, child, expression, true, child_status))
+    if (!change_mode(ec, cxt, child, expression, child_status,
+                     chmod_traversal_mode::Recursive))
       did_succeed = false;
   }
 
@@ -123,10 +132,12 @@ fn Chmod::execute(const ExecContext &ec, EvalContext &cxt,
 
   for (usize index = 1; index < operands.count(); index++) {
     if (os::INTERRUPT_REQUESTED) return 130;
-    if (!change_mode(ec, cxt,
-                     Path{operands[index].view(), cxt.scratch_allocator()},
-                     expression,
-                     FLAG_CHMOD_RECURSIVE.is_enabled()))
+    if (!change_mode(
+            ec, cxt, Path{operands[index].view(), cxt.scratch_allocator()},
+            expression, nullptr,
+            FLAG_CHMOD_RECURSIVE.is_enabled()
+                ? chmod_traversal_mode::Recursive
+                : chmod_traversal_mode::SinglePath))
       status = 1;
     if (os::INTERRUPT_REQUESTED) return 130;
   }

@@ -479,7 +479,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     if (is_source_location_variable(var.get_name()))
       actx.mark_working_directory_unknown();
 
-    if (actx.is_posix_sh_shebang && var.is_append()) {
+    if (actx.is_posix_sh_shebang &&
+        var.get_update_mode() == assignment_update_mode::Append) {
       actx.report_diagnostic(diagnostic_id::sc3024, var.get_location(),
                              {var.get_name()});
     }
@@ -490,20 +491,23 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         actx,
         assignment_lint_input{
             var.get_name(), analysis_source_text(actx, var.get_location()),
-            var.get_location(), var.is_append(), is_command_prefix, shape});
+            var.get_location(), var.get_update_mode(), is_command_prefix,
+            shape});
 
     if (prefix_outlives_command) {
       let const name_location =
           var.get_location().subspan(0, var.get_name().length);
       actx.note_variable_occurrence(
           var.get_name(), name_location, variable_occurrence_kind::Assignment,
-          !is_unconditional || actx.has_seen_runtime_definer, var.is_append());
+          !is_unconditional || actx.has_seen_runtime_definer,
+          var.get_update_mode());
       actx.note_variable_assignment(var.get_name(), var.get_location(),
                                     is_unconditional &&
                                         !actx.has_seen_runtime_definer);
       actx.note_variable_assignment_record(
           var.get_name(), &var.get_value(), var.get_location(),
-          !is_unconditional || actx.has_seen_runtime_definer, var.is_append());
+          !is_unconditional || actx.has_seen_runtime_definer,
+          var.get_update_mode());
     }
   }
 
@@ -520,7 +524,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     actx.note_variable_assignment_record(
         assignment.name.view(), nullptr, assignment.location,
         !is_unconditional || actx.has_seen_runtime_definer,
-        assignment.is_append);
+        assignment.update_mode);
     actx.add_array_valued_name(assignment.name.view());
     actx.constant_variables.erase(assignment.name.view());
 
@@ -753,14 +757,14 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       let split = Maybe<word_assignment_split>{None};
       StringView recorded_name;
       const Word *recorded_value = nullptr;
-      bool is_append = false;
+      let update_mode = assignment_update_mode::Replace;
 
       if (m_args[i]->kind() == Token::Kind::Assignment) {
         let const *assignment =
             static_cast<const tokens::Assignment *>(m_args[i]);
         recorded_name = assignment->key().view();
         recorded_value = &assignment->value_word();
-        is_append = assignment->is_append();
+        update_mode = assignment->get_update_mode();
       } else if (m_args[i]->kind() == Token::Kind::Word) {
         let const &word =
             static_cast<const tokens::WordToken *>(m_args[i])->word();
@@ -791,7 +795,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
         recorded_name = split->name.view();
         recorded_value = &split->value;
-        is_append = split->is_append;
+        update_mode = split->update_mode;
       } else {
         continue;
       }
@@ -816,10 +820,10 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
 
       actx.note_variable_occurrence(
           recorded_name, name_location, variable_occurrence_kind::Assignment,
-          !is_unconditional || actx.has_seen_runtime_definer, is_append);
+          !is_unconditional || actx.has_seen_runtime_definer, update_mode);
       actx.note_variable_assignment_record(
           recorded_name, recorded_value, m_args[i]->source_location(),
-          !is_unconditional || actx.has_seen_runtime_definer, is_append);
+          !is_unconditional || actx.has_seen_runtime_definer, update_mode);
       if (should_record_readonly_name)
         actx.readonly_assigned_names.add(recorded_name);
     }

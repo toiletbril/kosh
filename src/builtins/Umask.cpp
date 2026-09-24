@@ -167,7 +167,8 @@ cold i32 Umask::execute(ExecContext &ec, EvalContext &cxt) const throws
       requested.c_str());
 
   if (!requested.is_empty() && requested[0] >= '0' && requested[0] <= '7') {
-    let const parsed = utils::parse_integer_in_base(requested, int_base::octal);
+    let const parsed =
+        utils::parse_integer_in_base(requested, nullptr, int_base::octal);
     if (parsed.is_error())
       throw make_error_for_arg(
           ec, 1,

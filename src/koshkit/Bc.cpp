@@ -30,6 +30,12 @@ REGISTER_KOSHKIT_UTIL_FLAGS(Bc);
 
 namespace koshka::koshkit {
 
+enum class bc_output_mode : u8
+{
+  Silent,
+  Print,
+};
+
 static pure fn bc_digit_value(char byte) wontthrow -> u32
 {
   if (byte >= '0' && byte <= '9') {
@@ -875,30 +881,31 @@ static fn bc_expand_function_calls(StringView expression, const ExecContext &ec,
   return expanded;
 }
 
-static fn bc_try_function_call(StringView statement, bool should_print,
-                               const ExecContext &ec, EvalContext &cxt,
-                               bc_runtime &runtime) throws -> bool
+static fn bc_try_function_call(StringView statement, const ExecContext &ec,
+                               EvalContext &cxt, bc_runtime &runtime,
+                               bc_output_mode output_mode) throws -> bool
 {
   let result = bc_evaluate_function_call(statement, ec, cxt, runtime);
   if (!result.has_value()) return false;
-  if (should_print) bc_print_result(steal(*result), ec, cxt, runtime);
+  if (output_mode == bc_output_mode::Print)
+    bc_print_result(steal(*result), ec, cxt, runtime);
   return true;
 }
 
-static fn bc_execute_simple(StringView statement, bool should_print,
-                            const ExecContext &ec, EvalContext &cxt,
-                            bc_runtime &runtime) throws -> void
+static fn bc_execute_simple(StringView statement, const ExecContext &ec,
+                            EvalContext &cxt, bc_runtime &runtime,
+                            bc_output_mode output_mode) throws -> void
 {
   let const allocator = cxt.scratch_allocator();
   if (statement.length >= 2 && statement[0] == '"' &&
       statement[statement.length - 1] == '"')
   {
-    if (should_print)
+    if (output_mode == bc_output_mode::Print)
       ec.print_to_stdout(
           statement.substring_of_length(1, statement.length - 2));
     return;
   }
-  if (bc_try_function_call(statement, should_print, ec, cxt, runtime)) return;
+  if (bc_try_function_call(statement, ec, cxt, runtime, output_mode)) return;
 
   if (let const value = bc_register_value(statement, "ibase");
       value.has_value())
@@ -948,7 +955,8 @@ static fn bc_execute_simple(StringView statement, bool should_print,
 
   try {
     let result = bc_evaluate_text(statement, cxt, runtime, ec);
-    if (!should_print || bc_is_assignment(statement)) return;
+    if (output_mode != bc_output_mode::Print || bc_is_assignment(statement))
+      return;
     bc_print_result(steal(result), ec, cxt, runtime);
   } catch (const Error &error) {
     report_soft_koshkit_util_error(ec, cxt, "bc", error.to_string());
@@ -1070,7 +1078,7 @@ static fn bc_execute_statement(StringView statement, const ExecContext &ec,
     }
     if (part_count != 3) return bc_flow::Normal;
     if (!parts[0].is_empty())
-      bc_execute_simple(parts[0], false, ec, cxt, runtime);
+      bc_execute_simple(parts[0], ec, cxt, runtime, bc_output_mode::Silent);
     while (parts[1].is_empty() ||
            bc_condition_is_true(parts[1], ec, cxt, runtime))
     {
@@ -1080,13 +1088,13 @@ static fn bc_execute_statement(StringView statement, const ExecContext &ec,
       }
       if (flow == bc_flow::Break) break;
       if (!parts[2].is_empty())
-        bc_execute_simple(parts[2], false, ec, cxt, runtime);
+        bc_execute_simple(parts[2], ec, cxt, runtime, bc_output_mode::Silent);
       if (os::INTERRUPT_REQUESTED) break;
     }
     return bc_flow::Normal;
   }
 
-  bc_execute_simple(statement, true, ec, cxt, runtime);
+  bc_execute_simple(statement, ec, cxt, runtime, bc_output_mode::Print);
   return bc_flow::Normal;
 }
 

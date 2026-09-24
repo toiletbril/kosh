@@ -97,7 +97,7 @@ fn Renice::execute(const ExecContext &ec, EvalContext &cxt,
       result = 1;
       continue;
     }
-    let const current = os::get_priority(target, *id);
+    let const current = os::get_priority(*id, target);
     if (!current.has_value()) {
       report_soft_koshkit_util_error(
           ec, cxt, operand_locations[operand_position], args[0].view(),
@@ -109,7 +109,7 @@ fn Renice::execute(const ExecContext &ec, EvalContext &cxt,
     let priority = static_cast<i64>(*current) + increment;
     if (priority < -20) priority = -20;
     if (priority > 19) priority = 19;
-    if (!os::set_priority(target, *id, static_cast<i32>(priority))) {
+    if (!os::set_priority(*id, static_cast<i32>(priority), target)) {
       report_soft_koshkit_util_error(
           ec, cxt, operand_locations[operand_position], args[0].view(),
           "cannot adjust '" + operand +

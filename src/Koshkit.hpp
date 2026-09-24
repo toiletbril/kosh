@@ -29,6 +29,12 @@ class EvalContext;
 
 namespace koshkit {
 
+enum class report_sampling_mode : u8
+{
+  Instant,
+  Rolling,
+};
+
 class Utility
 {
 public:
@@ -615,7 +621,7 @@ enum class removal_mode : u8
   Recursive,
 };
 
-fn remove_path(StringView path, removal_mode mode, Allocator allocator) throws
+fn remove_path(StringView path, Allocator allocator, removal_mode mode) throws
     -> bool;
 
 enum class copy_file_result : u8

@@ -74,6 +74,12 @@ enum class command_match_mode : u8
   Glob,
 };
 
+enum class completion_filesystem_mode : u8
+{
+  Files,
+  Directories,
+};
+
 struct completion_result
 {
   ArrayList<String> candidates;
@@ -92,9 +98,9 @@ struct completion_result
 
 fn complete(StringView line, usize cursor, EvalContext &context,
             const Path &base_directory,
-            completion_mode mode = completion_mode::Ghost,
             const ArrayList<StringView> *extra_command_names = nullptr,
-            bool should_complete_external_arguments_in_posix = false) throws
+            bool should_complete_external_arguments_in_posix = false,
+            completion_mode mode = completion_mode::Ghost) throws
     -> completion_result;
 
 fn complete_command_names(
@@ -110,7 +116,8 @@ fn complete_command_names_by_prefix(StringView token,
     -> ArrayList<String>;
 fn complete_filesystem_names_by_prefix(
     StringView token, EvalContext &context, const Path &base_directory,
-    bool should_list_directories_only = false) throws -> ArrayList<String>;
+    completion_filesystem_mode mode = completion_filesystem_mode::Files) throws
+    -> ArrayList<String>;
 
 class ScopedCompletionScratch
 {

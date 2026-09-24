@@ -116,8 +116,8 @@ fn Retry::execute(const ExecContext &ec, EvalContext &cxt,
 
   i64 attempt_limit = DEFAULT_ATTEMPT_COUNT;
   if (FLAG_RETRY_ATTEMPTS.is_set()) {
-    let const parsed = utils::parse_integer_in_base(FLAG_RETRY_ATTEMPTS.value(),
-                                                    int_base::decimal);
+    let const parsed = utils::parse_integer_in_base(
+        FLAG_RETRY_ATTEMPTS.value(), nullptr, int_base::decimal);
     if (parsed.is_error() || parsed.value() < 1 ||
         parsed.value() > MAXIMUM_ATTEMPT_COUNT)
     {
@@ -165,8 +165,9 @@ fn Retry::execute(const ExecContext &ec, EvalContext &cxt,
   defer { cxt.set_terminal_exec_allowed(saved_terminal_exec); };
 
   for (i64 attempt = 1; attempt <= attempt_limit; attempt++) {
-    status = cxt.run_source(source.view(), "retry", return_handling::Consume,
-                            ec.source_location(), StringView{"retry"});
+    status = cxt.run_source(source.view(), "retry", ec.source_location(),
+                            StringView{"retry"}, nullptr, nullptr,
+                            return_handling::Consume);
     if (status == 0) return 0;
 
     if (os::INTERRUPT_REQUESTED) {

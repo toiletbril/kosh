@@ -462,9 +462,10 @@ constexpr static_string_entry<u8> DECLARATION_COMMAND_ENTRIES[] = {
 constexpr StaticStringMap DECLARATION_COMMANDS{DECLARATION_COMMAND_ENTRIES};
 
 hot fn EvalContext::process_args(
-    const ArrayList<const Token *> &args, argument_lifetime lifetime,
-    argument_context context,
-    ArrayList<SourceLocation> *expanded_locations) throws -> ArrayList<String>
+    const ArrayList<const Token *> &args,
+    ArrayList<SourceLocation> *expanded_locations,
+    argument_lifetime lifetime,
+    argument_context context) throws -> ArrayList<String>
 {
   let const args_are_transient = lifetime == argument_lifetime::Transient;
   let const is_array_literal = context == argument_context::ArrayLiteral;
@@ -490,10 +491,11 @@ hot fn EvalContext::process_args(
     if (expanded_locations != nullptr) expanded_locations->push(steal(loc));
   };
 
-  let const fields_mark = m_scratch_arena.mark();
+  let const fields_mark = expansion_store().scratch_arena().mark();
   defer
   {
-    if (!args_are_transient) m_scratch_arena.release(fields_mark);
+    if (!args_are_transient)
+      expansion_store().scratch_arena().release(fields_mark);
   };
 
   /* A declaration builtin treats a name=value argument as an assignment whose
@@ -528,9 +530,9 @@ hot fn EvalContext::process_args(
      literal and the probe returns false rather than tripping failglob. A
      declaration command such as unset names a variable, so its operand stays
      literal too. */
-  let const previous_glob_exempt = m_glob_exempt_for_test;
-  m_glob_exempt_for_test = is_test_command || is_declaration_command;
-  defer { m_glob_exempt_for_test = previous_glob_exempt; };
+  let const previous_glob_exempt = glob_exempt_for_test();
+  set_glob_exempt_for_test(is_test_command || is_declaration_command);
+  defer { set_glob_exempt_for_test(previous_glob_exempt); };
 
   /* An unset variable in a test operand is the question the command asks, so
      the advisory warning is suppressed. An explicit set -u still aborts. */
@@ -558,7 +560,8 @@ hot fn EvalContext::process_args(
         if (is_declaration_command) {
           let assignment = String{expanded_args.allocator()};
           assignment.append(assignment_token->key().view());
-          if (assignment_token->is_append() &&
+          if (assignment_token->get_update_mode() ==
+                  assignment_update_mode::Append &&
               (is_local_command || is_declare_command))
           {
             /* local shadows an outer name and declare may apply -i on the same
@@ -571,14 +574,16 @@ hot fn EvalContext::process_args(
                     .view());
           } else {
             assignment += '=';
-            if (assignment_token->is_append()) {
+            if (assignment_token->get_update_mode() ==
+                assignment_update_mode::Append) {
               let const existing = get_variable_value(assignment_token->key());
               if (existing.has_value()) assignment.append(existing->view());
             }
             let const expanded_value =
                 expand_word_for_assignment(assignment_token->value_word());
             /* An integer name adds rather than concatenates. */
-            if (assignment_token->is_append() &&
+            if (assignment_token->get_update_mode() ==
+                    assignment_update_mode::Append &&
                 is_integer_variable(assignment_token->key()))
             {
               append_integer_expression(assignment, expanded_value.view());
@@ -592,7 +597,9 @@ hot fn EvalContext::process_args(
         }
         /* An assignment as an argument, like echo k=$v, is an ordinary word. */
         let key_literal = String{assignment_token->key().view()};
-        if (assignment_token->is_append()) key_literal += "+";
+        if (assignment_token->get_update_mode() ==
+            assignment_update_mode::Append)
+          key_literal += "+";
         key_literal += "=";
         fallback_word = Word{};
         fallback_word->segments = ArrayList<WordSegment>{scratch_allocator()};
@@ -730,7 +737,7 @@ hot fn EvalContext::process_args(
                     break;
                   }
                 let const source_location = segment.get_source_location(
-                    m_current_location.source_name_index);
+                    source_store().m_current_location.source_name_index);
                 value += apply_parameter_expansion(
                     spec,
                     source_location.has_value() ? &*source_location : nullptr);
@@ -753,7 +760,7 @@ hot fn EvalContext::process_args(
                straight in without a directory scan. */
             if (no_glob() ||
                 !first_active_glob(field.text.view(), field.glob_active,
-                                   extglob_enabled())
+                                   get_extglob_mode())
                      .has_value())
             {
               expanded_args.push_managed(field.text.view());

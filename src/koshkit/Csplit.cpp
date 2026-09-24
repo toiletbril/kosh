@@ -256,9 +256,9 @@ fn Csplit::execute(const ExecContext &ec, EvalContext &cxt,
         offset = parsed_offset.value();
       }
       os::compiled_regex compiled;
-      if (os::compile_basic_regex(expression.view(),
-                                  os::case_sensitivity::Sensitive,
-                                  compiled) != os::regex_compile_result::Ok)
+      if (os::compile_basic_regex(expression.view(), compiled,
+                                  os::case_sensitivity::Sensitive) !=
+          os::regex_compile_result::Ok)
       {
         throw ErrorWithLocationAndDetails{
             pattern_location, "invalid regular expression",

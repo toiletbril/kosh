@@ -136,9 +136,10 @@ private:
       const Token *fd_allocation_name_token = nullptr) throws -> void;
 
   fn build_both_streams_redirection(
-      bool is_append, const SourceLocation &op_location,
+      const SourceLocation &op_location,
       Maybe<SourceLocation> &first_location,
-      ArrayList<expressions::Redirection> &out) throws -> void;
+      ArrayList<expressions::Redirection> &out,
+      assignment_update_mode update_mode) throws -> void;
 
   mustuse fn wrap_with_stderr_to_stdout(Command *command) throws -> Command *;
 
@@ -182,7 +183,7 @@ private:
       -> parsed_loop_body;
 
   mustuse fn parse_if() throws -> Command *;
-  mustuse fn parse_while_or_until(bool is_until) throws -> Command *;
+  mustuse fn parse_while_or_until(loop_kind kind) throws -> Command *;
   mustuse fn parse_for() throws -> Command *;
   mustuse fn parse_select() throws -> Command *;
   mustuse fn parse_coproc() throws -> Command *;

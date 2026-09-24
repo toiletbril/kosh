@@ -52,6 +52,12 @@ enum class sed_command_kind : u8
   Translate,
 };
 
+enum class sed_regex_mode : u8
+{
+  Basic,
+  Extended,
+};
+
 struct sed_address
 {
   sed_address_kind kind{sed_address_kind::Every};
@@ -144,26 +150,28 @@ static fn parse_sed_delimited(StringView script, usize &position,
                       "close the expression with the delimiter that opened it"};
 }
 
-static fn compile_sed_expression(StringView expression, bool is_extended,
-                                 os::compiled_regex &compiled,
-                                 usize position) throws -> void
+static fn compile_sed_expression(StringView expression,
+                                 os::compiled_regex &compiled, usize position,
+                                 sed_regex_mode regex_mode) throws -> void
 {
   let const result =
-      is_extended ? os::compile_regex(expression,
-                                      os::case_sensitivity::Sensitive, compiled)
-                  : os::compile_basic_regex(
-                        expression, os::case_sensitivity::Sensitive, compiled);
+      regex_mode == sed_regex_mode::Extended
+          ? os::compile_regex(expression, compiled,
+                              os::case_sensitivity::Sensitive)
+          : os::compile_basic_regex(expression, compiled,
+                                     os::case_sensitivity::Sensitive);
   if (result != os::regex_compile_result::Ok) {
     throw SedParseError{
         position, "invalid regular expression '" + String{expression} + "'",
-        is_extended ? "use a valid extended regular expression"
-                    : "use a valid basic regular expression"};
+        regex_mode == sed_regex_mode::Extended
+            ? "use a valid extended regular expression"
+            : "use a valid basic regular expression"};
   }
 }
 
 static fn parse_sed_address(StringView script, usize &position,
-                            bool is_extended, Allocator allocator,
-                            sed_address &address) throws -> bool
+                            Allocator allocator, sed_address &address,
+                            sed_regex_mode regex_mode) throws -> bool
 {
   if (position == script.length) return false;
   if (script[position] >= '0' && script[position] <= '9') {
@@ -198,17 +206,17 @@ static fn parse_sed_address(StringView script, usize &position,
     let const expression =
         parse_sed_delimited(script, position, '/', allocator);
     address.kind = sed_address_kind::Regex;
-    compile_sed_expression(expression.view(), is_extended, address.expression,
-                           expression_position);
+    compile_sed_expression(expression.view(), address.expression,
+                           expression_position, regex_mode);
     address.has_expression = true;
     return true;
   }
   return false;
 }
 
-static fn parse_sed_script(StringView script, bool is_extended,
-                           Allocator allocator,
-                           ArrayList<sed_command> &commands) throws -> void
+static fn parse_sed_script(StringView script, Allocator allocator,
+                           ArrayList<sed_command> &commands,
+                           sed_regex_mode regex_mode) throws -> void
 {
   usize position = 0;
 
@@ -227,14 +235,15 @@ static fn parse_sed_script(StringView script, bool is_extended,
     sed_address address{};
     defer { free_sed_address(address); };
     unused(
-        parse_sed_address(script, position, is_extended, allocator, address));
+        parse_sed_address(script, position, allocator, address, regex_mode));
     sed_address second_address{};
     defer { free_sed_address(second_address); };
     bool has_second_address = false;
     if (position < script.length && script[position] == ',') {
       position++;
-      has_second_address = parse_sed_address(script, position, is_extended,
-                                             allocator, second_address);
+      has_second_address =
+          parse_sed_address(script, position, allocator, second_address,
+                            regex_mode);
       if (!has_second_address)
         throw SedParseError{position, "missing second address",
                             "write an address after the comma"};
@@ -325,8 +334,8 @@ static fn parse_sed_script(StringView script, bool is_extended,
           parse_sed_delimited(script, position, delimiter, allocator);
       command.replacement =
           parse_sed_delimited(script, position, delimiter, allocator);
-      compile_sed_expression(expression.view(), is_extended, command.expression,
-                             expression_position);
+      compile_sed_expression(expression.view(), command.expression,
+                             expression_position, regex_mode);
       command.has_expression = true;
 
       while (position < script.length && script[position] != ';' &&
@@ -580,8 +589,10 @@ fn Sed::execute(const ExecContext &ec, EvalContext &cxt,
       free_sed_command(command);
   };
   try {
-    parse_sed_script(script.view(), FLAG_SED_EXTENDED.is_enabled(),
-                     cxt.scratch_allocator(), commands);
+    parse_sed_script(
+        script.view(), cxt.scratch_allocator(), commands,
+        FLAG_SED_EXTENDED.is_enabled() ? sed_regex_mode::Extended
+                                       : sed_regex_mode::Basic);
   } catch (SedParseError &error) {
     KOSHKIT_REPORT_ERROR_AT(
         get_sed_script_location(script_parts, error.get_position()),

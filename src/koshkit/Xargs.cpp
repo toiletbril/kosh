@@ -320,8 +320,8 @@ fn Xargs::execute(const ExecContext &ec, EvalContext &cxt,
       sub = ExecContext::make_from(
           ec.source_location(),
           source != nullptr ? source->view() : StringView{}, steal(command),
-          cxt.mood(), cxt.koshkit(), cxt.is_shopt_enabled("checkhash"),
-          cxt.get_program_resolver(), steal(command_locations));
+          cxt.koshkit(), cxt.is_shopt_enabled("checkhash"),
+          cxt.get_program_resolver(), steal(command_locations), cxt.mood());
     } catch (const CommandResolutionErrorWithLocation &resolution_error) {
       let const *source = cxt.current_source();
       show_message(resolution_error.to_string(

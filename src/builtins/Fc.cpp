@@ -276,8 +276,9 @@ static fn execute_fc_command(const ExecContext &ec, EvalContext &cxt,
                               "cannot replace the history event");
     return 1;
   }
-  return cxt.run_source(command.view(), "fc", return_handling::Reject,
-                        ec.source_location(), StringView{"fc"});
+  return cxt.run_source(command.view(), "fc", ec.source_location(),
+                        StringView{"fc"}, nullptr, nullptr,
+                        return_handling::Reject);
 }
 
 static fn list_fc_commands(const ExecContext &ec, EvalContext &cxt,
@@ -351,8 +352,9 @@ static fn edit_fc_commands(const ExecContext &ec, EvalContext &cxt,
     cxt.set_terminal_exec_allowed(false);
     defer { cxt.set_terminal_exec_allowed(saved_terminal_exec); };
     editor_status = cxt.run_source(editor_command.view(), "fc editor",
-                                   return_handling::Propagate,
-                                   ec.source_location(), StringView{"fc"});
+                                   ec.source_location(), StringView{"fc"},
+                                   nullptr, nullptr,
+                                   return_handling::Propagate);
   }
 
   if (editor_status != 0) {
@@ -401,8 +403,9 @@ static fn edit_fc_commands(const ExecContext &ec, EvalContext &cxt,
   };
 
   let const status =
-      cxt.run_source(edited->view(), "fc", return_handling::Consume,
-                     ec.source_location(), StringView{"fc"}, true);
+      cxt.run_source(edited->view(), "fc", ec.source_location(),
+                     StringView{"fc"}, nullptr, nullptr,
+                     return_handling::Consume, history_recording::Enabled);
   if (should_end_transaction) {
     cxt.end_history_transaction();
     should_end_transaction = false;

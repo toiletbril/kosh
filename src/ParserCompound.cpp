@@ -91,13 +91,14 @@ hot fn Parser::parse_if() throws -> Command *
   return node;
 }
 
-hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
+hot fn Parser::parse_while_or_until(loop_kind kind) throws -> Command *
 {
   Token *keyword = m_lexer.next_shell_token();
   ASSERT(keyword != nullptr);
   let const location = keyword->source_location();
 
-  LOG(Debug, "parsing a %s loop at byte %u", is_until ? "until" : "while",
+  LOG(Debug, "parsing a %s loop at byte %u",
+      kind == loop_kind::Until ? "until" : "while",
       location.position);
 
   Expression *condition = parse_command_list(token_kind_mask(Token::Kind::Do));
@@ -114,7 +115,7 @@ hot fn Parser::parse_while_or_until(bool is_until) throws -> Command *
   let const parsed_body = parse_loop_body(location, "Unterminated loop");
 
   let loop_node = m_lexer.arena().create<WhileLoop>(location, condition,
-                                                    parsed_body.body, is_until);
+                                                    parsed_body.body, kind);
   loop_node->set_source_end_position(parsed_body.done_location.position +
                                      parsed_body.done_location.length);
   return loop_node;
@@ -476,7 +477,8 @@ static fn word_token_from_assignment(BumpArena &arena,
   word.has_locale_translation_quote =
       a->value_word().has_locale_translation_quote;
   let prefix = a->key().clone();
-  prefix += a->is_append() ? "+=" : "=";
+  prefix += a->get_update_mode() == assignment_update_mode::Append ? "+="
+                                                                    : "=";
   word.segments.push(WordSegment{
       WordSegment::Kind::UnquotedText,
       SegmentText{bump_allocator(arena), prefix.view()},

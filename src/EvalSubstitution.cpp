@@ -157,7 +157,7 @@ fn EvalContext::capture_command_substitution(
         *call_site, StringView{"command substitution"});
   defer
   {
-    if (did_push_source_frame) m_source_frames.pop_back();
+    if (did_push_source_frame) source_store().m_source_frames.pop_back();
   };
 
   let parser = Parser{
@@ -203,7 +203,7 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
       segment, StringView{"process substitution"});
   defer
   {
-    if (did_push_source_frame) m_source_frames.pop_back();
+    if (did_push_source_frame) source_store().m_source_frames.pop_back();
   };
   let parser = Parser{
       Lexer{substitution_source.view(), *parse_arena(), false, None, mood()}
@@ -224,14 +224,16 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
   let const do_launch = [&]() throws -> os::process_substitution_launch {
     try {
       return os::launch_process_substitution(
-          substitution_source.view(), command_writes_the_pipe, mood(),
-          should_print_source_traces(),
+          substitution_source.view(), should_print_source_traces(),
           should_launch_fresh_evaluator ? &bootstrap : nullptr, shell_name(),
-          last_exit_status(), os::get_shell_process_id(),
-          get_subshell_depth() + 1);
+          last_exit_status(), os::get_shell_process_id(), get_subshell_depth() + 1,
+          command_writes_the_pipe
+              ? os::process_substitution_direction::CommandWrites
+              : os::process_substitution_direction::CommandReads,
+          mood());
     } catch (const ErrorBase &error) {
       let const location =
-          segment.get_source_location(m_current_location.source_name_index);
+          segment.get_source_location(source_store().m_current_location.source_name_index);
       if (!location.has_value() || current_source() == nullptr) {
         throw;
       }
@@ -252,14 +254,14 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
     enter_subshell();
     hide_coprocess_descriptors();
     i32 status = 0;
-    let const previous_source = m_current_source;
-    let const previous_origin = m_current_origin;
-    let const previous_location = m_current_location;
+    let const previous_source = source_store().m_current_source;
+    let const previous_origin = source_store().m_current_origin;
+    let const previous_location = source_store().m_current_location;
     set_current_source(&substitution_source, String{"process substitution"});
     defer
     {
       set_current_source(previous_source, previous_origin);
-      m_current_location = previous_location;
+      source_store().m_current_location = previous_location;
     };
     try {
       ast->evaluate(*this);
@@ -277,10 +279,10 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
 
   ASSERT(launch.retained_fd.has_value());
   ASSERT(launch.child != KOSH_INVALID_PROCESS);
-  let const location = m_current_location;
+  let const location = source_store().m_current_location;
   let const source =
-      m_current_source != nullptr ? m_current_source->view() : StringView{};
-  m_pending_process_substitutions.push(process_substitution{
+      source_store().m_current_source != nullptr ? source_store().m_current_source->view() : StringView{};
+  expansion_store().pending_process_substitutions().push(process_substitution{
       *launch.retained_fd, launch.child, launch.cleanup, location, source});
 
   LOG(Debug, "the process substitution is reachable at '%s'",
@@ -291,17 +293,19 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
 fn EvalContext::mark_process_substitutions() const wontthrow
     -> process_substitution_mark
 {
-  return {m_pending_process_substitutions.count()};
+  return {expansion_store().pending_process_substitutions().count()};
 }
 
 fn EvalContext::cleanup_process_substitutions(
     process_substitution_mark mark) wontthrow -> void
 {
   LOG(Debug, "cleaning up %zu pending process substitutions",
-      m_pending_process_substitutions.count() - mark.pending);
-  for (usize i = mark.pending; i < m_pending_process_substitutions.count(); i++)
+      expansion_store().pending_process_substitutions().count() - mark.pending);
+  for (usize i = mark.pending;
+       i < expansion_store().pending_process_substitutions().count(); i++)
   {
-    process_substitution &sub = m_pending_process_substitutions[i];
+    process_substitution &sub =
+        expansion_store().pending_process_substitutions()[i];
     os::release_unused_process_substitution(sub.platform_cleanup);
     /* Closing the shell end first sends SIGPIPE to a producer that still has
        output queued, so it ends rather than blocking the wait below. */
@@ -343,9 +347,10 @@ fn EvalContext::cleanup_process_substitutions(
       }
     }
   }
-  while (m_pending_process_substitutions.count() > mark.pending)
-    m_pending_process_substitutions.remove(
-        m_pending_process_substitutions.count() - 1);
+  while (expansion_store().pending_process_substitutions().count() >
+         mark.pending)
+    expansion_store().pending_process_substitutions().remove(
+        expansion_store().pending_process_substitutions().count() - 1);
 }
 
 fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
@@ -369,7 +374,7 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
       segment, StringView{"command substitution"});
   defer
   {
-    if (did_push_source_frame) m_source_frames.pop_back();
+    if (did_push_source_frame) source_store().m_source_frames.pop_back();
   };
   let &cache = segment.get_eval_cache(cache_arena);
   if (cache.substitution_ast == nullptr ||
@@ -406,7 +411,7 @@ fn EvalContext::push_substitution_source_frame(const WordSegment &segment,
                                                StringView origin) throws -> bool
 {
   let const location =
-      segment.get_source_location(m_current_location.source_name_index);
+      segment.get_source_location(source_store().m_current_location.source_name_index);
   if (!location.has_value()) return false;
   return push_substitution_source_frame(*location, origin);
 }
@@ -420,7 +425,7 @@ fn EvalContext::push_substitution_source_frame(const SourceLocation &location,
     return false;
   }
 
-  m_source_frames.push(source_frame{
+  source_store().m_source_frames.push(source_frame{
       String{heap_allocator(), origin},
       location, current_source(),
       source_generation_for(current_source()), String{heap_allocator()},
@@ -440,17 +445,17 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
   /* The inner scratch is reclaimed at the substitution boundary, so a $(...)
      inside a loop does not grow the arena across iterations. The captured
      output is heap and escapes. */
-  let const substitution_mark = m_scratch_arena.mark();
-  defer { m_scratch_arena.release(substitution_mark); };
+  let const substitution_mark = expansion_store().scratch_arena().mark();
+  defer { expansion_store().scratch_arena().release(substitution_mark); };
 
-  let const previous_source = m_current_source;
-  let const previous_origin = m_current_origin;
-  let const previous_location = m_current_location;
+  let const previous_source = source_store().m_current_source;
+  let const previous_origin = source_store().m_current_origin;
+  let const previous_location = source_store().m_current_location;
   set_current_source(&source, String{"command substitution"});
   defer
   {
     set_current_source(previous_source, previous_origin);
-    m_current_location = previous_location;
+    source_store().m_current_location = previous_location;
   };
 
   Maybe<eval_state_snapshot> in_process_snapshot;
@@ -744,7 +749,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
       segment, StringView{"function substitution"});
   defer
   {
-    if (did_push_source_frame) m_source_frames.pop_back();
+    if (did_push_source_frame) source_store().m_source_frames.pop_back();
   };
   let &cache = segment.get_eval_cache(cache_arena);
   if (cache.substitution_ast == nullptr ||
@@ -778,14 +783,14 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   /* The body runs against the live state, no snapshot and no subshell, so its
      assignments, cd, and definitions persist the way the bash 5.3 funsub
      leaves them. */
-  let const previous_source = m_current_source;
-  let const previous_origin = m_current_origin;
-  let const previous_location = m_current_location;
+  let const previous_source = source_store().m_current_source;
+  let const previous_origin = source_store().m_current_origin;
+  let const previous_location = source_store().m_current_location;
   set_current_source(&source, String{"function substitution"});
   defer
   {
     set_current_source(previous_source, previous_origin);
-    m_current_location = previous_location;
+    source_store().m_current_location = previous_location;
   };
 
   let const pipe = os::make_pipe();

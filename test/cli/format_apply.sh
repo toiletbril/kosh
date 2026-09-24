@@ -25,7 +25,6 @@ case $long_string_warning in
   ;;
 *) printf 'long-string-warning=no\n' ;;
 esac
-
 long_token_warning=$(printf '%s\n' \
   'echo this_is_an_unbreakable_token_that_is_longer_than_the_formatter_limit_and_should_warn' |
   "$BIN" --format 2>&1 > "$TEST_NULL_DEVICE")

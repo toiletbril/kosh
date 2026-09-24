@@ -69,12 +69,13 @@ fn Sync::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   i32 status = 0;
-  let const is_data_only = FLAG_SYNC_DATA.is_enabled();
+  let const mode = FLAG_SYNC_DATA.is_enabled() ? os::sync_mode::DataOnly
+                                               : os::sync_mode::All;
   for (usize operand_index = 0; operand_index < operands.count();
        operand_index++)
   {
     let const &operand = operands[operand_index];
-    if (!os::sync_path(operand.view(), is_data_only)) {
+    if (!os::sync_path(operand.view(), mode)) {
       KOSHKIT_REPORT_ERROR_AT(operand_locations[operand_index],
                               "cannot flush '" + operand +
                                   "': " + os::last_system_error_message());

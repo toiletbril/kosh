@@ -316,10 +316,11 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
   };
 
   os::process child = os::execute_program(
-      command, os::script_fallback_policy::Allow, process_group_mode,
-      source != nullptr ? source->view() : StringView{},
+      command, source != nullptr ? source->view() : StringView{}, 0,
+      os::script_fallback_policy::Allow,
       has_controlling_terminal ? os::terminal_handoff::BeforeStart
-                               : os::terminal_handoff::Keep);
+                               : os::terminal_handoff::Keep,
+      process_group_mode);
   if (child == KOSH_INVALID_PROCESS) {
     let const shell_path = os::current_executable_path();
     if (!shell_path.has_value())
@@ -343,10 +344,11 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
         ResolvedCommand::from_program(Path{shell_path->view()}),
         steal(fallback_args), steal(fallback_locations));
     child = os::execute_program(
-        fallback, os::script_fallback_policy::Reject, process_group_mode,
-        source != nullptr ? source->view() : StringView{},
+        fallback, source != nullptr ? source->view() : StringView{}, 0,
+        os::script_fallback_policy::Reject,
         has_controlling_terminal ? os::terminal_handoff::BeforeStart
-                                 : os::terminal_handoff::Keep);
+                                 : os::terminal_handoff::Keep,
+        process_group_mode);
   }
 
   os::process process_group = KOSH_INVALID_PROCESS;

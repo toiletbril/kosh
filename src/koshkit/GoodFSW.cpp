@@ -53,6 +53,12 @@ namespace koshka::koshkit {
 
 namespace {
 
+enum class goodfsw_traversal_mode : u8
+{
+  SinglePath,
+  Recursive,
+};
+
 constexpr f64 DEFAULT_LATENCY_SECONDS = 1.0;
 constexpr usize MAXIMUM_SCAN_DEPTH = 64;
 
@@ -212,10 +218,11 @@ fn is_excluded(StringView path) wontthrow -> bool
   return path.find_substring(FLAG_GOODFSW_EXCLUDE.value()).has_value();
 }
 
-fn scan_path(StringView path, ArrayList<watched_entry> &entries,
-             bool is_recursive, usize depth, Allocator allocator,
+fn scan_path(StringView path, ArrayList<watched_entry> &entries, usize depth,
+             Allocator allocator,
              u64 root_device_id,
-             const os::file_status *known_status = nullptr) throws -> void
+             const os::file_status *known_status,
+             goodfsw_traversal_mode traversal) throws -> void
 {
   if (os::INTERRUPT_REQUESTED != 0) return;
 
@@ -249,7 +256,7 @@ fn scan_path(StringView path, ArrayList<watched_entry> &entries,
 
   if (os::file_type_letter(known_status->mode) != 'd') return;
 
-  if (depth > 0 && !is_recursive) return;
+  if (depth > 0 && traversal == goodfsw_traversal_mode::SinglePath) return;
 
   let const children = os::list_directory_status(path, allocator);
   if (!children.has_value()) return;
@@ -263,8 +270,8 @@ fn scan_path(StringView path, ArrayList<watched_entry> &entries,
     child_path.append(child.name.view());
     let const child_status =
         child_entry.has_status ? &child_entry.status : nullptr;
-    scan_path(child_path.view(), entries, is_recursive, depth + 1,
-              allocator, root_device_id, child_status);
+    scan_path(child_path.view(), entries, depth + 1, allocator, root_device_id,
+              child_status, traversal);
   }
 }
 
@@ -336,7 +343,9 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
 
-  let const is_recursive = FLAG_GOODFSW_RECURSIVE.is_enabled();
+  let const traversal = FLAG_GOODFSW_RECURSIVE.is_enabled()
+                            ? goodfsw_traversal_mode::Recursive
+                            : goodfsw_traversal_mode::SinglePath;
 
   let operand_paths = ArrayList<Path>{allocator};
   let operand_statuses = ArrayList<os::file_status>{allocator};
@@ -364,9 +373,9 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
 
   ArrayList<watched_entry> previous{watch_allocator};
   for (usize index = 0; index < operands.count(); index++)
-    scan_path(operands[index].view(), previous, is_recursive, 0,
-              watch_allocator,
-              operand_statuses[index].device_id, &operand_statuses[index]);
+    scan_path(operands[index].view(), previous, 0, watch_allocator,
+              operand_statuses[index].device_id, &operand_statuses[index],
+              traversal);
   if (os::INTERRUPT_REQUESTED != 0) {
     os::INTERRUPT_REQUESTED = 0;
     return 130;
@@ -391,9 +400,8 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
         was_interrupted = true;
         break;
       }
-      scan_path(operands[index].view(), current, is_recursive, 0,
-                watch_allocator,
-                operand_statuses[index].device_id);
+      scan_path(operands[index].view(), current, 0, watch_allocator,
+                operand_statuses[index].device_id, nullptr, traversal);
     }
     if (was_interrupted) {
       os::INTERRUPT_REQUESTED = 0;

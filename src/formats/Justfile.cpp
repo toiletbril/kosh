@@ -36,7 +36,8 @@ fn parse_justfile_format(const parser_format_input &input,
     if (shell_start == line.length) continue;
     if (shell_start < line.length && line[shell_start] == '@') shell_start++;
     parser_format_add_fragment(document, input.source, line_start + shell_start,
-                               line_start + line.length, mood);
+                               line_start + line.length, 0, None,
+                               parser_format_codec::Direct, mood);
   }
 }
 

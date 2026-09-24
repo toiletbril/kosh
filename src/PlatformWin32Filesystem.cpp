@@ -1460,9 +1460,9 @@ fn sync_filesystems() wontthrow -> bool
   return was_any_flushed;
 }
 
-fn sync_path(StringView path, bool is_data_only) wontthrow -> bool
+fn sync_path(StringView path, sync_mode mode) wontthrow -> bool
 {
-  unused(is_data_only);
+  unused(mode);
   let const wide_path = utf8_to_wide(path, heap_allocator());
   if (!wide_path.has_value()) return false;
 

@@ -253,7 +253,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
         }
       }
       let const segment_source_location =
-          segment.get_source_location(m_current_location.source_name_index);
+          segment.get_source_location(source_store().m_current_location.source_name_index);
       let const do_source_location_for =
           [&](StringView part,
               SourceLocation &storage) -> const SourceLocation * {
@@ -688,7 +688,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
           }
       }
       let const source_location =
-          segment.get_source_location(m_current_location.source_name_index);
+          segment.get_source_location(source_store().m_current_location.source_name_index);
       let const value = apply_parameter_expansion(
           segment.text.view(),
           source_location.has_value() ? &*source_location : nullptr);
@@ -773,7 +773,7 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
     switch (segment.kind) {
     case WordSegment::Kind::VariableReference: {
       let const source_location =
-          segment.get_source_location(m_current_location.source_name_index);
+          segment.get_source_location(source_store().m_current_location.source_name_index);
       result += apply_parameter_expansion(
           segment_text,
           source_location.has_value() ? &*source_location : nullptr);
@@ -828,7 +828,7 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
       break;
     case WordSegment::Kind::VariableReference: {
       let const source_location =
-          segment.get_source_location(m_current_location.source_name_index);
+          segment.get_source_location(source_store().m_current_location.source_name_index);
       let const value = apply_parameter_expansion(
           segment_text,
           source_location.has_value() ? &*source_location : nullptr);
@@ -960,8 +960,8 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
     let expansion_source = String{"t__wordlist_fields=("};
     expansion_source.append(wordlist);
     expansion_source.push(')');
-    run_source(expansion_source.view(), "a -W word list",
-               return_handling::Propagate);
+    run_source(expansion_source.view(), "a -W word list", None, None, nullptr,
+               nullptr, return_handling::Propagate);
     if (const ArrayList<String> *expanded =
             lookup_indexed_array("t__wordlist_fields");
         expanded != nullptr)

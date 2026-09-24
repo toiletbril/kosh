@@ -460,8 +460,8 @@ fn internal::second_word_of(StringView line) wontthrow -> Maybe<StringView>
    keystroke never scans a directory or reads a page. */
 fn internal::complete_from_man_subcommands(StringView line, StringView token,
                                            usize token_start,
-                                           completion_mode mode,
-                                           EvalContext &context) throws
+                                           EvalContext &context,
+                                           completion_mode mode) throws
     -> Maybe<ArrayList<String>>
 {
   let const for_listing = mode == completion_mode::Listing;
@@ -754,8 +754,9 @@ fn internal::manpage_text_for(StringView page_name, EvalContext &context) throws
 /* Runs only on an explicit tab and a dash token, so the ghost never forks man.
    None falls through to the spec and files. */
 fn internal::complete_from_manpage(StringView line, StringView token,
-                                   completion_mode mode, EvalContext &context,
-                                   StringMap<String> &descriptions) throws
+                                   EvalContext &context,
+                                   StringMap<String> &descriptions,
+                                   completion_mode mode) throws
     -> Maybe<ArrayList<String>>
 {
   let const for_listing = mode == completion_mode::Listing;
@@ -1219,9 +1220,9 @@ static fn settled_subcommand_chain(EvalContext &context,
 }
 
 fn internal::complete_from_help(StringView line, StringView token,
-                                usize token_start, completion_mode mode,
-                                EvalContext &context,
-                                StringMap<String> &descriptions) throws
+                                usize token_start, EvalContext &context,
+                                StringMap<String> &descriptions,
+                                completion_mode mode) throws
     -> Maybe<ArrayList<String>>
 {
   let const for_listing = mode == completion_mode::Listing;
@@ -1247,8 +1248,8 @@ fn internal::complete_from_help(StringView line, StringView token,
 }
 
 fn internal::complete_from_help_subcommands(
-    StringView line, StringView token, usize token_start, completion_mode mode,
-    EvalContext &context, StringMap<String> &descriptions) throws
+    StringView line, StringView token, usize token_start, EvalContext &context,
+    StringMap<String> &descriptions, completion_mode mode) throws
     -> Maybe<ArrayList<String>>
 {
   let const for_listing = mode == completion_mode::Listing;

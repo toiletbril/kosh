@@ -43,6 +43,7 @@ fn parse_rpm_spec_format(const parser_format_input &input,
       }
     }
     parser_format_add_fragment(document, input.source, shell_start, shell_end,
+                               0, None, parser_format_codec::Direct,
                                mimic_mood::Posix);
   }
 }

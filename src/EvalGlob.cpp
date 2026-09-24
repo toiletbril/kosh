@@ -24,13 +24,14 @@ namespace koshka {
 namespace {
 
 fn name_matches_glob(StringView glob, StringView filename,
-                     const Bitset &glob_active, usize mask_offset, bool extglob,
+                     const Bitset &glob_active, usize mask_offset,
+                     utils::extglob_mode mode,
                      bool should_ignore_case, Allocator allocator) throws
     -> bool
 {
   if (!should_ignore_case)
     return utils::glob_matches(glob, filename, glob_active, mask_offset,
-                               extglob);
+                               mode);
 
   /* The glob arrives already lowered from the caller, so only the per-entry
      filename is lowered here. Lowering preserves length, so the active mask
@@ -38,13 +39,13 @@ fn name_matches_glob(StringView glob, StringView filename,
   let const lowered_name = filename.to_lower_ascii(allocator);
 
   return utils::glob_matches(glob, lowered_name.view(), glob_active,
-                             mask_offset, extglob);
+                             mask_offset, mode);
 }
 
 } /* namespace */
 
 fn EvalContext::expand_path_once(const glob_field &field,
-                                 bool should_expand_files) throws
+                                 glob_expansion_mode expansion_mode) throws
     -> ArrayList<glob_field>
 {
   let const scratch = scratch_allocator();
@@ -108,7 +109,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
 
   let const dotglob_is_on = is_shopt_enabled("dotglob");
   let const nocaseglob_is_on = is_shopt_enabled("nocaseglob");
-  let const is_extglob_enabled = extglob_enabled();
+  let const extglob = get_extglob_mode();
 
   let lowered_glob = String{scratch};
   if (nocaseglob_is_on) lowered_glob = glob.to_lower_ascii(scratch);
@@ -127,9 +128,10 @@ fn EvalContext::expand_path_once(const glob_field &field,
       return false;
     }
 
-    return name_matches_glob(match_glob, filename, field.glob_active,
-                             stem_start, is_extglob_enabled, nocaseglob_is_on,
-                             scratch);
+    return name_matches_glob(
+        match_glob, filename, field.glob_active, stem_start,
+        extglob,
+        nocaseglob_is_on, scratch);
   };
   let const do_append_entry = [&](StringView filename) throws -> void {
     add_expansion();
@@ -140,7 +142,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
     expanded.push(steal(result_field));
   };
 
-  if (should_expand_files) {
+  if (expansion_mode == glob_expansion_mode::Files) {
     for (let const &entry : *entries)
       if (do_entry_matches(entry)) do_append_entry(entry.name.view());
 
@@ -198,7 +200,7 @@ fn EvalContext::expand_path_once(const glob_field &field,
    without a later ']' is a literal bracket. None when the field is all
    literal. */
 hot pure fn first_active_glob(StringView text, const Bitset &mask,
-                              bool extglob) wontthrow -> Maybe<usize>
+                              extglob_mode mode) wontthrow -> Maybe<usize>
 {
   let open_bracket = Maybe<usize>{};
   /* An absent tail mask entry counts as inert, so an empty mask names a fully
@@ -209,7 +211,8 @@ hot pure fn first_active_glob(StringView text, const Bitset &mask,
     }
 
     let const ch = text.data[i];
-    if (extglob && i + 1 < text.length && lexer::is_extglob_operator(ch) &&
+    if (mode == extglob_mode::Enabled && i + 1 < text.length &&
+        lexer::is_extglob_operator(ch) &&
         text.data[i + 1] == '(')
     {
       return i;
@@ -389,7 +392,8 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
   let should_batch_literals = !fields.is_empty();
   for (let const &field : fields) {
     let const glob_index = first_active_glob(
-        field.text.view(), field.glob_active, extglob_enabled());
+        field.text.view(), field.glob_active,
+        get_extglob_mode());
     if (glob_index.has_value()) should_batch_literals = false;
     glob_indices.push(glob_index);
   }
@@ -513,7 +517,7 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
     }
 
     if (!slash_after) {
-      let expanded_files = expand_path_once(field, true);
+      let expanded_files = expand_path_once(field, glob_expansion_mode::Files);
       for (let &f : expanded_files)
         result.push(steal(f));
       continue;
@@ -532,7 +536,8 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
          k < field.glob_active.count(); k++)
       removed_suffix.glob_active.push(field.glob_active[k]);
 
-    let expanded_directories = expand_path_once(directory_component, false);
+    let expanded_directories =
+        expand_path_once(directory_component, glob_expansion_mode::Directories);
 
     /* Each match came back all-literal, so its false mask entries are restored
        before the suffix mask to keep the mask aligned with the text. */
@@ -651,7 +656,9 @@ hot fn EvalContext::expand_path(glob_field field,
   /* Fast path. A field with no glob is its own single result. */
   let const has_glob =
       !no_glob() &&
-      first_active_glob(field.text.view(), field.glob_active, extglob_enabled())
+      first_active_glob(
+          field.text.view(), field.glob_active,
+          get_extglob_mode())
           .has_value();
 
   if (!has_glob) {
@@ -685,7 +692,7 @@ hot fn EvalContext::expand_path(glob_field field,
     let const failglob_is_on = failglob() || is_shopt_enabled("failglob");
     let const failglob_is_explicit =
         m_runtime.was_failglob_set_explicitly() || is_shopt_enabled("failglob");
-    if (!m_glob_exempt_for_test)
+    if (!glob_exempt_for_test())
       warn_or_throw(failglob_is_on, failglob_is_explicit, location,
                     "The glob pattern '" + pattern +
                         "' matched no file, it expands to its literal text, "
@@ -694,7 +701,7 @@ hot fn EvalContext::expand_path(glob_field field,
                         "' or relax with set +o failglob");
     /* nullglob drops a no-match glob entirely, while the default and a test
        probe keep its literal text. */
-    if (m_glob_exempt_for_test || !is_shopt_enabled("nullglob")) {
+    if (glob_exempt_for_test() || !is_shopt_enabled("nullglob")) {
       values.push(steal(pattern));
     }
   }
@@ -716,7 +723,7 @@ fn EvalContext::expand_glob_lenient(StringView pattern) throws
     field.glob_active.push(true);
 
   if (!first_active_glob(field.text.view(), field.glob_active,
-                         extglob_enabled())
+                         get_extglob_mode())
            .has_value())
   {
     LOG(Debug, "compgen -G probe of '%.*s' has no glob, checking existence",

@@ -91,11 +91,11 @@ fn format_limit_value(u64 value, Allocator allocator) throws -> String
 }
 
 fn append_resource_limit(String &output, StringView name,
-                         os::resource_kind kind, Allocator allocator,
-                         bool should_color) throws -> void
+                         Allocator allocator, bool should_color,
+                         os::resource_kind kind) throws -> void
 {
   os::resource_limit limit{};
-  if (!os::get_resource_limit(kind, limit)) return;
+  if (!os::get_resource_limit(limit, kind)) return;
 
   let value = format_limit_value(limit.soft, allocator);
   value += " soft, ";
@@ -736,13 +736,13 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
                                 os::system_configuration_key::PageSize,
                                 allocator, should_color);
     append_resource_limit(output, "Open file limit",
-                          os::resource_kind::OpenFiles, allocator,
-                          should_color);
-    append_resource_limit(output, "Process limit", os::resource_kind::Processes,
-                          allocator, should_color);
+                          allocator, should_color,
+                          os::resource_kind::OpenFiles);
+    append_resource_limit(output, "Process limit", allocator, should_color,
+                          os::resource_kind::Processes);
     append_resource_limit(output, "Core size limit",
-                          os::resource_kind::CoreBlocks, allocator,
-                          should_color);
+                          allocator, should_color,
+                          os::resource_kind::CoreBlocks);
     append_procfs_report(output, should_color, allocator);
     append_anomaly_report(output, cxt, should_color);
   }

@@ -213,8 +213,8 @@ fn EvilFiles::execute(
   i64 wanted_pid = 0;
   let const has_wanted_pid = FLAG_EVILFILES_PID.is_set();
   if (has_wanted_pid) {
-    let const parsed = utils::parse_integer_in_base(FLAG_EVILFILES_PID.value(),
-                                                    int_base::decimal);
+    let const parsed = utils::parse_integer_in_base(
+        FLAG_EVILFILES_PID.value(), nullptr, int_base::decimal);
     if (parsed.is_error()) {
       KOSHKIT_REPORT_ERROR_AT(
           FLAG_EVILFILES_PID.value_location(),
@@ -232,7 +232,7 @@ fn EvilFiles::execute(
     wanted_owner = os::username_to_uid(FLAG_EVILFILES_USER.value());
     if (!wanted_owner.has_value()) {
       let const parsed = utils::parse_integer_in_base(
-          FLAG_EVILFILES_USER.value(), int_base::decimal);
+          FLAG_EVILFILES_USER.value(), nullptr, int_base::decimal);
       if (parsed.is_error()) {
         KOSHKIT_REPORT_ERROR_AT(
             FLAG_EVILFILES_USER.value_location(),

@@ -382,8 +382,8 @@ fn internal::complete_from_process_arguments(StringView line, StringView token,
 
 fn internal::complete_from_tools_with_targets(StringView line, StringView token,
                                               usize token_start,
-                                              completion_mode mode,
-                                              EvalContext &context) throws
+                                              EvalContext &context,
+                                              completion_mode mode) throws
     -> Maybe<ArrayList<String>>
 {
   let const for_listing = mode == completion_mode::Listing;
@@ -648,8 +648,8 @@ static fn push_variable_name_candidates(StringView token, EvalContext &context,
 
 fn internal::complete_from_builtin_flags(StringView line, StringView token,
                                          usize token_start,
-                                         completion_mode mode,
-                                         EvalContext &context) throws
+                                         EvalContext &context,
+                                         completion_mode mode) throws
     -> Maybe<ArrayList<String>>
 {
   let const command = command_word_of(line);
@@ -1060,8 +1060,9 @@ static fn push_spec_candidate(StringView entry, ArrayList<String> &candidates,
 }
 
 fn internal::complete_from_spec(StringView line, StringView token, usize cursor,
-                                completion_mode mode, EvalContext &context,
-                                StringMap<String> &descriptions) throws
+                                EvalContext &context,
+                                StringMap<String> &descriptions,
+                                completion_mode mode) throws
     -> Maybe<ArrayList<String>>
 {
   if (!context.is_shopt_enabled(shopt_option_id::Progcomp)) return None;

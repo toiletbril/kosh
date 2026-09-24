@@ -1293,7 +1293,7 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
     assignment_split->value.move_resources_to_arena(arena);
     token = arena.create<tokens::Assignment>(
         here(actual_cursor_position, byte_count), steal(assignment_split->name),
-        steal(assignment_split->value), assignment_split->is_append);
+        steal(assignment_split->value), assignment_split->update_mode);
   } else if (word.segments.count() == 1 &&
              word.segments[0].kind == WordSegment::Kind::UnquotedText)
   {

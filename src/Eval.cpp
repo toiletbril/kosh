@@ -137,8 +137,8 @@ fn EvalContext::end_command() wontthrow -> void
 
 fn EvalContext::record_history_event(StringView command) throws -> bool
 {
-  if (!m_history_transaction_stack.is_empty()) {
-    m_history_transaction_stack.back()->push(String{heap_allocator(), command});
+  if (!source_store().m_history_transaction_stack.is_empty()) {
+    source_store().m_history_transaction_stack.back()->push(String{heap_allocator(), command});
     return true;
   }
 
@@ -149,18 +149,17 @@ fn EvalContext::record_history_event(StringView command) throws -> bool
 fn EvalContext::begin_history_transaction(ArrayList<String> &commands) throws
     -> void
 {
-  m_history_transaction_stack.push(&commands);
+  source_store().begin_history_transaction(commands);
 }
 
 fn EvalContext::end_history_transaction() wontthrow -> void
 {
-  ASSERT(!m_history_transaction_stack.is_empty());
-  m_history_transaction_stack.pop_back();
+  source_store().end_history_transaction();
 }
 
 pure fn EvalContext::has_history_transaction() const wontthrow -> bool
 {
-  return !m_history_transaction_stack.is_empty();
+  return source_store().has_history_transaction();
 }
 
 fn EvalContext::begin_command_evaluation() wontthrow -> void
@@ -207,9 +206,10 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
     m_runtime.set_option(shell_option_id::Ignoreeof, true);
   }
 
-  m_shell_variables.set(name, value);
+  m_variable_store.shell_variables().set(name, value);
   if (is_prompt_special_variable(name))
-    m_special_variable_definition_locations.set(name, m_current_location);
+    m_variable_store.special_variable_definition_locations().set(
+        name, source_store().m_current_location);
   if (is_exported(name)) {
     if (m_subshell_depth > 0)
       m_environment_undo_log.push(environment_undo_entry{
@@ -223,15 +223,15 @@ fn EvalContext::restore_temporary_shell_variable(
     Maybe<SourceLocation> previous_definition_location) throws -> void
 {
   if (previous_value.has_value())
-    m_shell_variables.set(name, previous_value->view());
+    m_variable_store.shell_variables().set(name, previous_value->view());
   else
-    m_shell_variables.erase(name);
+    m_variable_store.shell_variables().erase(name);
   if (is_prompt_special_variable(name)) {
     if (previous_definition_location.has_value())
-      m_special_variable_definition_locations.set(
+      m_variable_store.special_variable_definition_locations().set(
           name, *previous_definition_location);
     else
-      m_special_variable_definition_locations.erase(name);
+      m_variable_store.special_variable_definition_locations().erase(name);
   }
 }
 
@@ -477,10 +477,11 @@ fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
     force_unset_shell_variable(binding.name);
   if (is_prompt_special_variable(binding.name.view())) {
     if (binding.previous_special_definition_location.has_value())
-      m_special_variable_definition_locations.set(
+      m_variable_store.special_variable_definition_locations().set(
           binding.name.view(), *binding.previous_special_definition_location);
     else
-      m_special_variable_definition_locations.erase(binding.name.view());
+      m_variable_store.special_variable_definition_locations().erase(
+          binding.name.view());
   }
   if (binding.previous_indexed_array.has_value())
     indexed_arrays().set(binding.name.view(),
@@ -535,7 +536,7 @@ fn EvalContext::set_indexed_array(StringView name,
   if (is_lowercase_variable(name) || is_uppercase_variable(name)) [[unlikely]]
     for (let &value : values)
       apply_variable_case(name, value);
-  m_shell_variables.erase(name);
+  m_variable_store.shell_variables().erase(name);
   clear_sparse_array(name);
   indexed_arrays().set(name, steal(values));
 }
@@ -560,7 +561,7 @@ fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
   if (existing != nullptr && existing->count() == 1 &&
       !sparse_array_names().contains("PIPESTATUS"))
   {
-    m_shell_variables.erase("PIPESTATUS");
+    m_variable_store.shell_variables().erase("PIPESTATUS");
     char status_text_buffer[32];
     let const status_text = utils::int_to_text_into(status, status_text_buffer,
                                                     sizeof(status_text_buffer));
@@ -569,7 +570,7 @@ fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
     return;
   }
 
-  m_shell_variables.erase("PIPESTATUS");
+  m_variable_store.shell_variables().erase("PIPESTATUS");
   clear_sparse_array("PIPESTATUS");
   let &values = indexed_arrays().get_or_create(
       "PIPESTATUS", ArrayList<String>{heap_allocator()});
@@ -590,7 +591,7 @@ fn EvalContext::append_indexed_array(StringView name,
     if (is_lowercase_variable(name) || is_uppercase_variable(name)) [[unlikely]]
       for (let &value : values)
         apply_variable_case(name, value);
-    m_shell_variables.erase(name);
+    m_variable_store.shell_variables().erase(name);
     for (let &element : values)
       existing->push(steal(element));
     return;
@@ -616,7 +617,7 @@ fn EvalContext::append_indexed_array(StringView name,
 
 cold fn EvalContext::show_runtime_warning(StringView message) wontthrow -> void
 {
-  show_runtime_warning_at(m_current_location, message);
+  show_runtime_warning_at(source_store().m_current_location, message);
 }
 
 cold fn EvalContext::show_runtime_warning_at(
@@ -646,7 +647,7 @@ cold fn EvalContext::show_runtime_warning_at(
     let warning = WarningWithLocationAndDetails{location, message, note};
     warning.set_line_offset(line_offset);
     show_message(warning.to_string(resolved_source.text->view(), this));
-    if (!m_source_frames.is_empty()) print_source_backtrace(trace_location);
+    if (!source_store().m_source_frames.is_empty()) print_source_backtrace(trace_location);
   } catch (...) {
     LOG(Debug, "formatting a runtime warning failed, the error is swallowed");
   }
@@ -674,7 +675,7 @@ cold fn EvalContext::show_runtime_error_at(SourceLocation location,
     let error = ErrorWithLocation{location, message};
     error.set_line_offset(line_offset);
     show_message(error.to_string(resolved_source.text->view(), this));
-    if (!m_source_frames.is_empty()) print_source_backtrace(trace_location);
+    if (!source_store().m_source_frames.is_empty()) print_source_backtrace(trace_location);
   } catch (...) {
     LOG(Debug, "formatting a runtime error failed, the error is swallowed");
   }
@@ -683,7 +684,7 @@ cold fn EvalContext::show_runtime_error_at(SourceLocation location,
 pure fn EvalContext::locate_variable_reference(StringView name) const wontthrow
     -> SourceLocation
 {
-  let fallback = m_current_location;
+  let fallback = source_store().m_current_location;
   if (name.is_empty()) return fallback;
   let const resolved_source = resolve_render_source(fallback);
   if (resolved_source.text == nullptr) return fallback;
@@ -779,8 +780,8 @@ fn EvalContext::report_unset_reference(StringView name) throws -> void
                         "' because the parameter is not set";
 
     let const reference = locate_variable_reference(name);
-    if (reference.position == m_current_location.position &&
-        reference.length == m_current_location.length)
+    if (reference.position == source_store().m_current_location.position &&
+        reference.length == source_store().m_current_location.length)
     {
       throw_script_fatal(String{message}, empty_expansion_note.view());
     }
@@ -813,11 +814,11 @@ fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
   }
   if (is_completion_function_running()) return;
   if ((fatal || should_demote) && !diagnostics_disabled() &&
-      m_current_source != nullptr)
+      source_store().m_current_source != nullptr)
   {
     try {
       let warning = WarningWithLocationAndDetails{location, message, note};
-      show_message(warning.to_string(m_current_source->view(), this));
+      show_message(warning.to_string(source_store().m_current_source->view(), this));
     } catch (...) {
       LOG(Debug, "showing a located warning failed, the error is swallowed");
     }
@@ -828,9 +829,9 @@ fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
 {
   LOG(All, "removing variable '%.*s' from the store and the environment",
       static_cast<int>(name.length), name.data);
-  m_shell_variables.erase(name);
+  m_variable_store.shell_variables().erase(name);
   if (is_prompt_special_variable(name))
-    m_special_variable_definition_locations.erase(name);
+    m_variable_store.special_variable_definition_locations().erase(name);
   record_environment_change(name);
   os::unset_environment_variable(name);
   unmark_exported(name);
@@ -844,7 +845,8 @@ fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
 pure fn EvalContext::special_variable_definition_location(
     StringView name) const wontthrow -> Maybe<SourceLocation>
 {
-  let const *location = m_special_variable_definition_locations.find(name);
+  let const *location =
+      m_variable_store.special_variable_definition_locations().find(name);
   if (location == nullptr) return None;
   return *location;
 }
@@ -929,7 +931,8 @@ fn EvalContext::unmark_exported(StringView name) throws -> void
 
 fn EvalContext::unexport_shell_variable(StringView name) throws -> void
 {
-  let const has_shell_binding = m_shell_variables.find(name) != nullptr ||
+  let const has_shell_binding =
+      m_variable_store.shell_variables().find(name) != nullptr ||
                                 indexed_arrays().find(name) != nullptr ||
                                 associative_names().contains(name) ||
                                 is_local_in_current_scope(name) ||
@@ -1190,32 +1193,40 @@ fn EvalContext::push_function_call_name(
     StringView name, const FunctionBodyHandle &body_storage) throws -> void
 {
   let owned_name = String{heap_allocator(), name};
-  m_function_call_names.reserve(m_function_call_names.count() + 1);
-  m_function_call_storages.reserve(m_function_call_storages.count() + 1);
-  m_function_call_locations.reserve(m_function_call_locations.count() + 1);
-  m_function_call_sources.reserve(m_function_call_sources.count() + 1);
-  m_function_call_names.push(steal(owned_name));
-  m_function_call_storages.push(body_storage);
-  m_function_call_locations.push(m_current_location);
-  m_function_call_sources.push(m_current_source);
+  function_store().call_names().reserve(function_store().call_names().count() +
+                                         1);
+  function_store().call_storages().reserve(
+      function_store().call_storages().count() + 1);
+  function_store().call_locations().reserve(
+      function_store().call_locations().count() + 1);
+  function_store().call_sources().reserve(
+      function_store().call_sources().count() + 1);
+  function_store().call_names().push(steal(owned_name));
+  function_store().call_storages().push(body_storage);
+  function_store().call_locations().push(source_store().m_current_location);
+  function_store().call_sources().push(source_store().m_current_source);
 }
 
 fn EvalContext::pop_function_call_name() wontthrow -> void
 {
-  if (!m_function_call_names.is_empty()) {
-    m_function_call_names.remove(m_function_call_names.count() - 1);
-    m_function_call_storages.remove(m_function_call_storages.count() - 1);
-    m_function_call_locations.remove(m_function_call_locations.count() - 1);
-    m_function_call_sources.remove(m_function_call_sources.count() - 1);
+  if (!function_store().call_names().is_empty()) {
+    function_store().call_names().remove(function_store().call_names().count() -
+                                         1);
+    function_store().call_storages().remove(
+        function_store().call_storages().count() - 1);
+    function_store().call_locations().remove(
+        function_store().call_locations().count() - 1);
+    function_store().call_sources().remove(
+        function_store().call_sources().count() - 1);
   }
 }
 
 pure fn EvalContext::script_source_frame_index() const wontthrow -> Maybe<usize>
 {
-  if (!m_is_script_run) return None;
+  if (!source_store().is_script_run()) return None;
 
-  for (usize i = 0; i < m_source_frames.count(); i++) {
-    let const &path = m_source_frames[i].source_path;
+  for (usize i = 0; i < source_store().m_source_frames.count(); i++) {
+    let const &path = source_store().m_source_frames[i].source_path;
     if (path.is_empty()) continue;
 
     if (path.view() == m_shell_name.view()) return i;
@@ -1235,29 +1246,29 @@ pure fn EvalContext::merged_frame_at(
   let const target = total - 1 - index;
   usize emitted_count = 0;
 
-  if (m_is_script_run && !script_source_index.has_value()) {
+  if (source_store().is_script_run() && !script_source_index.has_value()) {
     if (target == 0) return MergedFrame{MergedFrame::Kind::Main, 0};
     emitted_count = 1;
   }
 
-  let const function_count = m_function_call_names.count();
+  let const function_count = function_store().call_names().count();
   usize function_index = 0;
   usize source_index = 0;
 
   loop
   {
-    while (source_index < m_source_frames.count() &&
-           m_source_frames[source_index].source_path.is_empty())
+    while (source_index < source_store().m_source_frames.count() &&
+           source_store().m_source_frames[source_index].source_path.is_empty())
     {
       source_index++;
     }
 
-    let const has_source = source_index < m_source_frames.count();
+    let const has_source = source_index < source_store().m_source_frames.count();
     let const has_function = function_index < function_count;
     if (!has_source && !has_function) break;
 
     if (has_source &&
-        m_source_frames[source_index].function_call_depth <= function_index)
+        source_store().m_source_frames[source_index].function_call_depth <= function_index)
     {
       if (emitted_count == target) {
         if (script_source_index.has_value() &&
@@ -1294,7 +1305,7 @@ pure fn EvalContext::merged_frame_at(usize index) const wontthrow -> MergedFrame
 
 fn EvalContext::funcname_frame_count() const wontthrow -> usize
 {
-  if (m_function_call_names.is_empty()) return 0;
+  if (function_store().call_names().is_empty()) return 0;
   return bash_source_frame_count();
 }
 
@@ -1303,7 +1314,7 @@ fn EvalContext::funcname_frame_at(usize index) const wontthrow -> StringView
   let const frame = merged_frame_at(index);
   switch (frame.kind) {
   case MergedFrame::Kind::Function:
-    return m_function_call_names[frame.storage_index].view();
+    return function_store().call_names()[frame.storage_index].view();
   case MergedFrame::Kind::Source: return StringView{"source"};
   case MergedFrame::Kind::Main: break;
   }
@@ -1335,10 +1346,10 @@ fn EvalContext::funcname_line_at(usize index) const throws -> usize
   switch (frame.kind) {
   case MergedFrame::Kind::Function:
     return line_number_at_location(
-        m_function_call_locations[frame.storage_index],
-        m_function_call_sources[frame.storage_index]);
+        function_store().call_locations()[frame.storage_index],
+        function_store().call_sources()[frame.storage_index]);
   case MergedFrame::Kind::Source: {
-    let const &source = m_source_frames[frame.storage_index];
+    let const &source = source_store().m_source_frames[frame.storage_index];
     return line_number_at_location(source.call_site,
                                    borrowed_frame_source(source));
   }
@@ -1359,7 +1370,8 @@ pure fn EvalContext::bash_source_frame_at(usize index) const wontthrow
   switch (frame.kind) {
   case MergedFrame::Kind::Function: {
     let const *info =
-        m_function_call_storages[frame.storage_index].get_definition_info();
+        function_store().call_storages()[frame.storage_index]
+            .get_definition_info();
     if (info != nullptr) {
       if (let const name = source_name_at(info->source_name_index);
           name.has_value())
@@ -1371,7 +1383,7 @@ pure fn EvalContext::bash_source_frame_at(usize index) const wontthrow
     return m_shell_name.view();
   }
   case MergedFrame::Kind::Source:
-    return m_source_frames[frame.storage_index].source_path.view();
+    return source_store().m_source_frames[frame.storage_index].source_path.view();
   case MergedFrame::Kind::Main: break;
   }
 
@@ -1381,13 +1393,14 @@ pure fn EvalContext::bash_source_frame_at(usize index) const wontthrow
 pure fn EvalContext::bash_source_frame_count(
     Maybe<usize> script_source_index) const wontthrow -> usize
 {
-  usize frame_count = m_function_call_names.count();
+  usize frame_count = function_store().call_names().count();
 
-  for (usize i = 0; i < m_source_frames.count(); i++) {
-    if (!m_source_frames[i].source_path.is_empty()) frame_count++;
+  for (usize i = 0; i < source_store().m_source_frames.count(); i++) {
+    if (!source_store().m_source_frames[i].source_path.is_empty()) frame_count++;
   }
 
-  if (m_is_script_run && !script_source_index.has_value()) frame_count++;
+  if (source_store().is_script_run() && !script_source_index.has_value())
+    frame_count++;
 
   return frame_count;
 }
@@ -1407,7 +1420,7 @@ fn EvalContext::dynamic_array_element_count(DynamicArray which) const throws
         bash_argument_frame_context() != nullptr
             ? bash_argument_frame_context()->has_flag(
                   BashArgumentFrameFlag::IsSource)
-            : m_function_call_names.is_empty();
+            : function_store().call_names().is_empty();
     initialize_bash_argument_arrays(should_include_current_frame);
     ASSERT(bash_argument_arrays() != nullptr);
     return which == DynamicArray::ArgumentCount
@@ -1650,11 +1663,12 @@ fn ExecContext::print_to_stderr(StringView s) const throws -> void
 }
 
 fn ExecContext::make_from(const SourceLocation &location, StringView source,
-                          ArrayList<String> &&args, mimic_mood mood,
+                          ArrayList<String> &&args,
                           bool are_koshkit_utilities_reachable,
                           bool should_check_hash,
                           ProgramResolver &program_resolver,
-                          ArrayList<SourceLocation> &&arg_locations) throws
+                          ArrayList<SourceLocation> &&arg_locations,
+                          mimic_mood mood) throws
     -> ExecContext
 {
   ASSERT(args.count() > 0);

@@ -48,8 +48,8 @@ static pure fn effective_entry_kind(
   }
 }
 
-static fn remove_path_impl(StringView path, removal_mode mode,
-                           Allocator allocator,
+static fn remove_path_impl(StringView path, Allocator allocator,
+                           removal_mode mode,
                            Path::entry_kind known_kind) throws
     -> bool
 {
@@ -71,7 +71,7 @@ static fn remove_path_impl(StringView path, removal_mode mode,
         if (os::INTERRUPT_REQUESTED) return false;
         let child = Path{path, allocator};
         child.append(entry.child.name.view());
-        if (!remove_path_impl(child.view(), mode, allocator,
+        if (!remove_path_impl(child.view(), allocator, mode,
                               effective_entry_kind(entry)))
           return false;
       }
@@ -80,16 +80,16 @@ static fn remove_path_impl(StringView path, removal_mode mode,
   return os::remove_file(path);
 }
 
-fn remove_path(StringView path, removal_mode mode, Allocator allocator) throws
+fn remove_path(StringView path, Allocator allocator, removal_mode mode) throws
     -> bool
 {
-  return remove_path_impl(path, mode, allocator, Path::entry_kind::Unknown);
+  return remove_path_impl(path, allocator, mode, Path::entry_kind::Unknown);
 }
 
 static fn remove_path_with_prompt(const ExecContext &ec, EvalContext &cxt,
                                   StringView utility_name, StringView path,
-                                  removal_mode mode, bool should_prompt,
-                                  Allocator allocator,
+                                  bool should_prompt, Allocator allocator,
+                                  removal_mode mode,
                                   Path::entry_kind known_kind =
                                       Path::entry_kind::Unknown) throws
     -> bool
@@ -118,8 +118,8 @@ static fn remove_path_with_prompt(const ExecContext &ec, EvalContext &cxt,
         let child = Path{path, allocator};
         child.append(entry.child.name.view());
         if (!remove_path_with_prompt(
-                ec, cxt, utility_name, child.view(), mode, should_prompt,
-                allocator, effective_entry_kind(entry)))
+                ec, cxt, utility_name, child.view(), should_prompt, allocator,
+                mode, effective_entry_kind(entry)))
           did_succeed = false;
       }
     } else {
@@ -157,8 +157,8 @@ static fn remove_path_with_prompt(const ExecContext &ec, EvalContext &cxt,
 
 static fn report_dry_run_removal(const ExecContext &ec, EvalContext &cxt,
                                  StringView utility_name, StringView path,
-                                 removal_mode mode,
                                  bool should_prompt, Allocator allocator,
+                                 removal_mode mode,
                                  Path::entry_kind known_kind =
                                      Path::entry_kind::Unknown) throws
     -> bool
@@ -188,8 +188,8 @@ static fn report_dry_run_removal(const ExecContext &ec, EvalContext &cxt,
         let child = Path{path, allocator};
         child.append(entry.child.name.view());
         if (!report_dry_run_removal(
-                ec, cxt, utility_name, child.view(), mode, should_prompt,
-                allocator, effective_entry_kind(entry)))
+                ec, cxt, utility_name, child.view(), should_prompt, allocator,
+                mode, effective_entry_kind(entry)))
           did_succeed = false;
         if (os::INTERRUPT_REQUESTED) return false;
       }
@@ -300,9 +300,9 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
     if (is_dry_run) {
       if (!report_dry_run_removal(
               ec, cxt, args[0].view(), operand.view(),
+              should_prompt, allocator,
               is_recursive ? removal_mode::Recursive
-                           : removal_mode::SinglePath,
-              should_prompt, allocator))
+                           : removal_mode::SinglePath))
         status = 1;
       if (os::INTERRUPT_REQUESTED) return 130;
       continue;
@@ -310,9 +310,9 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
 
     if (!remove_path_with_prompt(
             ec, cxt, args[0].view(), operand.view(),
+            should_prompt, allocator,
             is_recursive ? removal_mode::Recursive
-                         : removal_mode::SinglePath,
-            should_prompt, allocator))
+                         : removal_mode::SinglePath))
     {
       if (os::INTERRUPT_REQUESTED) return 130;
       status = 1;

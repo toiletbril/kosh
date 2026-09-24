@@ -21,6 +21,7 @@ class BumpArena;
 class Expression;
 
 struct word_assignment_split;
+
 struct fd_allocation_target;
 
 struct arith_token
@@ -613,7 +614,7 @@ struct word_assignment_split
 {
   String name;
   Word value;
-  bool is_append;
+  assignment_update_mode update_mode;
 };
 
 struct fd_allocation_target
@@ -822,19 +823,20 @@ class Assignment : public Token
 public:
   static constexpr bool is_arena_destructor_noop = true;
 
-  Assignment(SourceLocation location, String key, Word value, bool is_append);
+  Assignment(SourceLocation location, String key, Word value,
+             assignment_update_mode update_mode);
 
   fn raw_string() const throws -> String override;
 
   pure fn key() const wontthrow -> const String &;
   pure fn value_word() const wontthrow -> const Word &;
 
-  pure fn is_append() const wontthrow -> bool;
+  pure fn get_update_mode() const wontthrow -> assignment_update_mode;
 
 protected:
   String m_key;
   Word m_value;
-  bool m_is_append;
+  assignment_update_mode m_update_mode;
 };
 
 class WordToken : public Token

@@ -24,6 +24,12 @@
 
 namespace koshka {
 
+enum class assignment_update_mode : u8
+{
+  Replace,
+  Append,
+};
+
 /* A case-sensitive environment is keyed by the name itself and needs no value.
    An environment that ignores case is keyed by the folded name, and the value
    holds the original spelling when folding changed it. */
@@ -59,6 +65,12 @@ enum class return_handling : u8
   Propagate,
   Consume,
   Reject,
+};
+
+enum class history_recording : u8
+{
+  Disabled,
+  Enabled,
 };
 
 enum class status_flag : u32
@@ -114,12 +126,24 @@ struct glob_field
   Bitset glob_active;
 };
 
+enum class glob_expansion_mode : u8
+{
+  Files,
+  Directories,
+};
+
+enum class extglob_mode : u8
+{
+  Disabled,
+  Enabled,
+};
+
 /* The index of the first active glob metacharacter in a field, or None when the
    field is all literal. The argument expander reads it to push a glob-free
    field straight through, skipping the directory scan that expand_path would
    run. */
 hot pure fn first_active_glob(StringView text, const Bitset &mask,
-                              bool extglob) wontthrow -> Maybe<usize>;
+                              extglob_mode mode) wontthrow -> Maybe<usize>;
 
 inline pure fn is_colon_modifier_operator(char c) wontthrow -> bool
 {

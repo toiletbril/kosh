@@ -21,6 +21,12 @@ namespace expressions::internal {
 
 namespace {
 
+enum class trap_condition_mode : u8
+{
+  Default,
+  Posix,
+};
+
 pure fn signal_name_is_unblockable(StringView bare) wontthrow -> bool
 {
   return bare == "KILL" || bare == "STOP";
@@ -28,8 +34,9 @@ pure fn signal_name_is_unblockable(StringView bare) wontthrow -> bool
 
 fn check_trap_condition_operands(AnalysisContext &actx,
                                  const ArrayList<const Token *> &args,
-                                 bool is_posix) throws -> void
+                                 trap_condition_mode mode) throws -> void
 {
+  let const is_posix = mode == trap_condition_mode::Posix;
   for (usize i = 2; i < args.count(); i++) {
     if (args[i]->kind() != Token::Kind::Word) continue;
 
@@ -351,7 +358,9 @@ fn check_command_name_lints(AnalysisContext &actx,
         actx.report_diagnostic(diagnostic_id::sc2064,
                                args[1]->source_location());
     }
-    check_trap_condition_operands(actx, args, is_posix);
+    check_trap_condition_operands(
+        actx, args, is_posix ? trap_condition_mode::Posix
+                             : trap_condition_mode::Default);
     break;
 
   case command_name_id::Exec:

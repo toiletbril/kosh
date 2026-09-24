@@ -29,6 +29,12 @@ namespace koshka {
 
 namespace koshkit {
 
+enum class head_unit : u8
+{
+  Lines,
+  Bytes,
+};
+
 static fn read_all(os::descriptor fd, Allocator allocator) throws
     -> Maybe<String>
 {
@@ -71,22 +77,23 @@ static fn byte_prefix_length_dropping_last(StringView text,
 }
 
 static fn read_all_but_last(os::descriptor fd, u64 drop_count,
-                            bool is_byte_mode, Allocator allocator) throws
+                            Allocator allocator, head_unit unit) throws
     -> Maybe<String>
 {
   let text = read_all(fd, allocator);
   if (!text.has_value()) return None;
 
   let const keep_length =
-      is_byte_mode ? byte_prefix_length_dropping_last(text->view(), drop_count)
-                   : line_prefix_length_dropping_last(text->view(), drop_count);
+      unit == head_unit::Bytes
+          ? byte_prefix_length_dropping_last(text->view(), drop_count)
+          : line_prefix_length_dropping_last(text->view(), drop_count);
   text->truncate(keep_length);
   return text;
 }
 
 static fn read_regular_all_but_last(os::descriptor fd, u64 file_size,
-                                    u64 drop_count, bool is_byte_mode,
-                                    Allocator allocator) throws -> Maybe<String>
+                                    u64 drop_count, Allocator allocator,
+                                    head_unit unit) throws -> Maybe<String>
 {
   constexpr usize block_byte_count = 64 * 1024;
   char block[block_byte_count];
@@ -103,7 +110,7 @@ static fn read_regular_all_but_last(os::descriptor fd, u64 file_size,
   };
 
   u64 prefix_end = file_size;
-  if (is_byte_mode) {
+  if (unit == head_unit::Bytes) {
     prefix_end = drop_count >= file_size ? 0 : file_size - drop_count;
   } else if (drop_count != 0) {
     u64 remaining_lines = drop_count;
@@ -122,7 +129,7 @@ static fn read_regular_all_but_last(os::descriptor fd, u64 file_size,
         return None;
       }
       if (read_result.transferred_byte_count != byte_count)
-        return read_all_but_last(fd, drop_count, is_byte_mode, allocator);
+        return read_all_but_last(fd, drop_count, allocator, unit);
 
       for (usize position = byte_count; position > 0; position--) {
         if (block[position - 1] != '\n') continue;
@@ -153,7 +160,7 @@ static fn read_regular_all_but_last(os::descriptor fd, u64 file_size,
       return None;
     }
     if (read_result.transferred_byte_count != byte_count)
-      return read_all_but_last(fd, drop_count, is_byte_mode, allocator);
+      return read_all_but_last(fd, drop_count, allocator, unit);
 
     result.append(StringView{block, byte_count});
     next_offset += byte_count;
@@ -182,6 +189,7 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
   let const is_byte_mode =
       has_bytes_flag && (!has_lines_flag || FLAG_HEAD_BYTES.position() >
                                                 FLAG_HEAD_LINES.position());
+  let const unit = is_byte_mode ? head_unit::Bytes : head_unit::Lines;
 
   u64 count = 10;
   bool is_all_but_last = false;
@@ -259,10 +267,10 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
                                 : Maybe<u64>{};
       let const text = file_size.has_value()
                            ? read_regular_all_but_last(
-                                 fd, *file_size, count, is_byte_mode,
-                                 cxt.scratch_allocator())
-                           : read_all_but_last(fd, count, is_byte_mode,
-                                               cxt.scratch_allocator());
+                                 fd, *file_size, count,
+                                 cxt.scratch_allocator(), unit)
+                           : read_all_but_last(fd, count,
+                                               cxt.scratch_allocator(), unit);
       let const read_error = os::get_last_system_error_number();
       if (was_opened) os::close_fd(fd);
       if (os::INTERRUPT_REQUESTED) return 130;

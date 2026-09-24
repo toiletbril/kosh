@@ -137,15 +137,15 @@ struct compgen_filter
   String pattern;
   Bitset active;
   bool is_negated{false};
-  bool is_extglob_enabled{false};
+  extglob_mode extglob{extglob_mode::Disabled};
 };
 
 static fn compile_filter(StringView raw_filter, StringView word,
-                         bool is_extglob_enabled, Allocator allocator) throws
+                         Allocator allocator, extglob_mode extglob) throws
     -> compgen_filter
 {
   let compiled = compgen_filter{allocator};
-  compiled.is_extglob_enabled = is_extglob_enabled;
+  compiled.extglob = extglob;
 
   let const upper_bound = raw_filter.length + word.length;
   compiled.pattern.reserve(upper_bound);
@@ -182,7 +182,7 @@ static fn candidate_is_excluded(StringView candidate,
 {
   let const matches =
       utils::glob_matches(filter.pattern.view(), candidate, filter.active, 0,
-                          filter.is_extglob_enabled);
+                          filter.extglob);
   return filter.is_negated ? !matches : matches;
 }
 
@@ -366,7 +366,8 @@ static fn run_compgen_actions(EvalContext &cxt, u32 action_mask,
 
       for (let const &candidate :
            completion::complete_filesystem_names_by_prefix(
-               emitter.word, cxt, Path::current_directory(), true))
+               emitter.word, cxt, Path::current_directory(),
+               completion::completion_filesystem_mode::Directories))
       {
         emitter.push_filtered(candidate.view());
       }
@@ -377,7 +378,8 @@ static fn run_compgen_actions(EvalContext &cxt, u32 action_mask,
 
       for (let const &candidate :
            completion::complete_filesystem_names_by_prefix(
-               emitter.word, cxt, Path::current_directory(), false))
+               emitter.word, cxt, Path::current_directory(),
+               completion::completion_filesystem_mode::Files))
       {
         emitter.push_filtered(candidate.view());
       }
@@ -583,8 +585,8 @@ fn Compgen::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   Maybe<compgen_filter> filter = None;
   if (filter_pattern.has_value()) {
-    filter = compile_filter(*filter_pattern, word, cxt.extglob_enabled(),
-                            cxt.scratch_allocator());
+    filter = compile_filter(*filter_pattern, word, cxt.scratch_allocator(),
+                            cxt.get_extglob_mode());
   }
 
   let const prefix =

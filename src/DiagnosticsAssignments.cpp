@@ -908,7 +908,9 @@ fn check_assignment_value_shape(AnalysisContext &actx,
 
   /* PATH without a separator and without its own value replaces the search
      path, shellcheck SC2123. An expanded value may already hold a path list. */
-  if (input.name == "PATH" && !input.is_append && !value.is_empty() &&
+  if (input.name == "PATH" &&
+      input.update_mode != assignment_update_mode::Append &&
+      !value.is_empty() &&
       input.shape.has_only_literal_segments &&
       !value.find_character(':').has_value() &&
       !view_contains(value, StringView{"PATH"}))
@@ -924,7 +926,8 @@ fn check_assignment_value_shape(AnalysisContext &actx,
 
   /* A prefix repeating the value the name already holds exports it into the
      environment of the command, which an ordinary assignment does not do. */
-  if (!input.is_append && !input.is_command_prefix &&
+  if (input.update_mode != assignment_update_mode::Append &&
+      !input.is_command_prefix &&
       assignment_value_is_own_name(input.name, value))
   {
     actx.report_diagnostic(diagnostic_id::sc2269, input.location, {input.name});
@@ -943,7 +946,8 @@ fn check_assignment_value_shape(AnalysisContext &actx,
   let const is_deliberate_command_prefix =
       input.is_command_prefix && COMMAND_VALUED_VARIABLES.contains(input.name);
 
-  if (!input.is_append && !is_deliberate_command_prefix &&
+  if (input.update_mode != assignment_update_mode::Append &&
+      !is_deliberate_command_prefix &&
       input.shape.has_bare_literal_value &&
       word_names_a_command_as_a_value(value) &&
       actx.should_report(diagnostic_id::sc2209))
@@ -966,7 +970,9 @@ fn check_assignment_value_shape(AnalysisContext &actx,
         actx.array_valued_names.contains(input.name))
     {
       let const id =
-          input.is_append ? diagnostic_id::sc2179 : diagnostic_id::sc2178;
+          input.update_mode == assignment_update_mode::Append
+              ? diagnostic_id::sc2179
+              : diagnostic_id::sc2178;
       actx.report_diagnostic(id, input.location, {input.name});
     }
 

@@ -74,12 +74,12 @@ constexpr resource_entry RESOURCE_TABLE[] = {
     {"rtprio",                os::resource_kind::RealtimePriority,    1   },
 };
 
-fn block_factor(const resource_entry &entry, bool is_posix_mode) throws -> u64
+fn block_factor(const resource_entry &entry, mimic_mood mood) throws -> u64
 {
   if (entry.kind == os::resource_kind::FileBlocks ||
       entry.kind == os::resource_kind::CoreBlocks)
   {
-    return is_posix_mode ? 512 : 1024;
+    return mood == mimic_mood::Posix ? 512 : 1024;
   }
 
   return entry.units_per_value;
@@ -138,12 +138,12 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     let out = String{cxt.scratch_allocator()};
     for (let const &entry : RESOURCE_TABLE) {
       os::resource_limit limit{};
-      if (!os::get_resource_limit(entry.kind, limit)) continue;
+      if (!os::get_resource_limit(limit, entry.kind)) continue;
       let const label = String{cxt.scratch_allocator(), entry.label};
       out += label;
       out.append_repeated(' ', label.count() < 20 ? 20 - label.count() : 0);
       out.push(' ');
-      out += render_limit(limit, block_factor(entry, cxt.is_posix_mode()),
+      out += render_limit(limit, block_factor(entry, cxt.mood()),
                           cxt.scratch_allocator());
       out.push('\n');
     }
@@ -168,14 +168,14 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   }
 
   os::resource_limit limit{};
-  if (!os::get_resource_limit(resource.kind, limit))
+  if (!os::get_resource_limit(limit, resource.kind))
     throw Error{"Unable to read the resource limit: " +
                 os::last_system_error_message()};
 
   if (args.count() < 2) {
     LOG(Debug, "ulimit reading the '%s' limit", resource.label);
     ec.print_to_stdout(render_limit(limit,
-                                    block_factor(resource, cxt.is_posix_mode()),
+                                    block_factor(resource, cxt.mood()),
                                     cxt.scratch_allocator()) +
                        "\n");
     return 0;
@@ -185,7 +185,7 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       args[1].c_str());
 
   let const &requested = args[1];
-  let const units = block_factor(resource, cxt.is_posix_mode());
+  let const units = block_factor(resource, cxt.mood());
   u64 value = os::RESOURCE_UNLIMITED;
   if (requested != "unlimited") {
     let const parsed = utils::parse_decimal_u64(requested.view());
@@ -214,7 +214,7 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     limit.soft = value;
   }
 
-  if (!os::set_resource_limit(resource.kind, limit))
+  if (!os::set_resource_limit(limit, resource.kind))
     throw Error{"Unable to set the resource limit: " +
                 os::last_system_error_message()};
 

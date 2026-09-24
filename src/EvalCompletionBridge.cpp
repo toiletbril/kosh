@@ -25,27 +25,26 @@ fn EvalContext::register_completion_spec(StringView command,
       "word-list bytes",
       static_cast<int>(command.length), command.data,
       spec.function_name.c_str(), spec.word_list.length());
-  completion_store().specs().set(command, steal(spec));
+  completion_store().register_spec(command, steal(spec));
 }
 
 fn EvalContext::register_default_completion_spec(completion_spec spec) throws
     -> void
 {
   LOG(Debug, "registering the default completion spec");
-  completion_store().default_spec() = steal(spec);
+  completion_store().register_default_spec(steal(spec));
 }
 
 pure fn EvalContext::default_completion_spec() const wontthrow
     -> const completion_spec *
 {
-  return completion_store().default_spec().has_value() ? &*completion_store().default_spec()
-                                               : nullptr;
+  return completion_store().default_spec_ptr();
 }
 
 pure fn EvalContext::lookup_completion_spec(StringView command) const wontthrow
     -> const completion_spec *
 {
-  return completion_store().specs().find(command);
+  return completion_store().lookup_spec(command);
 }
 
 fn EvalContext::run_completion_function(StringView function_name,
@@ -94,7 +93,7 @@ fn EvalContext::run_completion_function(StringView function_name,
       throw Error{"Unable to assign '" + name + "' because it is read only"};
     }
 
-    m_shell_variables.erase(name);
+    m_variable_store.shell_variables().erase(name);
     clear_sparse_array(name);
     let &storage = indexed_arrays().get_or_create(
         name, ArrayList<String>{heap_allocator()});

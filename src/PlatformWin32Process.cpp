@@ -60,7 +60,7 @@ run_measured_with_options(const ArrayList<String> &argv, measured_output output,
                           const windows_measured_launch_options &options) throws
     -> Maybe<measured_result>;
 
-fn get_priority(priority_target target, i64 id) wontthrow -> Maybe<i32>
+fn get_priority(i64 id, priority_target target) wontthrow -> Maybe<i32>
 {
   if (target != priority_target::Process || id < 0 || id > UINT32_MAX) {
     SetLastError(ERROR_NOT_SUPPORTED);
@@ -78,7 +78,7 @@ fn get_priority(priority_target target, i64 id) wontthrow -> Maybe<i32>
   return priority_from_windows_class(priority_class);
 }
 
-fn set_priority(priority_target target, i64 id, i32 priority) wontthrow -> bool
+fn set_priority(i64 id, i32 priority, priority_target target) wontthrow -> bool
 {
   if (target != priority_target::Process || id < 0 || id > UINT32_MAX) {
     SetLastError(ERROR_NOT_SUPPORTED);
@@ -831,9 +831,10 @@ static pure fn is_batch_program(StringView path) wontthrow -> bool
          utils::ascii_to_lower(suffix[3]) == 't';
 }
 
-fn execute_program(ExecContext &ec, script_fallback_policy fallback,
-                   process_group_mode process_group, StringView,
-                   terminal_handoff handoff, i64 process_group_id) -> process
+fn execute_program(ExecContext &ec, StringView, i64 process_group_id,
+                   script_fallback_policy fallback,
+                   terminal_handoff handoff,
+                   process_group_mode process_group) -> process
 {
   let const allow_script_fallback = fallback == script_fallback_policy::Allow;
   unused(process_group_id);
@@ -1016,11 +1017,13 @@ fn execute_program(ExecContext &ec, script_fallback_policy fallback,
 
 static fn spawn_subshell_stage(
     StringView source, Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
-    Maybe<descriptor> err_fd, mimic_mood mood, process_group_mode process_group,
-    bool source_traces_enabled = true,
+    Maybe<descriptor> err_fd, bool source_traces_enabled = true,
     const subshell_bootstrap *bootstrap = nullptr, StringView shell_name = {},
     i32 previous_exit_status = 0, i64 shell_process_id = 0,
-    usize subshell_depth = 0) throws -> Maybe<process>;
+    usize subshell_depth = 0,
+    mimic_mood mood = mimic_mood::Default,
+    process_group_mode process_group = process_group_mode::Inherit) throws
+    -> Maybe<process>;
 
 static fn make_internal_pipe_path() throws -> String
 {
@@ -1124,14 +1127,15 @@ static fn send_internal_pipe(StringView path, StringView content,
   }
 }
 
-fn launch_process_substitution(StringView source, bool command_writes_pipe,
-                               mimic_mood mood, bool source_traces_enabled,
-                               const subshell_bootstrap *bootstrap,
-                               StringView shell_name, i32 previous_exit_status,
-                               i64 shell_process_id,
-                               usize subshell_depth) throws
+fn launch_process_substitution(
+    StringView source, bool source_traces_enabled,
+    const subshell_bootstrap *bootstrap, StringView shell_name,
+    i32 previous_exit_status, i64 shell_process_id, usize subshell_depth,
+    process_substitution_direction direction, mimic_mood mood) throws
     -> process_substitution_launch
 {
+  let const command_writes_pipe =
+      direction == process_substitution_direction::CommandWrites;
   let path = make_internal_pipe_path();
   let const wide_path = utf8_to_wide(path.view(), heap_allocator());
   if (!wide_path.has_value())
@@ -1165,9 +1169,9 @@ fn launch_process_substitution(StringView source, bool command_writes_pipe,
       unset_environment_variable(internal::CONNECT_NAMED_PIPE);
   };
   let const child = spawn_subshell_stage(
-      source, None, None, None, mood, process_group_mode::Inherit,
-      source_traces_enabled, bootstrap, shell_name, previous_exit_status,
-      shell_process_id, subshell_depth);
+      source, None, None, None, source_traces_enabled, bootstrap, shell_name,
+      previous_exit_status, shell_process_id, subshell_depth, mood,
+      process_group_mode::Inherit);
   if (!child.has_value())
     throw Error{"Unable to run the process substitution because the inner "
                 "shell could not be spawned: " +
@@ -1224,10 +1228,11 @@ fn release_unused_process_substitution(opaque *cleanup) wontthrow -> void
 
 static fn spawn_subshell_stage(
     StringView source, Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
-    Maybe<descriptor> err_fd, mimic_mood mood, process_group_mode process_group,
-    bool source_traces_enabled, const subshell_bootstrap *bootstrap,
+    Maybe<descriptor> err_fd, bool source_traces_enabled,
+    const subshell_bootstrap *bootstrap,
     StringView shell_name, i32 previous_exit_status, i64 shell_process_id,
-    usize subshell_depth) throws -> Maybe<process>
+    usize subshell_depth, mimic_mood mood, process_group_mode process_group)
+    throws -> Maybe<process>
 {
   /* Windows has no fork, so a compound pipeline stage re-parses its source in a
      fresh shell, returned unwaited for the pipeline to reap. */
@@ -1376,8 +1381,8 @@ static fn spawn_subshell_stage(
 
 fn try_fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
                            Maybe<descriptor> err_fd, SourceLocation location,
-                           StringView source, process_group_mode process_group,
-                           i64 process_group_id) -> Maybe<process>
+                           StringView source, i64 process_group_id,
+                           process_group_mode process_group) -> Maybe<process>
 {
   unused(in_fd);
   unused(out_fd);
@@ -1395,12 +1400,13 @@ fn can_fork_evaluator() wontthrow -> bool { return false; }
 
 fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
                          Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
-                         mimic_mood mood, SourceLocation location,
-                         StringView diagnostic_source,
-                         process_group_mode process_group, i64 process_group_id,
+                         SourceLocation location, StringView diagnostic_source,
+                         i64 process_group_id,
                          const subshell_bootstrap *bootstrap,
                          StringView shell_name, i32 previous_exit_status,
-                         i64 shell_process_id, usize subshell_depth) throws
+                         i64 shell_process_id, usize subshell_depth,
+                         mimic_mood mood, process_group_mode process_group)
+    throws
     -> compound_stage_launch
 {
   unused(diagnostic_source);
@@ -1411,8 +1417,9 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
 
   unused(process_group_id);
   let child = spawn_subshell_stage(
-      source, in_fd, out_fd, err_fd, mood, process_group, true, bootstrap,
-      shell_name, previous_exit_status, shell_process_id, subshell_depth);
+      source, in_fd, out_fd, err_fd, true, bootstrap, shell_name,
+      previous_exit_status, shell_process_id, subshell_depth, mood,
+      process_group);
   if (!child.has_value())
     throw ErrorWithLocation{steal(location),
                             "Could not spawn the compound pipeline stage"};
@@ -1435,7 +1442,7 @@ fn replace_process(ExecContext &&ec) -> void
      shell exits with its status. */
   LOG(Debug, "running '%s' to completion in place of an exec",
       ec.program_path().c_str());
-  process child = execute_program(ec, script_fallback_policy::Allow);
+  process child = execute_program(ec, {}, 0, script_fallback_policy::Allow);
   if (child == KOSH_INVALID_PROCESS) {
     redirect_self(ec);
     ec.close_fds();
@@ -2206,8 +2213,9 @@ run_measured_with_options(const ArrayList<String> &argv, measured_output output,
   return result;
 }
 
-fn run_measured(const ArrayList<String> &argv, measured_output output,
-                const Maybe<descriptor> &inherited_handle) throws
+fn run_measured(const ArrayList<String> &argv,
+                const Maybe<descriptor> &inherited_handle,
+                measured_output output) throws
     -> Maybe<measured_result>
 {
   windows_measured_launch_options options{};
