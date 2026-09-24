@@ -374,6 +374,35 @@ enum class shopt_option_id : u8
 inline constexpr StringView EXTDEBUG_SHOPT_OPTION{"extdebug"};
 pure fn shopt_option_index(shopt_option_id option) wontthrow -> u8;
 
+enum class BashArgumentFrameFlag : u8
+{
+  DidEnter = 1 << 0,
+  IsSource = 1 << 1,
+  HasSourceArguments = 1 << 2,
+};
+
+struct BashArgumentFrameContext
+{
+  BashArgumentFrameContext *previous{nullptr};
+  StringView source_path{};
+  u8 flags{0};
+
+  pure fn has_flag(BashArgumentFrameFlag flag) const wontthrow -> bool
+  {
+    return (flags & static_cast<u8>(flag)) != 0;
+  }
+  fn set_flag(BashArgumentFrameFlag flag) wontthrow -> void
+  {
+    flags |= static_cast<u8>(flag);
+  }
+};
+
+struct BashArgumentArrayStorage
+{
+  ArrayList<String> values{heap_allocator()};
+  ArrayList<u32> frame_counts{heap_allocator()};
+};
+
 class VariableStore
 {
 public:
@@ -475,6 +504,37 @@ public:
   {
     return m_directory_stack;
   }
+  fn bash_argument_arrays_ref() wontthrow -> BashArgumentArrayStorage *&
+  {
+    return m_bash_argument_arrays;
+  }
+  fn bash_argument_arrays_ref() const wontthrow -> BashArgumentArrayStorage *&
+  {
+    return m_bash_argument_arrays;
+  }
+  pure fn bash_argument_arrays() const wontthrow
+      -> BashArgumentArrayStorage *
+  {
+    return m_bash_argument_arrays;
+  }
+  fn bash_argument_arrays() wontthrow -> BashArgumentArrayStorage *
+  {
+    return m_bash_argument_arrays;
+  }
+  fn bash_argument_frame_context_ref() wontthrow
+      -> BashArgumentFrameContext *&
+  {
+    return m_bash_argument_frame_context;
+  }
+  pure fn bash_argument_frame_context() const wontthrow
+      -> BashArgumentFrameContext *
+  {
+    return m_bash_argument_frame_context;
+  }
+  fn bash_argument_frame_context() wontthrow -> BashArgumentFrameContext *
+  {
+    return m_bash_argument_frame_context;
+  }
 
 private:
   String m_field_separators{" \t\n"};
@@ -488,6 +548,8 @@ private:
   StringMap<u8> m_variable_attributes{heap_allocator()};
   ArrayList<String> m_positional_params{heap_allocator()};
   ArrayList<String> m_directory_stack{heap_allocator()};
+  mutable BashArgumentArrayStorage *m_bash_argument_arrays{nullptr};
+  BashArgumentFrameContext *m_bash_argument_frame_context{nullptr};
 };
 
 class CompletionStore
@@ -560,6 +622,24 @@ public:
   pure fn variable_store() const wontthrow -> const VariableStore &
   {
     return m_variable_store;
+  }
+  fn bash_argument_arrays() wontthrow -> BashArgumentArrayStorage *
+  {
+    return m_variable_store.bash_argument_arrays();
+  }
+  pure fn bash_argument_arrays() const wontthrow
+      -> BashArgumentArrayStorage *
+  {
+    return m_variable_store.bash_argument_arrays();
+  }
+  fn bash_argument_frame_context() wontthrow -> BashArgumentFrameContext *
+  {
+    return m_variable_store.bash_argument_frame_context();
+  }
+  pure fn bash_argument_frame_context() const wontthrow
+      -> BashArgumentFrameContext *
+  {
+    return m_variable_store.bash_argument_frame_context();
   }
   mustuse fn scratch_mark() const wontthrow -> BumpArena::Mark
   {
@@ -718,7 +798,7 @@ public:
   }
   pure fn bash_directory_stack_element_count() const wontthrow -> usize
   {
-    return m_directory_stack.count() + 1;
+    return directory_stack().count() + 1;
   }
   fn get_bash_directory_stack_element(usize index,
                                       Allocator allocator) const throws
@@ -1234,27 +1314,8 @@ public:
                              const FunctionBodyHandle &body_storage) throws
       -> void;
   fn pop_function_call_name() wontthrow -> void;
-  enum class BashArgumentFrameFlag : u8
-  {
-    DidEnter = 1 << 0,
-    IsSource = 1 << 1,
-    HasSourceArguments = 1 << 2,
-  };
-  struct BashArgumentFrameContext
-  {
-    BashArgumentFrameContext *previous{nullptr};
-    StringView source_path{};
-    u8 flags{0};
-
-    pure fn has_flag(BashArgumentFrameFlag flag) const wontthrow -> bool
-    {
-      return (flags & static_cast<u8>(flag)) != 0;
-    }
-    fn set_flag(BashArgumentFrameFlag flag) wontthrow -> void
-    {
-      flags |= static_cast<u8>(flag);
-    }
-  };
+  using BashArgumentFrameFlag = koshka::BashArgumentFrameFlag;
+  using BashArgumentFrameContext = koshka::BashArgumentFrameContext;
   fn enter_bash_function_argument_frame(
       BashArgumentFrameContext &frame_context,
       const ArrayList<String> &arguments) throws -> void;
@@ -2312,21 +2373,9 @@ protected:
   bool m_has_execution_string{false};
   String m_current_command{heap_allocator()};
   bool m_make_shell_suppressed{false};
-  ArrayList<String> m_positional_params{heap_allocator()};
-  struct BashArgumentArrayStorage
-  {
-    ArrayList<String> values{heap_allocator()};
-    ArrayList<u32> frame_counts{heap_allocator()};
-  };
   /* One pointer keeps unused Bash argument arrays out of every EvalContext.
      The lazily allocated object stores flattened values and one count per
      frame. */
-  mutable BashArgumentArrayStorage *m_bash_argument_arrays{nullptr};
-  BashArgumentFrameContext *m_bash_argument_frame_context{nullptr};
-  /* The saved directories below the current one, back is the top of the stack.
-     pushd appends the current directory, popd drops the back and moves to it.
-   */
-  ArrayList<String> m_directory_stack{heap_allocator()};
   StringMap<FunctionBodyHandle> m_functions{heap_allocator()};
   HashSet m_readonly_functions{heap_allocator()};
   usize m_subshell_depth{0};

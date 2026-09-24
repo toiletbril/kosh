@@ -784,8 +784,8 @@ fn EvalContext::apply_array_subscript(
             out.push(separator);
           }
           if (*which == DynamicArray::ArgumentValue) {
-            ASSERT(m_bash_argument_arrays != nullptr);
-            let const &values = m_bash_argument_arrays->values;
+            ASSERT(bash_argument_arrays() != nullptr);
+            let const &values = bash_argument_arrays()->values;
             out.append(values[values.count() - 1 - i].view());
           } else {
             out.append(
