@@ -307,14 +307,14 @@ cold static fn get_context_pointing_to(
   bool has_left_ellipsis = false;
   bool has_right_ellipsis = false;
 
-  u32 terminal_columns = 0;
-  u32 terminal_rows = 0;
+  let const terminal_dimensions = os::get_terminal_dimensions(KOSH_STDERR);
   if (display_cells > 24 && colors::stderr_is_a_terminal() &&
-      os::terminal_size(terminal_columns, terminal_rows, KOSH_STDERR) &&
-      terminal_columns > gutter_width + 24 &&
-      display_cells > terminal_columns - gutter_width)
+      terminal_dimensions.has_value() &&
+      terminal_dimensions->columns > gutter_width + 24 &&
+      display_cells > terminal_dimensions->columns - gutter_width)
   {
-    let const available_line_width = terminal_columns - gutter_width;
+    let const available_line_width =
+        terminal_dimensions->columns - gutter_width;
     let const caret_display_width = caret_width < 1 ? 1 : caret_width;
     let const half_window_width = available_line_width / 2;
     let const caret_center = caret_column + caret_display_width / 2;

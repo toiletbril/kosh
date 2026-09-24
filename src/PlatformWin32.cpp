@@ -1506,17 +1506,15 @@ pure fn is_directory_separator(char c) wontthrow -> bool
   return c == '/' || c == '\\';
 }
 
-fn terminal_size(u32 &columns, u32 &rows, descriptor output) wontthrow -> bool
+fn get_terminal_dimensions(descriptor output) wontthrow
+    -> Maybe<terminal_dimensions>
 {
   CONSOLE_SCREEN_BUFFER_INFO info;
-  if (GetConsoleScreenBufferInfo(output, &info) == 0) return false;
+  if (GetConsoleScreenBufferInfo(output, &info) == 0) return None;
   const i32 width = info.srWindow.Right - info.srWindow.Left + 1;
   const i32 height = info.srWindow.Bottom - info.srWindow.Top + 1;
-  if (width <= 0 || height <= 0) return false;
-  columns = static_cast<u32>(width);
-  rows = static_cast<u32>(height);
-
-  return true;
+  if (width <= 0 || height <= 0) return None;
+  return terminal_dimensions{static_cast<u32>(width), static_cast<u32>(height)};
 }
 
 fn terminal_settings(descriptor terminal, Allocator allocator,

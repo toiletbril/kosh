@@ -1608,15 +1608,14 @@ fn shell_fd_is_a_tty(int shell_fd) wontthrow -> bool
 
 pure fn is_directory_separator(char c) wontthrow -> bool { return c == '/'; }
 
-fn terminal_size(u32 &columns, u32 &rows, descriptor output) wontthrow -> bool
+fn get_terminal_dimensions(descriptor output) wontthrow
+    -> Maybe<terminal_dimensions>
 {
   LOG(Debug, "querying the terminal size");
   struct winsize window{};
-  if (ioctl(output, TIOCGWINSZ, &window) != 0) return false;
-  if (window.ws_col == 0 || window.ws_row == 0) return false;
-  columns = window.ws_col;
-  rows = window.ws_row;
-  return true;
+  if (ioctl(output, TIOCGWINSZ, &window) != 0) return None;
+  if (window.ws_col == 0 || window.ws_row == 0) return None;
+  return terminal_dimensions{window.ws_col, window.ws_row};
 }
 
 static pure fn terminal_speed_number(speed_t speed) wontthrow -> u32
@@ -1819,13 +1818,11 @@ fn terminal_settings(descriptor terminal, Allocator allocator,
   output += "speed ";
   output += String::from(terminal_speed_number(cfgetospeed(&state)), allocator);
   output += " baud; ";
-  u32 columns = 0;
-  u32 rows = 0;
-  if (terminal_size(columns, rows, terminal)) {
+  if (let const dimensions = get_terminal_dimensions(terminal)) {
     output += "rows ";
-    output += String::from(rows, allocator);
+    output += String::from(dimensions->rows, allocator);
     output += "; columns ";
-    output += String::from(columns, allocator);
+    output += String::from(dimensions->columns, allocator);
     output += "; ";
   }
   for (let const &entry : TERMINAL_FLAG_ENTRIES) {

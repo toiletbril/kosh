@@ -116,11 +116,12 @@ fn Tput::execute(const ExecContext &ec, EvalContext &cxt,
     return 0;
   }
   if (capability == "cols" || capability == "lines") {
-    u32 columns = 0;
-    u32 rows = 0;
-    if (!os::terminal_size(columns, rows, ec.out_fd.value_or(KOSH_STDOUT)))
+    let const dimensions =
+        os::get_terminal_dimensions(ec.out_fd.value_or(KOSH_STDOUT));
+    if (!dimensions.has_value())
       return 1;
-    let output = String::from(capability == "cols" ? columns : rows,
+    let output = String::from(capability == "cols" ? dimensions->columns
+                                                    : dimensions->rows,
                               cxt.scratch_allocator());
     output += '\n';
     ec.print_to_stdout(output);

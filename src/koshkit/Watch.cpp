@@ -160,10 +160,8 @@ fn Watch::execute(const ExecContext &ec, EvalContext &cxt,
   loop
   {
     u32 column_count = FALLBACK_COLUMN_COUNT;
-    u32 row_count = 0;
-    if (!os::terminal_size(column_count, row_count)) {
-      column_count = FALLBACK_COLUMN_COUNT;
-    }
+    if (let const dimensions = os::get_terminal_dimensions())
+      column_count = dimensions->columns;
 
     let const body =
         cxt.capture_command_substitution(command, StringView{"watch"});

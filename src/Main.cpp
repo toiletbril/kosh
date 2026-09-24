@@ -890,12 +890,13 @@ fn kosh_main(int argc, char **argv) -> int
      COLUMNS, such as ble.sh, sees a non-zero width. They are seeded once and
      not tracked across a later resize. */
   if (should_be_interactive) {
-    u32 columns = 0, rows = 0;
-    if (koshka::os::terminal_size(columns, rows)) {
+    if (let const dimensions = koshka::os::get_terminal_dimensions()) {
       context.set_shell_variable(
-          "COLUMNS", koshka::String::from(columns, koshka::heap_allocator()));
+          "COLUMNS", koshka::String::from(dimensions->columns,
+                                          koshka::heap_allocator()));
       context.set_shell_variable(
-          "LINES", koshka::String::from(rows, koshka::heap_allocator()));
+          "LINES", koshka::String::from(dimensions->rows,
+                                        koshka::heap_allocator()));
     }
   }
 
@@ -1256,14 +1257,14 @@ fn kosh_main(int argc, char **argv) -> int
            return push the prompt to a fresh line, and on a clean line the
            prompt overwrites the marker so nothing shows. */
         if (should_be_interactive) {
-          u32 marker_columns = 0, marker_rows = 0;
-          if (koshka::os::terminal_size(marker_columns, marker_rows) &&
-              marker_columns > 0)
+          if (let const dimensions =
+                  koshka::os::get_terminal_dimensions();
+              dimensions.has_value() && dimensions->columns > 0)
           {
             koshka::String eol_marker{koshka::heap_allocator()};
             /* One allocation holds the glyph, the fill spaces, and the controls
                so the fill loop never regrows the buffer. */
-            eol_marker.reserve(marker_columns + 12);
+            eol_marker.reserve(dimensions->columns + 12);
             if (koshka::colors::stdout_wants_color()) {
               eol_marker += koshka::colors::ansi::INVERSE;
               eol_marker += "\\n";
@@ -1273,7 +1274,7 @@ fn kosh_main(int argc, char **argv) -> int
             }
             /* The marker is the two-column \n glyph, so the fill starts at
                column two. */
-            for (u32 column = 2; column < marker_columns; column++)
+            for (u32 column = 2; column < dimensions->columns; column++)
               eol_marker.push(' ');
             eol_marker.push('\r');
             koshka::print(eol_marker);

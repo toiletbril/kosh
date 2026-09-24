@@ -519,10 +519,9 @@ static fn render_columns(const ArrayList<listing_entry> &entries,
   let const count = entries.count();
   if (count == 0) return;
 
-  u32 terminal_columns = 0;
-  u32 terminal_rows = 0;
+  let const terminal_dimensions = os::get_terminal_dimensions();
   let const is_terminal = !options.is_one_per_line &&
-                          os::terminal_size(terminal_columns, terminal_rows);
+                          terminal_dimensions.has_value();
   if (!is_terminal) {
     for (let const &entry : entries) {
       append_decorated_name(output, entry, options);
@@ -542,7 +541,7 @@ static fn render_columns(const ArrayList<listing_entry> &entries,
     widths.push(decorated_width(entry, options));
   }
 
-  const usize terminal_width = terminal_columns;
+  const usize terminal_width = terminal_dimensions->columns;
 
   /* A column-major grid puts the entry at column*rows+row. */
   usize shortest_name_length = widths.front();

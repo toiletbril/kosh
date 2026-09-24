@@ -864,12 +864,10 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
 
   let line_width_limit = SIZE_MAX;
   if (!FLAG_EVILPS_WIDE.is_enabled()) {
-    u32 terminal_columns = 0;
-    u32 terminal_rows = 0;
-    if (os::terminal_size(terminal_columns, terminal_rows,
-                          ec.out_fd.value_or(KOSH_STDOUT)) &&
-        terminal_columns > 8)
-      line_width_limit = terminal_columns;
+    if (let const dimensions =
+            os::get_terminal_dimensions(ec.out_fd.value_or(KOSH_STDOUT));
+        dimensions.has_value() && dimensions->columns > 8)
+      line_width_limit = dimensions->columns;
   }
 
   if (FLAG_EVILPS_LIVE.is_enabled()) {
@@ -938,13 +936,10 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
       if (now - last_sample_nanoseconds >= sample_interval_nanoseconds) {
         live_line_width_limit = line_width_limit;
         if (!FLAG_EVILPS_WIDE.is_enabled() && is_terminal) {
-          u32 terminal_columns = 0;
-          u32 terminal_rows = 0;
-          if (os::terminal_size(terminal_columns, terminal_rows,
-                                ec.out_fd.value_or(KOSH_STDOUT)) &&
-              terminal_columns > 8)
-            live_line_width_limit = terminal_columns;
-          unused(terminal_rows);
+          if (let const dimensions = os::get_terminal_dimensions(
+                  ec.out_fd.value_or(KOSH_STDOUT));
+              dimensions.has_value() && dimensions->columns > 8)
+            live_line_width_limit = dimensions->columns;
         }
         nodes = read_process_nodes(live_allocator, resource_mode);
         if (should_sample_cpu)
@@ -960,12 +955,11 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
         continue;
       }
       last_refresh_nanoseconds = now;
-      u32 terminal_rows = 0;
+      u32 terminal_rows = 24;
       if (is_terminal) {
-        u32 terminal_columns = 0;
-        if (!os::terminal_size(terminal_columns, terminal_rows,
-                               ec.out_fd.value_or(KOSH_STDOUT)))
-          terminal_rows = 24;
+        if (let const dimensions = os::get_terminal_dimensions(
+                ec.out_fd.value_or(KOSH_STDOUT)))
+          terminal_rows = dimensions->rows;
       }
       usize visible_line_count = 0;
       let frame = String{frame_allocator};

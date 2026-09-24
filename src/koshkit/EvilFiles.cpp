@@ -391,12 +391,10 @@ fn EvilFiles::execute(
   let output = String{allocator};
   usize line_width_limit = SIZE_MAX;
   if (!FLAG_EVILFILES_WIDE.is_enabled()) {
-    u32 terminal_columns = 0;
-    u32 terminal_rows = 0;
-    if (os::terminal_size(terminal_columns, terminal_rows,
-                          ec.out_fd.value_or(KOSH_STDOUT)) &&
-        terminal_columns > 8)
-      line_width_limit = terminal_columns;
+    if (let const dimensions =
+            os::get_terminal_dimensions(ec.out_fd.value_or(KOSH_STDOUT));
+        dimensions.has_value() && dimensions->columns > 8)
+      line_width_limit = dimensions->columns;
   }
   if (line_width_limit != SIZE_MAX) {
     let const fixed_width = 2 + widths.pid + 2 + widths.user + 2 +

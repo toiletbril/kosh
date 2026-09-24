@@ -1860,8 +1860,14 @@ fn realtime_microseconds() wontthrow -> u64;
 /* A negative epoch renders the current time, the bash -1 and -2 forms. */
 fn format_local_time(StringView format, i64 epoch) throws -> String;
 
-fn terminal_size(u32 &columns, u32 &rows,
-                 descriptor output = KOSH_STDOUT) wontthrow -> bool;
+struct terminal_dimensions
+{
+  u32 columns{0};
+  u32 rows{0};
+};
+
+fn get_terminal_dimensions(descriptor output = KOSH_STDOUT) wontthrow
+    -> Maybe<terminal_dimensions>;
 enum class terminal_settings_output_mode : u8
 {
   Normal,
