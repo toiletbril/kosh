@@ -722,13 +722,15 @@ fn set_quit_context(const EvalContext *context) wontthrow -> void
    other long-lived allocations the arenas do not own. */
 cold fn print_memory_report() wontthrow -> void
 {
-  if (AST_ARENA != nullptr)
+  if (QUIT_CONTEXT != nullptr && QUIT_CONTEXT->parse_arena() != nullptr)
     std::fprintf(stderr,
                  "AST arena: used %zu, reserved %zu, blocks %zu, destructors "
                  "%zu of %zu\n",
-                 AST_ARENA->bytes_used(), AST_ARENA->bytes_capacity(),
-                 AST_ARENA->block_count(), AST_ARENA->destructor_count(),
-                 AST_ARENA->destructor_capacity());
+                 QUIT_CONTEXT->parse_arena()->bytes_used(),
+                 QUIT_CONTEXT->parse_arena()->bytes_capacity(),
+                 QUIT_CONTEXT->parse_arena()->block_count(),
+                 QUIT_CONTEXT->parse_arena()->destructor_count(),
+                 QUIT_CONTEXT->parse_arena()->destructor_capacity());
   if (QUIT_CONTEXT != nullptr) {
     let const stats = QUIT_CONTEXT->function_storage_stats();
     std::fprintf(stderr,

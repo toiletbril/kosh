@@ -373,16 +373,16 @@ static fn edit_fc_commands(const ExecContext &ec, EvalContext &cxt,
   if (edited->is_empty()) return 0;
 
   edited->normalize_crlf_line_endings();
-  let const ast_mark = AST_ARENA->mark();
+  let const ast_mark = cxt.parse_arena()->mark();
   let const function_mark = FUNCTION_ARENA->mark();
   {
     defer
     {
       FUNCTION_ARENA->release(function_mark);
-      AST_ARENA->release(ast_mark);
+      cxt.parse_arena()->release(ast_mark);
     };
     let parser = Parser{
-        Lexer{edited->view(), *AST_ARENA, false, None, cxt.mood()}
+        Lexer{edited->view(), *cxt.parse_arena(), false, None, cxt.mood()}
     };
     unused(parser.construct_ast());
   }

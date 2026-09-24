@@ -1766,7 +1766,7 @@ cold fn EvalContext::make_stats_string() const throws -> String
   /* Stats print before end_command runs the rollup, so the live arena is
      sampled here. */
   const usize live_ast_arena_bytes =
-      AST_ARENA != nullptr ? AST_ARENA->bytes_used() : 0;
+      parse_arena() != nullptr ? parse_arena()->bytes_used() : 0;
   usize peak_ast_arena_bytes = m_peak_ast_arena_bytes;
   if (live_ast_arena_bytes > peak_ast_arena_bytes)
     peak_ast_arena_bytes = live_ast_arena_bytes;
