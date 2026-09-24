@@ -722,7 +722,7 @@ fn EvalContext::sorted_variable_assignments() const throws -> ArrayList<String>
   return assignments;
 }
 
-fn EvalContext::clear_functions() wontthrow -> void { m_functions.clear(); }
+fn EvalContext::clear_functions() wontthrow -> void { function_store().definitions().clear(); }
 
 fn EvalContext::snapshot_state() throws -> eval_state_snapshot
 {
@@ -742,7 +742,7 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       sparse_array_names(),
       m_shopt_option_overrides,
       m_shopt_option_values,
-      m_functions,
+      function_store().definitions(),
       m_aliases,
       positional_params(),
       bash_argument_arrays() != nullptr
@@ -807,7 +807,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   sparse_array_names() = steal(snapshot.sparse_array_names);
   m_shopt_option_overrides = snapshot.shopt_option_overrides;
   m_shopt_option_values = snapshot.shopt_option_values;
-  m_functions = steal(snapshot.functions);
+  function_store().definitions() = steal(snapshot.functions);
   m_aliases = steal(snapshot.aliases);
   positional_params() = steal(snapshot.positional_params);
   if (!snapshot.had_bash_argument_arrays) {

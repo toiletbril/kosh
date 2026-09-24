@@ -78,7 +78,7 @@ fn EvalContext::register_function(StringView name,
   ASSERT(body_storage.has_value());
   ASSERT(body_storage.get_body() != nullptr);
 
-  if (m_readonly_functions.contains(name)) {
+  if (function_store().readonly().contains(name)) {
     throw Error{"Unable to redefine '" + name +
                 "' because it is a read only function"};
   }
@@ -108,13 +108,13 @@ fn EvalContext::register_function(StringView name,
 
   LOG(Info, "registering function '%.*s' with a %zu byte definition",
       static_cast<int>(name.length), name.data, definition_text.length);
-  m_functions.set(name, body_storage);
+  function_store().definitions().set(name, body_storage);
 }
 
 fn EvalContext::function_definition_info_of(StringView name) const wontthrow
     -> const function_definition_info *
 {
-  let const *storage = m_functions.find(name);
+  let const *storage = function_store().definitions().find(name);
   return storage != nullptr ? storage->get_definition_info() : nullptr;
 }
 
@@ -181,15 +181,15 @@ pure fn EvalContext::source_text_in_span(const SourceLocation &location,
 fn EvalContext::find_function_source(StringView name) const wontthrow
     -> const String *
 {
-  let const *storage = m_functions.find(name);
+  let const *storage = function_store().definitions().find(name);
   return storage != nullptr ? storage->get_source() : nullptr;
 }
 
 fn EvalContext::sorted_function_names() const throws -> ArrayList<String>
 {
   let out = ArrayList<String>{heap_allocator()};
-  out.reserve(m_functions.count());
-  m_functions.for_each([&](StringView name, const FunctionBodyHandle &) {
+  out.reserve(function_store().definitions().count());
+  function_store().definitions().for_each([&](StringView name, const FunctionBodyHandle &) {
     out.push_managed(name);
   });
   out.sort();
@@ -199,19 +199,19 @@ fn EvalContext::sorted_function_names() const throws -> ArrayList<String>
 fn EvalContext::find_function(StringView name) const wontthrow
     -> const Expression *
 {
-  let const *storage = m_functions.find(name);
+  let const *storage = function_store().definitions().find(name);
   return storage != nullptr ? storage->get_body() : nullptr;
 }
 
 pure fn EvalContext::find_function_storage(StringView name) const wontthrow
     -> const FunctionBodyHandle *
 {
-  return m_functions.find(name);
+  return function_store().definitions().find(name);
 }
 
 pure fn EvalContext::has_functions() const wontthrow -> bool
 {
-  return m_functions.count() != 0;
+  return function_store().definitions().count() != 0;
 }
 
 pure fn EvalContext::function_storage_stats() const wontthrow
@@ -222,35 +222,35 @@ pure fn EvalContext::function_storage_stats() const wontthrow
 
 fn EvalContext::unset_function(StringView name) throws -> void
 {
-  if (m_readonly_functions.contains(name)) {
+  if (function_store().readonly().contains(name)) {
     throw Error{"Unable to unset '" + name +
                 "' because it is a read only function"};
   }
 
   LOG(Info, "unsetting function '%.*s'", static_cast<int>(name.length),
       name.data);
-  m_functions.erase(name);
+  function_store().definitions().erase(name);
 }
 
 fn EvalContext::mark_function_readonly(StringView name) throws -> void
 {
   LOG(Info, "marking function '%.*s' read only", static_cast<int>(name.length),
       name.data);
-  m_readonly_functions.add(name);
+  function_store().readonly().add(name);
 }
 
 pure fn EvalContext::is_function_readonly(StringView name) const wontthrow
     -> bool
 {
-  return m_readonly_functions.contains(name);
+  return function_store().readonly().contains(name);
 }
 
 fn EvalContext::sorted_readonly_function_names() const throws
     -> ArrayList<String>
 {
   let out = ArrayList<String>{heap_allocator()};
-  out.reserve(m_readonly_functions.count());
-  m_readonly_functions.for_each([&](StringView name) {
+  out.reserve(function_store().readonly().count());
+  function_store().readonly().for_each([&](StringView name) {
     if (find_function(name) != nullptr) out.push_managed(name);
   });
   out.sort();
@@ -261,7 +261,7 @@ fn EvalContext::sorted_readonly_function_names() const throws
 fn EvalContext::function_names() const throws -> HashSet
 {
   let names = HashSet{heap_allocator()};
-  m_functions.for_each([&](StringView name, const FunctionBodyHandle &storage) {
+  function_store().definitions().for_each([&](StringView name, const FunctionBodyHandle &storage) {
     unused(storage);
     names.add(name);
   });

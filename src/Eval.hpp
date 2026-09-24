@@ -574,6 +574,26 @@ private:
   Maybe<completion_spec> m_default_spec{};
 };
 
+class FunctionStore
+{
+public:
+  fn definitions() wontthrow -> StringMap<FunctionBodyHandle> &
+  {
+    return m_definitions;
+  }
+  pure fn definitions() const wontthrow
+      -> const StringMap<FunctionBodyHandle> &
+  {
+    return m_definitions;
+  }
+  fn readonly() wontthrow -> HashSet & { return m_readonly; }
+  pure fn readonly() const wontthrow -> const HashSet & { return m_readonly; }
+
+private:
+  StringMap<FunctionBodyHandle> m_definitions{heap_allocator()};
+  HashSet m_readonly{heap_allocator()};
+};
+
 class EvalContext
 {
 public:
@@ -617,6 +637,11 @@ public:
   pure fn function_arena() const wontthrow -> BumpArena *
   {
     return m_function_arena;
+  }
+  fn function_store() wontthrow -> FunctionStore & { return m_function_store; }
+  pure fn function_store() const wontthrow -> const FunctionStore &
+  {
+    return m_function_store;
   }
   fn variable_store() wontthrow -> VariableStore & { return m_variable_store; }
   pure fn variable_store() const wontthrow -> const VariableStore &
@@ -1044,7 +1069,8 @@ public:
   template <typename Callback>
   fn for_each_function_name(Callback callback) const throws -> void
   {
-    m_functions.for_each([&](StringView name, const FunctionBodyHandle &storage)
+    function_store().definitions().for_each(
+        [&](StringView name, const FunctionBodyHandle &storage)
                              throws {
                                unused(storage);
                                callback(name);
@@ -2376,8 +2402,7 @@ protected:
   /* One pointer keeps unused Bash argument arrays out of every EvalContext.
      The lazily allocated object stores flattened values and one count per
      frame. */
-  StringMap<FunctionBodyHandle> m_functions{heap_allocator()};
-  HashSet m_readonly_functions{heap_allocator()};
+  FunctionStore m_function_store{};
   usize m_subshell_depth{0};
   /* The shell descriptors the live coprocess is reached through, -1 when no
      coprocess runs. Only one coprocess is live at a time, the way bash counts
