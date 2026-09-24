@@ -952,7 +952,7 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
 
   defer
   {
-    m_indexed_arrays.erase("t__wordlist_fields");
+    indexed_arrays().erase("t__wordlist_fields");
     force_unset_shell_variable("t__wordlist_fields");
   };
   let fields = ArrayList<String>{heap_allocator()};

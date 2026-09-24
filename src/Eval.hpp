@@ -402,9 +402,50 @@ public:
             (u64{1} << (byte & 63))) != 0;
   }
 
+  fn indexed_arrays() wontthrow -> StringMap<ArrayList<String>> &
+  {
+    return m_indexed_arrays;
+  }
+  pure fn indexed_arrays() const wontthrow
+      -> const StringMap<ArrayList<String>> &
+  {
+    return m_indexed_arrays;
+  }
+  fn associative_names() wontthrow -> HashSet & { return m_associative_names; }
+  pure fn associative_names() const wontthrow -> const HashSet &
+  {
+    return m_associative_names;
+  }
+  fn associative_values() wontthrow -> StringMap<String> &
+  {
+    return m_associative_values;
+  }
+  pure fn associative_values() const wontthrow -> const StringMap<String> &
+  {
+    return m_associative_values;
+  }
+  fn sparse_array_values() wontthrow -> StringMap<String> &
+  {
+    return m_sparse_array_values;
+  }
+  pure fn sparse_array_values() const wontthrow -> const StringMap<String> &
+  {
+    return m_sparse_array_values;
+  }
+  fn sparse_array_names() wontthrow -> HashSet & { return m_sparse_array_names; }
+  pure fn sparse_array_names() const wontthrow -> const HashSet &
+  {
+    return m_sparse_array_names;
+  }
+
 private:
   String m_field_separators{" \t\n"};
   u64 m_field_separator_bits[4]{};
+  StringMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
+  HashSet m_associative_names{heap_allocator()};
+  StringMap<String> m_associative_values{heap_allocator()};
+  StringMap<String> m_sparse_array_values{heap_allocator()};
+  HashSet m_sparse_array_names{heap_allocator()};
 };
 
 class EvalContext
@@ -512,10 +553,51 @@ public:
                           StringView value, bool is_append) throws -> void;
   fn read_array_element_arithmetic_text(StringView name,
                                         StringView subscript) throws -> String;
+  fn indexed_arrays() wontthrow -> StringMap<ArrayList<String>> &
+  {
+    return m_variable_store.indexed_arrays();
+  }
+  pure fn indexed_arrays() const wontthrow
+      -> const StringMap<ArrayList<String>> &
+  {
+    return m_variable_store.indexed_arrays();
+  }
+  fn associative_names() wontthrow -> HashSet &
+  {
+    return m_variable_store.associative_names();
+  }
+  pure fn associative_names() const wontthrow -> const HashSet &
+  {
+    return m_variable_store.associative_names();
+  }
+  fn associative_values() wontthrow -> StringMap<String> &
+  {
+    return m_variable_store.associative_values();
+  }
+  pure fn associative_values() const wontthrow -> const StringMap<String> &
+  {
+    return m_variable_store.associative_values();
+  }
+  fn sparse_array_values() wontthrow -> StringMap<String> &
+  {
+    return m_variable_store.sparse_array_values();
+  }
+  pure fn sparse_array_values() const wontthrow -> const StringMap<String> &
+  {
+    return m_variable_store.sparse_array_values();
+  }
+  fn sparse_array_names() wontthrow -> HashSet &
+  {
+    return m_variable_store.sparse_array_names();
+  }
+  pure fn sparse_array_names() const wontthrow -> const HashSet &
+  {
+    return m_variable_store.sparse_array_names();
+  }
   pure fn lookup_indexed_array(StringView name) const wontthrow
       -> const ArrayList<String> *
   {
-    return m_indexed_arrays.find(name);
+    return indexed_arrays().find(name);
   }
 
   /* The bash associative arrays. The values live in one flat map under a
@@ -523,7 +605,7 @@ public:
   fn declare_associative_array(StringView name) throws -> void;
   pure fn is_associative_array(StringView name) const wontthrow -> bool
   {
-    return m_associative_names.contains(name) || is_bash_aliases_special(name);
+    return associative_names().contains(name) || is_bash_aliases_special(name);
   }
   pure fn is_bash_special_array_active(bash_special_array_id id) const wontthrow
       -> bool
@@ -652,8 +734,8 @@ public:
   hot fn has_variable_name(StringView name) const throws -> bool
   {
     return m_shell_variables.find(name) != nullptr ||
-           m_indexed_arrays.find(name) != nullptr ||
-           m_associative_names.contains(name) || is_exported(name) ||
+           indexed_arrays().find(name) != nullptr ||
+           associative_names().contains(name) || is_exported(name) ||
            variable_requires_dynamic_lookup(name);
   }
 
@@ -2098,16 +2180,11 @@ protected:
   StringMap<String> m_shell_variables{heap_allocator()};
   StringMap<SourceLocation> m_special_variable_definition_locations{
       heap_allocator()};
-  StringMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
   StringMap<completion_spec> m_completion_specs{heap_allocator()};
   Maybe<completion_spec> m_default_completion_spec{};
-  HashSet m_associative_names{heap_allocator()};
-  StringMap<String> m_associative_values{heap_allocator()};
   /* An indexed array element whose subscript is past the dense limit, held by
      its name and decimal index so a sparse far subscript does not pad a huge
      dense gap. The name still reads as indexed. */
-  StringMap<String> m_sparse_array_values{heap_allocator()};
-  HashSet m_sparse_array_names{heap_allocator()};
   u64 m_shopt_option_overrides{0};
   u64 m_shopt_option_values{0};
   /* The compiled form of each [[ =~ ]] pattern, keyed by the pattern text, so a

@@ -96,7 +96,7 @@ fn EvalContext::run_completion_function(StringView function_name,
 
     m_shell_variables.erase(name);
     clear_sparse_array(name);
-    let &storage = m_indexed_arrays.get_or_create(
+    let &storage = indexed_arrays().get_or_create(
         name, ArrayList<String>{heap_allocator()});
     storage.clear();
 
@@ -182,7 +182,7 @@ fn EvalContext::run_completion_function(StringView function_name,
   if (has_pending_control_flow()) clear_control_flow();
 
   let result = ArrayList<String>{heap_allocator()};
-  if (ArrayList<String> *reply = m_indexed_arrays.find("COMPREPLY");
+  if (ArrayList<String> *reply = indexed_arrays().find("COMPREPLY");
       !was_interrupted && reply != nullptr)
   {
     result = steal(*reply);

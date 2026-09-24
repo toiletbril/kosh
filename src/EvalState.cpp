@@ -681,10 +681,10 @@ fn EvalContext::suggest_similar_variable_name(StringView name) const throws
   m_shell_variables.for_each(
       [&suggestion](StringView candidate, const String &)
           throws -> void { suggestion.consider(candidate); });
-  m_indexed_arrays.for_each(
+  indexed_arrays().for_each(
       [&suggestion](StringView candidate, const ArrayList<String> &)
           throws -> void { suggestion.consider(candidate); });
-  m_associative_names.for_each(
+  associative_names().for_each(
       [&suggestion](StringView candidate)
           throws -> void { suggestion.consider(candidate); });
   /* A case-sensitive environment types the value as Nothing. The generic
@@ -733,13 +733,13 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
   let snapshot = eval_state_snapshot{
       m_shell_variables,
       m_special_variable_definition_locations,
-      m_indexed_arrays,
+      indexed_arrays(),
       m_completion_specs,
       m_default_completion_spec,
-      m_associative_names,
-      m_associative_values,
-      m_sparse_array_values,
-      m_sparse_array_names,
+      associative_names(),
+      associative_values(),
+      sparse_array_values(),
+      sparse_array_names(),
       m_shopt_option_overrides,
       m_shopt_option_values,
       m_functions,
@@ -798,13 +798,13 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_shell_variables = steal(snapshot.shell_variables);
   m_special_variable_definition_locations =
       steal(snapshot.special_variable_definition_locations);
-  m_indexed_arrays = steal(snapshot.indexed_arrays);
+  indexed_arrays() = steal(snapshot.indexed_arrays);
   m_completion_specs = steal(snapshot.completion_specs);
   m_default_completion_spec = steal(snapshot.default_completion_spec);
-  m_associative_names = steal(snapshot.associative_names);
-  m_associative_values = steal(snapshot.associative_values);
-  m_sparse_array_values = steal(snapshot.sparse_array_values);
-  m_sparse_array_names = steal(snapshot.sparse_array_names);
+  associative_names() = steal(snapshot.associative_names);
+  associative_values() = steal(snapshot.associative_values);
+  sparse_array_values() = steal(snapshot.sparse_array_values);
+  sparse_array_names() = steal(snapshot.sparse_array_names);
   m_shopt_option_overrides = snapshot.shopt_option_overrides;
   m_shopt_option_values = snapshot.shopt_option_values;
   m_functions = steal(snapshot.functions);

@@ -435,8 +435,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 
   /* A read of an array name with no scalar yields element zero, the way bash
      treats $a as ${a[0]}. */
-  if (m_indexed_arrays.count() != 0)
-    if (let const *array = m_indexed_arrays.find(name); array != nullptr) {
+  if (indexed_arrays().count() != 0)
+    if (let const *array = indexed_arrays().find(name); array != nullptr) {
       if (array->is_empty()) return koshka::None;
       return array->front();
     }

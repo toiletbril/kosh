@@ -428,7 +428,7 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
   let const should_disable_bash_directory_stack =
       is_bash_directory_stack_special(name);
   force_unset_shell_variable(name);
-  m_indexed_arrays.erase(name);
+  indexed_arrays().erase(name);
   clear_sparse_array(name);
   clear_associative_array(name);
   if (should_disable_bash_aliases)
@@ -483,10 +483,10 @@ fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
       m_special_variable_definition_locations.erase(binding.name.view());
   }
   if (binding.previous_indexed_array.has_value())
-    m_indexed_arrays.set(binding.name.view(),
+    indexed_arrays().set(binding.name.view(),
                          steal(*binding.previous_indexed_array));
   else
-    m_indexed_arrays.erase(binding.name.view());
+    indexed_arrays().erase(binding.name.view());
   let const was_restricted = restricted_enforcement_active();
   m_runtime.set_option(shell_option_id::Restricted, false);
   m_variable_attributes.erase(binding.name.view());
@@ -537,13 +537,13 @@ fn EvalContext::set_indexed_array(StringView name,
       apply_variable_case(name, value);
   m_shell_variables.erase(name);
   clear_sparse_array(name);
-  m_indexed_arrays.set(name, steal(values));
+  indexed_arrays().set(name, steal(values));
 }
 
 fn EvalContext::publish_pipe_statuses(ArrayList<String> values) throws -> void
 {
   if (is_readonly("PIPESTATUS")) {
-    if (let *current = m_indexed_arrays.find("PIPESTATUS"); current != nullptr)
+    if (let *current = indexed_arrays().find("PIPESTATUS"); current != nullptr)
       *current = steal(values);
 
     return;
@@ -554,11 +554,11 @@ fn EvalContext::publish_pipe_statuses(ArrayList<String> values) throws -> void
 
 fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
 {
-  let *existing = m_indexed_arrays.find("PIPESTATUS");
+  let *existing = indexed_arrays().find("PIPESTATUS");
   if (existing == nullptr && is_readonly("PIPESTATUS")) return;
 
   if (existing != nullptr && existing->count() == 1 &&
-      !m_sparse_array_names.contains("PIPESTATUS"))
+      !sparse_array_names().contains("PIPESTATUS"))
   {
     m_shell_variables.erase("PIPESTATUS");
     char status_text_buffer[32];
@@ -571,7 +571,7 @@ fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
 
   m_shell_variables.erase("PIPESTATUS");
   clear_sparse_array("PIPESTATUS");
-  let &values = m_indexed_arrays.get_or_create(
+  let &values = indexed_arrays().get_or_create(
       "PIPESTATUS", ArrayList<String>{heap_allocator()});
   values.clear();
   values.push(String::from(status, values.allocator()));
@@ -582,7 +582,7 @@ fn EvalContext::append_indexed_array(StringView name,
 {
   if (is_write_discarded_dynamic_variable(name)) return;
 
-  if (let *existing = m_indexed_arrays.find(name); existing != nullptr) {
+  if (let *existing = indexed_arrays().find(name); existing != nullptr) {
     LOG(All, "appending %zu elements to the existing array '%.*s'",
         values.count(), static_cast<int>(name.length), name.data);
     if (is_readonly(name))
@@ -930,8 +930,8 @@ fn EvalContext::unmark_exported(StringView name) throws -> void
 fn EvalContext::unexport_shell_variable(StringView name) throws -> void
 {
   let const has_shell_binding = m_shell_variables.find(name) != nullptr ||
-                                m_indexed_arrays.find(name) != nullptr ||
-                                m_associative_names.contains(name) ||
+                                indexed_arrays().find(name) != nullptr ||
+                                associative_names().contains(name) ||
                                 is_local_in_current_scope(name) ||
                                 variable_requires_dynamic_lookup(name);
   let const environment_value =

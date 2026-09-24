@@ -278,12 +278,12 @@ fn EvalContext::variable_names(Allocator result_allocator) const throws
   });
   /* An indexed or associative array is a set variable too, so its name joins
      the scalar names. */
-  m_indexed_arrays.for_each(
+  indexed_arrays().for_each(
       [&](StringView name, const ArrayList<String> &value) {
         unused(value);
         names.add(name);
       });
-  m_associative_names.for_each([&](StringView name) { names.add(name); });
+  associative_names().for_each([&](StringView name) { names.add(name); });
   if (bash_dynamic_variables_enabled()) {
     names.add(BASH_ARGUMENT_COUNT_VARIABLE);
     names.add(BASH_ARGUMENT_VALUE_VARIABLE);
@@ -377,7 +377,7 @@ fn EvalContext::run_named_trap(StringView condition,
   };
 
   let const saved_exit_status = m_last_exit_status;
-  let const *current_pipe_statuses = m_indexed_arrays.find("PIPESTATUS");
+  let const *current_pipe_statuses = indexed_arrays().find("PIPESTATUS");
   let const has_saved_pipe_statuses = current_pipe_statuses != nullptr;
   ArrayList<String> saved_pipe_statuses{heap_allocator()};
   if (has_saved_pipe_statuses)
@@ -424,17 +424,17 @@ fn EvalContext::restore_trap_pipe_statuses(
 {
   try {
     if (!has_saved_pipe_statuses) {
-      m_indexed_arrays.erase("PIPESTATUS");
+      indexed_arrays().erase("PIPESTATUS");
       return;
     }
 
-    if (let *current = m_indexed_arrays.find("PIPESTATUS"); current != nullptr)
+    if (let *current = indexed_arrays().find("PIPESTATUS"); current != nullptr)
     {
       *current = steal(saved_pipe_statuses);
       return;
     }
 
-    m_indexed_arrays.set("PIPESTATUS", steal(saved_pipe_statuses));
+    indexed_arrays().set("PIPESTATUS", steal(saved_pipe_statuses));
   } catch (...) {
     LOG(Info, "the PIPESTATUS restore of a trap action could not allocate");
   }
@@ -659,7 +659,7 @@ fn EvalContext::run_pending_traps() throws -> void
   }
 
   let const saved_exit_status = m_last_exit_status;
-  let const *current_pipe_statuses = m_indexed_arrays.find("PIPESTATUS");
+  let const *current_pipe_statuses = indexed_arrays().find("PIPESTATUS");
   let const has_saved_pipe_statuses = current_pipe_statuses != nullptr;
   ArrayList<String> saved_pipe_statuses{heap_allocator()};
   if (has_saved_pipe_statuses)
@@ -771,7 +771,7 @@ cold fn EvalContext::run_exit_trap(Maybe<i32> final_status) throws -> void
   defer { m_trap_action_depth -= 1; };
 
   let const saved_exit_status = m_last_exit_status;
-  let const *current_pipe_statuses = m_indexed_arrays.find("PIPESTATUS");
+  let const *current_pipe_statuses = indexed_arrays().find("PIPESTATUS");
   let const has_saved_pipe_statuses = current_pipe_statuses != nullptr;
   ArrayList<String> saved_pipe_statuses{heap_allocator()};
   if (has_saved_pipe_statuses)
@@ -827,7 +827,7 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> Maybe<i32>
   defer { m_trap_action_depth -= 1; };
 
   let const saved_exit_status = m_last_exit_status;
-  let const *current_pipe_statuses = m_indexed_arrays.find("PIPESTATUS");
+  let const *current_pipe_statuses = indexed_arrays().find("PIPESTATUS");
   let const has_saved_pipe_statuses = current_pipe_statuses != nullptr;
   ArrayList<String> saved_pipe_statuses{heap_allocator()};
   if (has_saved_pipe_statuses)
