@@ -9,11 +9,11 @@
 
 #pragma once
 
+#include "Completion.hpp"
+#include "Eval.hpp"
 #include "base/Allocator.hpp"
 #include "base/Arena.hpp"
-#include "Completion.hpp"
 #include "base/Containers.hpp"
-#include "Eval.hpp"
 #include "base/HashSet.hpp"
 #include "base/String.hpp"
 #include "base/StringView.hpp"
@@ -111,8 +111,7 @@ fn manpage_text_for(StringView page_name, EvalContext &context) throws
     -> StringView;
 fn help_text_of(StringView command, EvalContext &context) throws -> StringView;
 fn complete_from_man_subcommands(StringView line, StringView token,
-                                 usize token_start,
-                                 EvalContext &context,
+                                 usize token_start, EvalContext &context,
                                  completion::completion_mode mode) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_manpage(StringView line, StringView token,
@@ -124,8 +123,7 @@ fn complete_from_help(StringView line, StringView token, usize token_start,
                       completion::completion_mode mode) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_help_subcommands(StringView line, StringView token,
-                                  usize token_start,
-                                  EvalContext &context,
+                                  usize token_start, EvalContext &context,
                                   StringMap<String> &descriptions,
                                   completion::completion_mode mode) throws
     -> Maybe<ArrayList<String>>;
@@ -136,13 +134,11 @@ fn complete_from_process_arguments(StringView line, StringView token,
                                    completion::completion_mode mode) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_tools_with_targets(StringView line, StringView token,
-                                    usize token_start,
-                                    EvalContext &context,
+                                    usize token_start, EvalContext &context,
                                     completion::completion_mode mode) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_builtin_flags(StringView line, StringView token,
-                               usize token_start,
-                               EvalContext &context,
+                               usize token_start, EvalContext &context,
                                completion::completion_mode mode) throws
     -> Maybe<ArrayList<String>>;
 fn complete_from_spec(StringView line, StringView token, usize cursor,

@@ -10,10 +10,10 @@
 #include "../CLI.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
-#include "../base/Path.hpp"
 #include "../Platform.hpp"
-#include "../base/Trace.hpp"
 #include "../Utils.hpp"
+#include "../base/Path.hpp"
+#include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
 
@@ -245,9 +245,7 @@ fn Cd::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   } else {
     let raw_logical_target = Path{};
     let logical_operand = target.view();
-    if (target.is_absolute() ||
-        os::path_is_drive_relative(target.view()))
-    {
+    if (target.is_absolute() || os::path_is_drive_relative(target.view())) {
       raw_logical_target = target.to_absolute_without_normalizing();
     } else {
       old_directory = logical_working_directory(cxt);

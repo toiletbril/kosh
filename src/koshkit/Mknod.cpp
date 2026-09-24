@@ -18,7 +18,8 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-m mode] [--type type --major N --minor N] name [type [major minor]]");
+HELP_SYNOPSIS_DECL(
+    "[-m mode] [--type type --major N --minor N] name [type [major minor]]");
 HELP_DESCRIPTION_DECL(
     "The mknod utility creates FIFO, character, and block special files.\n"
     "Examples: mknod pipe p; mknod --fifo pipe; "
@@ -45,10 +46,13 @@ static constexpr u32 CHARACTER_TYPE = 0020000;
 static constexpr u32 BLOCK_TYPE = 0060000;
 
 static constexpr static_string_entry<u32> NODE_TYPE_ENTRIES[] = {
-    {SSK("b"), BLOCK_TYPE},       {SSK("block"), BLOCK_TYPE},
-    {SSK("c"), CHARACTER_TYPE},   {SSK("char"), CHARACTER_TYPE},
+    {SSK("b"),         BLOCK_TYPE    },
+    {SSK("block"),     BLOCK_TYPE    },
+    {SSK("c"),         CHARACTER_TYPE},
+    {SSK("char"),      CHARACTER_TYPE},
     {SSK("character"), CHARACTER_TYPE},
-    {SSK("fifo"), FIFO_TYPE},     {SSK("p"), FIFO_TYPE},
+    {SSK("fifo"),      FIFO_TYPE     },
+    {SSK("p"),         FIFO_TYPE     },
 };
 static constexpr StaticStringMap NODE_TYPES{NODE_TYPE_ENTRIES};
 
@@ -75,7 +79,7 @@ fn Mknod::execute(const ExecContext &ec, EvalContext &cxt,
                   const ArrayList<SourceLocation> &arg_locations) const throws
     -> i32
 {
-  let const [operands, operand_locations] = parse_util_operands(
+  let const[operands, operand_locations] = parse_util_operands(
       FLAG_LIST, args, cxt.scratch_allocator(), &arg_locations);
   defer { reset_flags(FLAG_LIST); };
 
@@ -91,15 +95,14 @@ fn Mknod::execute(const ExecContext &ec, EvalContext &cxt,
       static_cast<usize>(FLAG_MKNOD_CHARACTER.is_enabled()) +
       static_cast<usize>(FLAG_MKNOD_BLOCK.is_enabled());
   if (named_type_count > 1) {
-    KOSHKIT_REPORT_ERROR_AT(FLAG_MKNOD_TYPE.is_set()
-                                ? FLAG_MKNOD_TYPE.value_location()
-                                : FLAG_MKNOD_FIFO.is_enabled()
-                                      ? FLAG_MKNOD_FIFO.value_location()
-                                      : FLAG_MKNOD_CHARACTER.is_enabled()
-                                            ? FLAG_MKNOD_CHARACTER.value_location()
-                                            : FLAG_MKNOD_BLOCK.value_location(),
-                            "Conflicting node types",
-                            "choose one of --type, --fifo, --character, or --block");
+    KOSHKIT_REPORT_ERROR_AT(
+        FLAG_MKNOD_TYPE.is_set()       ? FLAG_MKNOD_TYPE.value_location()
+        : FLAG_MKNOD_FIFO.is_enabled() ? FLAG_MKNOD_FIFO.value_location()
+        : FLAG_MKNOD_CHARACTER.is_enabled()
+            ? FLAG_MKNOD_CHARACTER.value_location()
+            : FLAG_MKNOD_BLOCK.value_location(),
+        "Conflicting node types",
+        "choose one of --type, --fifo, --character, or --block");
     return 1;
   }
   if (FLAG_MKNOD_TYPE.is_set()) {
@@ -126,8 +129,8 @@ fn Mknod::execute(const ExecContext &ec, EvalContext &cxt,
   let const type = node_type(type_text);
   if (!type.has_value()) {
     KOSHKIT_REPORT_ERROR_AT(type_location,
-                            "Invalid node type '" + String{allocator, type_text} +
-                                "'",
+                            "Invalid node type '" +
+                                String{allocator, type_text} + "'",
                             "use p, c, b, fifo, character, or block");
     return 1;
   }
@@ -226,10 +229,8 @@ fn Mknod::execute(const ExecContext &ec, EvalContext &cxt,
   u32 mode = 0666;
   if (FLAG_MKNOD_MODE.is_set()) {
     let const parsed = parse_file_mode(FLAG_MKNOD_MODE.value(), mode, 0, false);
-    if (!parsed.has_value())
-    {
-      KOSHKIT_REPORT_ERROR_AT(FLAG_MKNOD_MODE.value_location(),
-                              "Invalid mode",
+    if (!parsed.has_value()) {
+      KOSHKIT_REPORT_ERROR_AT(FLAG_MKNOD_MODE.value_location(), "Invalid mode",
                               "use an octal or symbolic permission mode");
       return 1;
     }

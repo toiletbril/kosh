@@ -10,11 +10,11 @@
 
 #pragma once
 
-#include "base/Common.hpp"
 #include "Diagnostics.hpp"
 #include "Eval.hpp"
 #include "Formatter.hpp"
 #include "Tokens.hpp"
+#include "base/Common.hpp"
 
 namespace koshka {
 

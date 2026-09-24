@@ -62,8 +62,8 @@ fn Unexpand::execute(
 
   let tab_stops = ArrayList<usize>{cxt.scratch_allocator()};
   if (FLAG_UNEXPAND_TABS.is_set()) {
-    let const parsed = utils::parse_tab_stop_list(
-        FLAG_UNEXPAND_TABS.value(), cxt.scratch_allocator());
+    let const parsed = utils::parse_tab_stop_list(FLAG_UNEXPAND_TABS.value(),
+                                                  cxt.scratch_allocator());
     if (!parsed.has_value()) {
       KOSHKIT_REPORT_ERROR_AT(
           FLAG_UNEXPAND_TABS.value_location(), "invalid tab list",

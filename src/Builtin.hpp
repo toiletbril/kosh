@@ -12,10 +12,10 @@
 #pragma once
 
 #include "CLI.hpp"
-#include "base/Common.hpp"
-#include "base/Maybe.hpp"
 #include "MimicMood.hpp"
 #include "Platform.hpp"
+#include "base/Common.hpp"
+#include "base/Maybe.hpp"
 
 namespace koshka {
 

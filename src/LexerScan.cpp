@@ -7,15 +7,15 @@
  * substitutions and heredoc bodies without running the full parser.
  */
 
-#include "base/Arena.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Lexer.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 

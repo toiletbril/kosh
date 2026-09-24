@@ -77,8 +77,7 @@ fn batch_operation::exists(const Path &path) wontthrow -> batch_operation
 Batch::Batch(Allocator allocator)
     : m_operations(allocator), m_canonical_positions(allocator),
       m_buckets(allocator), m_optimized_operations(allocator)
-{
-}
+{}
 
 fn Batch::reserve(usize operation_count) throws -> void
 {
@@ -259,8 +258,7 @@ fn Batch::execute(ArrayList<batch_result> &results,
   for (usize index = 0; index < m_operations.count(); index++) {
     let const canonical_position = m_canonical_positions[index];
     if (canonical_position != index) {
-      m_canonical_positions[index] =
-          m_canonical_positions[canonical_position];
+      m_canonical_positions[index] = m_canonical_positions[canonical_position];
       continue;
     }
 
@@ -289,8 +287,7 @@ fn Batch::execute(ArrayList<batch_result> &results,
     results[index] = result;
 
     let const &operation = m_operations[index];
-    let const &optimized_operation =
-        m_optimized_operations[optimized_position];
+    let const &optimized_operation = m_optimized_operations[optimized_position];
     let *status = batch_internal::batch_operation_access::get_status(operation);
     let *optimized_status =
         batch_internal::batch_operation_access::get_status(optimized_operation);

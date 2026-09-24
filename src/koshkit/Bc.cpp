@@ -455,7 +455,7 @@ enum class bc_flow : u8
 
 static constexpr static_string_entry<bc_flow> BC_CONTROL_FLOW_ENTRIES[] = {
     {SSK("break"), bc_flow::Break},
-    {SSK("quit"), bc_flow::Quit},
+    {SSK("quit"),  bc_flow::Quit },
 };
 static constexpr StaticStringMap BC_CONTROL_FLOW{BC_CONTROL_FLOW_ENTRIES};
 

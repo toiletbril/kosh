@@ -91,8 +91,8 @@ enum class nl_number_format : uchar
 };
 
 static fn append_nl_number(String &output, i64 number, usize width,
-                           StringView separator,
-                           nl_number_format format) throws -> void
+                           StringView separator, nl_number_format format) throws
+    -> void
 {
   let const digits = String::from(number, output.allocator());
   let const padding = width > digits.length() ? width - digits.length() : 0;

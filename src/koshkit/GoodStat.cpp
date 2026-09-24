@@ -11,8 +11,8 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../base/Path.hpp"
 #include "../Platform.hpp"
+#include "../base/Path.hpp"
 
 FLAG_LIST_DECL();
 
@@ -172,16 +172,14 @@ fn append_subject(String &output, StringView operand,
                   colors::ansi::BOLD_CYAN, should_color);
   do_append_field("Permissions", permission_text(status.mode, allocator).view(),
                   colors::ansi::BOLD_CYAN, should_color);
-  do_append_field("Owner",
-                  id_name(status.owner_id, allocator,
-                          goodstat_identity_kind::User)
-                      .view(),
-                  colors::ansi::BOLD_CYAN, should_color);
-  do_append_field("Group",
-                  id_name(status.group_id, allocator,
-                          goodstat_identity_kind::Group)
-                      .view(),
-                  colors::ansi::BOLD_CYAN, should_color);
+  do_append_field(
+      "Owner",
+      id_name(status.owner_id, allocator, goodstat_identity_kind::User).view(),
+      colors::ansi::BOLD_CYAN, should_color);
+  do_append_field(
+      "Group",
+      id_name(status.group_id, allocator, goodstat_identity_kind::Group).view(),
+      colors::ansi::BOLD_CYAN, should_color);
   do_append_field("Inode", String::from(status.file_id, allocator).view(),
                   colors::ansi::BOLD_CYAN, should_color);
   do_append_field("Links", String::from(status.link_count, allocator).view(),
@@ -289,14 +287,12 @@ fn GoodStat::execute(
   }
 
   let const should_color = koshkit_should_color();
-  let const filesystem_report =
-      FLAG_GOODSTAT_FILESYSTEM.is_enabled()
-          ? goodstat_filesystem_report::Include
-          : goodstat_filesystem_report::Omit;
-  let const checksum_report =
-      FLAG_GOODSTAT_CHECKSUM.is_enabled()
-          ? goodstat_checksum_report::Include
-          : goodstat_checksum_report::Omit;
+  let const filesystem_report = FLAG_GOODSTAT_FILESYSTEM.is_enabled()
+                                    ? goodstat_filesystem_report::Include
+                                    : goodstat_filesystem_report::Omit;
+  let const checksum_report = FLAG_GOODSTAT_CHECKSUM.is_enabled()
+                                  ? goodstat_checksum_report::Include
+                                  : goodstat_checksum_report::Omit;
 
   let const allocator = cxt.scratch_allocator();
   let output = String{allocator};

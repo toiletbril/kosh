@@ -12,11 +12,11 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../base/Path.hpp"
 #include "../Platform.hpp"
 #include "../StaticStringMap.hpp"
-#include "../base/Trace.hpp"
 #include "../Utils.hpp"
+#include "../base/Path.hpp"
+#include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
 
@@ -284,8 +284,7 @@ make_entry(const Path &path, StringView name, const listing_options &options,
   }
 
   os::file_status status{};
-  if (os::stat_path(path.view(), status))
-    set_entry_status(entry, status);
+  if (os::stat_path(path.view(), status)) set_entry_status(entry, status);
 
   return entry;
 }
@@ -522,9 +521,8 @@ static fn render_columns(const ArrayList<listing_entry> &entries,
 
   u32 terminal_columns = 0;
   u32 terminal_rows = 0;
-  let const is_terminal =
-      !options.is_one_per_line &&
-      os::terminal_size(terminal_columns, terminal_rows);
+  let const is_terminal = !options.is_one_per_line &&
+                          os::terminal_size(terminal_columns, terminal_rows);
   if (!is_terminal) {
     for (let const &entry : entries) {
       append_decorated_name(output, entry, options);
@@ -682,7 +680,8 @@ static fn render_directory_block(
   if (os::INTERRUPT_REQUESTED) return;
   ArrayList<listing_entry> entries{allocator};
   if (!collect_directory(Path{directory, allocator}, options, allocator,
-                         entries)) {
+                         entries))
+  {
     report_soft_koshkit_util_error(ec, cxt, "ls",
                                    "cannot open directory '" +
                                        String{allocator, directory} + "'");
@@ -712,9 +711,9 @@ static fn render_directory_block(
 
     let child = Path{directory, allocator};
     child.append(entry.name.view());
-    render_directory_block(child.view(), options, depth + 1, true,
-                           uid_cache, gid_cache, has_printed_block, output, ec,
-                           cxt, status, allocator);
+    render_directory_block(child.view(), options, depth + 1, true, uid_cache,
+                           gid_cache, has_printed_block, output, ec, cxt,
+                           status, allocator);
   }
 }
 
@@ -733,9 +732,8 @@ static fn resolve_depth_limit(const ExecContext &ec, EvalContext &cxt,
 {
   if (!FLAG_LS_LEVEL.is_set()) return true;
 
-  let const parsed =
-      utils::parse_integer_in_base(FLAG_LS_LEVEL.value(), nullptr,
-                                   int_base::decimal);
+  let const parsed = utils::parse_integer_in_base(FLAG_LS_LEVEL.value(),
+                                                  nullptr, int_base::decimal);
   if (parsed.is_error() || parsed.value() < 1) {
     report_soft_koshkit_util_error(
         ec, cxt, utility_name,
@@ -822,8 +820,8 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
     target_is_broken_symlink.push(false);
   }
   for (usize index = 0; index < targets.count(); index++) {
-    target_batch.add(
-        os::batch_operation::lstat(target_paths[index], target_statuses[index]));
+    target_batch.add(os::batch_operation::lstat(target_paths[index],
+                                                target_statuses[index]));
   }
   let const target_results = target_batch.execute();
 
@@ -867,8 +865,8 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
     follow_batch.reserve(symlink_target_indices.count());
     for (let const target_index : symlink_target_indices) {
       followed_statuses.push({});
-      follow_batch.add(os::batch_operation::stat(
-          target_paths[target_index], followed_statuses.back()));
+      follow_batch.add(os::batch_operation::stat(target_paths[target_index],
+                                                 followed_statuses.back()));
     }
 
     let const follow_results = follow_batch.execute();

@@ -12,20 +12,20 @@
 /* The toiletline configuration macros are defined here, so Toiletline.hpp is
    not included. */
 
-#include "base/Allocator.hpp"
 #include "CLI.hpp"
 #include "CLIColors.hpp"
 #include "Completion.hpp"
-#include "base/Debug.hpp"
-#include "base/ErrorOr.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "ExecContext.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "ToiletlineHistory.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Allocator.hpp"
+#include "base/Debug.hpp"
+#include "base/ErrorOr.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace toiletline {
 
@@ -388,11 +388,11 @@ fn run_selector_program(koshka::EvalContext &context, koshka::StringView input,
   };
 
   are_child_descriptors_owned = false;
-  let const child = koshka::os::execute_program(
-      selector, koshka::StringView{}, 0,
-      koshka::os::script_fallback_policy::Reject,
-      koshka::os::terminal_handoff::BeforeStart,
-      koshka::os::process_group_mode::Inherit);
+  let const child =
+      koshka::os::execute_program(selector, koshka::StringView{}, 0,
+                                  koshka::os::script_fallback_policy::Reject,
+                                  koshka::os::terminal_handoff::BeforeStart,
+                                  koshka::os::process_group_mode::Inherit);
 
   let const captured =
       koshka::os::read_fd_to_string(output_pipe->in, koshka::heap_allocator());
@@ -417,8 +417,8 @@ fn run_selector_program(koshka::EvalContext &context, koshka::StringView input,
 
     let const note = selector_variable_note(context);
     report_selector_failure(
-        koshka::StringView{"The tab selector '"} +
-            selector_program.view() + "' exited with status " +
+        koshka::StringView{"The tab selector '"} + selector_program.view() +
+            "' exited with status " +
             koshka::String::from(status, koshka::heap_allocator()),
         note.view(), false);
 

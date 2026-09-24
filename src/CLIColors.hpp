@@ -10,8 +10,8 @@
 
 #pragma once
 
-#include "base/Common.hpp"
 #include "Highlight.hpp"
+#include "base/Common.hpp"
 #include "base/StringView.hpp"
 
 namespace koshka {

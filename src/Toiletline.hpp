@@ -8,14 +8,14 @@
  * while ToiletlineStubs.cpp supplies noninteractive builds.
  */
 
-#include "base/ArrayList.hpp"
 #include "Completion.hpp"
+#include "ToiletlineHistory.hpp"
+#include "base/ArrayList.hpp"
 #include "base/Common.hpp"
 #include "base/ErrorOr.hpp"
 #include "base/Path.hpp"
 #include "base/String.hpp"
 #include "base/StringView.hpp"
-#include "ToiletlineHistory.hpp"
 
 #define TL_HISTORY_MAX_SIZE (1024 * 4)
 #include "toiletline/toiletline.h"
@@ -117,8 +117,9 @@ usize get_codepoint_byte_offset(const char *bytes, usize byte_length,
 
 usize get_display_width(StringView text);
 
-usize get_byte_offset_at_or_before_display_cell(
-    StringView text, usize cell_position, usize &actual_cell_position);
+usize get_byte_offset_at_or_before_display_cell(StringView text,
+                                                usize cell_position,
+                                                usize &actual_cell_position);
 
 bool is_active();
 

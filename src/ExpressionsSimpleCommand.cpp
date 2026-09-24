@@ -8,11 +8,8 @@
  * final dispatch.
  */
 
-#include "base/Arena.hpp"
 #include "Builtin.hpp"
 #include "CLI.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
@@ -22,8 +19,11 @@
 #include "Optimizer.hpp"
 #include "Platform.hpp"
 #include "Tokens.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -99,7 +99,8 @@ fn AssignCommand::analyze(AnalysisContext &actx,
   ASSERT(m_assignment != nullptr);
 
   if (actx.is_posix_sh_shebang &&
-      m_assignment->get_update_mode() == assignment_update_mode::Append) {
+      m_assignment->get_update_mode() == assignment_update_mode::Append)
+  {
     actx.report_diagnostic(diagnostic_id::sc3024, source_location(),
                            {m_assignment->key().view()});
   }
@@ -110,10 +111,10 @@ fn AssignCommand::analyze(AnalysisContext &actx,
   let const raw_assignment = m_assignment->raw_string();
 
   check_assignment_value_shape(
-      actx, assignment_lint_input{m_assignment->key().view(),
-                                  raw_assignment.view(), source_location(),
-                                  m_assignment->get_update_mode(), false,
-                                  shape});
+      actx,
+      assignment_lint_input{m_assignment->key().view(), raw_assignment.view(),
+                            source_location(), m_assignment->get_update_mode(),
+                            false, shape});
   let const first_colon = raw_assignment.view().find_character(':');
   if (m_assignment->key().view() == "PATH" &&
       (raw_assignment.view().starts_with(StringView{"PATH=~/"}) ||
@@ -1658,10 +1659,9 @@ fn SimpleCommand::redirect_exec_context(ExecContext &ec,
       try {
         if (restore.was_set) {
           if (restore.target.has_subscript) {
-            cxt.assign_array_element(restore.target.name,
-                                     restore.target.subscript,
-                                     restore.previous_value.view(),
-                                     assignment_update_mode::Replace);
+            cxt.assign_array_element(
+                restore.target.name, restore.target.subscript,
+                restore.previous_value.view(), assignment_update_mode::Replace);
           } else {
             cxt.set_shell_variable(restore.target.name,
                                    restore.previous_value.view());

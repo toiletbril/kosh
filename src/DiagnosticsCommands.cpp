@@ -10,10 +10,10 @@
 
 #include "DiagnosticsChecksInternal.hpp"
 #include "Lexer.hpp"
-#include "base/PackedStringKey.hpp"
 #include "StaticStringMap.hpp"
 #include "Tokens.hpp"
 #include "Utils.hpp"
+#include "base/PackedStringKey.hpp"
 
 namespace koshka {
 
@@ -358,9 +358,9 @@ fn check_command_name_lints(AnalysisContext &actx,
         actx.report_diagnostic(diagnostic_id::sc2064,
                                args[1]->source_location());
     }
-    check_trap_condition_operands(
-        actx, args, is_posix ? trap_condition_mode::Posix
-                             : trap_condition_mode::Default);
+    check_trap_condition_operands(actx, args,
+                                  is_posix ? trap_condition_mode::Posix
+                                           : trap_condition_mode::Default);
     break;
 
   case command_name_id::Exec:

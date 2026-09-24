@@ -9,11 +9,8 @@
  * simple-command storage, formatting, analysis, and redirection construction.
  */
 
-#include "base/Arena.hpp"
 #include "Builtin.hpp"
 #include "CLI.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
@@ -23,8 +20,11 @@
 #include "Optimizer.hpp"
 #include "Platform.hpp"
 #include "Tokens.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -203,8 +203,7 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
   }
   let program_args =
       cxt.process_args(*argument_tokens, &program_arg_locations,
-                       argument_lifetime::Transient,
-                       argument_context::Command);
+                       argument_lifetime::Transient, argument_context::Command);
   defer { cxt.cleanup_process_substitutions(substitution_mark); };
   expand_command_aliases(cxt, program_args, program_arg_locations);
 
@@ -515,9 +514,9 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
       value_ref = steal(appended);
     }
   };
-  let const do_trace_assignment = [&](StringView name,
-                                      assignment_update_mode update_mode,
-                                      StringView value) throws -> void {
+  let const do_trace_assignment =
+      [&](StringView name, assignment_update_mode update_mode, StringView value)
+          throws -> void {
     if (!cxt.should_echo_expanded()) return;
     let trace = String{cxt.scratch_allocator(), name};
     trace += update_mode == assignment_update_mode::Append ? "+=" : "=";
@@ -529,8 +528,8 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
           const ArrayList<String> &values) throws -> void {
     if (!cxt.should_echo_expanded()) return;
     let trace = String{cxt.scratch_allocator(), assignment.name.view()};
-    trace += assignment.update_mode == assignment_update_mode::Append ? "+=("
-                                                                      : "=(";
+    trace +=
+        assignment.update_mode == assignment_update_mode::Append ? "+=(" : "=(";
     for (usize i = 0; i < values.count(); i++) {
       if (i > 0) trace.push(' ');
       append_shell_quoted_arg(trace, values[i].view());
@@ -566,10 +565,9 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
       if (cxt.is_readonly(assignment.name))
         throw Error{"Unable to assign '" + assignment.name +
                     "' because it is read only"};
-      ArrayList<String> values =
-          cxt.process_args(assignment.elements, nullptr,
-                           argument_lifetime::Persistent,
-                           argument_context::ArrayLiteral);
+      ArrayList<String> values = cxt.process_args(
+          assignment.elements, nullptr, argument_lifetime::Persistent,
+          argument_context::ArrayLiteral);
       do_trace_array_assignment(assignment, values);
       cxt.assign_indexed_array_elements(assignment.name, values,
                                         assignment.update_mode);
@@ -1065,10 +1063,9 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
       if (should_unmark_uppercase) cxt.unmark_uppercase(assignment.name);
       if (should_mark_lowercase) cxt.mark_lowercase(assignment.name);
       if (should_mark_uppercase) cxt.mark_uppercase(assignment.name);
-      ArrayList<String> values =
-          cxt.process_args(assignment.elements, nullptr,
-                           argument_lifetime::Persistent,
-                           argument_context::ArrayLiteral);
+      ArrayList<String> values = cxt.process_args(
+          assignment.elements, nullptr, argument_lifetime::Persistent,
+          argument_context::ArrayLiteral);
       do_trace_array_assignment(assignment, values);
       if (is_associative_request) {
         /* A bare element with no bracketed key becomes a key with an empty

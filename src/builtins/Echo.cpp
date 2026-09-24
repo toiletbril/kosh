@@ -9,8 +9,8 @@
 #include "../Builtin.hpp"
 #include "../CLI.hpp"
 #include "../Eval.hpp"
-#include "../base/Trace.hpp"
 #include "../Utils.hpp"
+#include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
 

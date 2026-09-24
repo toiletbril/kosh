@@ -320,8 +320,8 @@ inline constexpr static_string_entry<os::path_configuration_key>
 inline constexpr StaticStringMap PATH_CONFIGURATIONS{
     PATH_CONFIGURATION_ENTRIES};
 
-fn append_configuration_row(String &output, StringView name, StringView value)
-    throws -> void
+fn append_configuration_row(String &output, StringView name,
+                            StringView value) throws -> void
 {
   output += name;
   output += ' ';
@@ -331,15 +331,14 @@ fn append_configuration_row(String &output, StringView name, StringView value)
 
 fn append_numeric_configuration_row(
     String &output, StringView name,
-    const os::numeric_configuration_result &result,
-    Allocator allocator) throws -> void
+    const os::numeric_configuration_result &result, Allocator allocator) throws
+    -> void
 {
   if (result.status == os::configuration_query_status::Undefined) {
     append_configuration_row(output, name, "undefined");
     return;
   }
-  append_configuration_row(output, name,
-                           String::from(result.value, allocator));
+  append_configuration_row(output, name, String::from(result.value, allocator));
 }
 
 fn report_configuration_query_error(const ExecContext &ec, EvalContext &cxt,
@@ -348,9 +347,9 @@ fn report_configuration_query_error(const ExecContext &ec, EvalContext &cxt,
                                     StringView variable_name) throws -> i32
 {
   let const reason = os::last_system_error_message();
-  report_soft_koshkit_util_error(
-      ec, cxt, location, utility_name,
-      "Cannot query variable '" + variable_name + "': " + reason);
+  report_soft_koshkit_util_error(ec, cxt, location, utility_name,
+                                 "Cannot query variable '" + variable_name +
+                                     "': " + reason);
   return 1;
 }
 
@@ -397,26 +396,26 @@ fn Getconf::execute(const ExecContext &ec, EvalContext &cxt,
       let const result = os::query_system_configuration(entry.value);
       if (result.status == os::configuration_query_status::Error) {
         if (!output.is_empty()) ec.print_to_stdout(output);
-        return report_configuration_query_error(
-            ec, cxt, error_location, args[0].view(), name.view());
+        return report_configuration_query_error(ec, cxt, error_location,
+                                                args[0].view(), name.view());
       }
       append_numeric_configuration_row(output, name.view(), result,
                                        cxt.scratch_allocator());
     }
     for (let const &entry : STRING_CONFIGURATION_ENTRIES) {
       let const name = entry.key.to_string();
-      let result = os::query_string_configuration(
-          entry.value, cxt.scratch_allocator());
+      let result =
+          os::query_string_configuration(entry.value, cxt.scratch_allocator());
       if (result.status == os::configuration_query_status::Error) {
         if (!output.is_empty()) ec.print_to_stdout(output);
-        return report_configuration_query_error(
-            ec, cxt, error_location, args[0].view(), name.view());
+        return report_configuration_query_error(ec, cxt, error_location,
+                                                args[0].view(), name.view());
       }
-      append_configuration_row(
-          output, name.view(),
-          result.status == os::configuration_query_status::Value
-              ? result.value.view()
-              : StringView{"undefined"});
+      append_configuration_row(output, name.view(),
+                               result.status ==
+                                       os::configuration_query_status::Value
+                                   ? result.value.view()
+                                   : StringView{"undefined"});
     }
     let const path = operands.is_empty() ? StringView{"."} : operands[0].view();
     for (let const &entry : PATH_CONFIGURATION_ENTRIES) {
@@ -424,8 +423,8 @@ fn Getconf::execute(const ExecContext &ec, EvalContext &cxt,
       let const result = os::query_path_configuration(path, entry.value);
       if (result.status == os::configuration_query_status::Error) {
         if (!output.is_empty()) ec.print_to_stdout(output);
-        return report_configuration_query_error(
-            ec, cxt, error_location, args[0].view(), name.view());
+        return report_configuration_query_error(ec, cxt, error_location,
+                                                args[0].view(), name.view());
       }
       append_numeric_configuration_row(output, name.view(), result,
                                        cxt.scratch_allocator());
@@ -440,8 +439,8 @@ fn Getconf::execute(const ExecContext &ec, EvalContext &cxt,
     if (operands.count() != 1)
       return report_usage_error(ec, cxt, args[0].view());
 
-    let value = os::query_string_configuration(*string_key,
-                                               cxt.scratch_allocator());
+    let value =
+        os::query_string_configuration(*string_key, cxt.scratch_allocator());
     if (value.status == os::configuration_query_status::Error) {
       return report_configuration_query_error(
           ec, cxt, operand_locations[0], args[0].view(), operands[0].view());
@@ -476,8 +475,8 @@ fn Getconf::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (result.status == os::configuration_query_status::Error) {
-    return report_configuration_query_error(
-        ec, cxt, operand_locations[0], args[0].view(), operands[0].view());
+    return report_configuration_query_error(ec, cxt, operand_locations[0],
+                                            args[0].view(), operands[0].view());
   }
   if (result.status == os::configuration_query_status::Undefined)
     ec.print_to_stdout("undefined\n");

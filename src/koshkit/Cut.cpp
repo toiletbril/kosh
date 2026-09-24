@@ -100,8 +100,8 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
           usize byte_position = 0;
           while (byte_position < line_view.length) {
             let const decoded = utils::decode_utf8(line_view, byte_position, 0);
-            if (utils::text_position_is_selected(
-                    byte_position + decoded.length, *ranges))
+            if (utils::text_position_is_selected(byte_position + decoded.length,
+                                                 *ranges))
             {
               output +=
                   line_view.substring_of_length(byte_position, decoded.length);

@@ -12,9 +12,9 @@
 #include "../Eval.hpp"
 #include "../Formatter.hpp"
 #include "../Koshkit.hpp"
+#include "../Utils.hpp"
 #include "../base/Path.hpp"
 #include "../base/Trace.hpp"
-#include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 

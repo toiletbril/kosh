@@ -12,10 +12,10 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../base/Path.hpp"
 #include "../Platform.hpp"
 #include "../ProgramResolver.hpp"
 #include "../Utils.hpp"
+#include "../base/Path.hpp"
 
 FLAG_LIST_DECL();
 
@@ -284,8 +284,8 @@ fn GoodCore::execute(
 
   i64 process_id = 0;
   if (has_pid) {
-    let const parsed = utils::parse_integer_in_base(
-        FLAG_GOODCORE_PID.value(), nullptr, int_base::decimal);
+    let const parsed = utils::parse_integer_in_base(FLAG_GOODCORE_PID.value(),
+                                                    nullptr, int_base::decimal);
     if (parsed.is_error() || parsed.value() <= 0) {
       KOSHKIT_REPORT_ERROR_AT(FLAG_GOODCORE_PID.value_location(),
                               "invalid process id",
@@ -328,8 +328,7 @@ fn GoodCore::execute(
   let const stage_directory =
       os::make_temp_directory(Path::temp_directory(), "goodcore");
   if (!stage_directory.has_value()) {
-    report_soft_koshkit_error(ec, cxt,
-                              "cannot create staging directory",
+    report_soft_koshkit_error(ec, cxt, "cannot create staging directory",
                               os::last_system_error_message());
     return 1;
   }
@@ -382,9 +381,8 @@ fn GoodCore::execute(
       let const captured_core =
           Path{core.text() + "." + String::from(process_id, allocator)};
       if (!os::rename_path(captured_core.view(), core.view())) {
-        report_soft_koshkit_error(
-            ec, cxt, "capture failed",
-            "the debugger produced no usable core file");
+        report_soft_koshkit_error(ec, cxt, "capture failed",
+                                  "the debugger produced no usable core file");
         return 1;
       }
     }
@@ -417,8 +415,7 @@ fn GoodCore::execute(
 
   print_progress(ec, should_show_progress,
                  "collecting executable and libraries");
-  collect_core_libraries(cxt, core.view(), binary->view(), paths,
-                         allocator);
+  collect_core_libraries(cxt, core.view(), binary->view(), paths, allocator);
   print_progress(ec, should_show_progress,
                  String{"collected "} + String::from(paths.count(), allocator) +
                      " candidate files");
@@ -493,8 +490,7 @@ fn GoodCore::execute(
   let const temporary_output =
       os::write_to_named_temp_file(output.parent(), ".goodcore", StringView{});
   if (!temporary_output.has_value()) {
-    report_soft_koshkit_error(ec, cxt,
-                              "cannot create temporary archive",
+    report_soft_koshkit_error(ec, cxt, "cannot create temporary archive",
                               os::last_system_error_message());
     return 1;
   }
@@ -517,8 +513,7 @@ fn GoodCore::execute(
     let const temporary_tar = os::write_to_named_temp_file(
         output.parent(), ".goodcore-tar", StringView{});
     if (!temporary_tar.has_value()) {
-      report_soft_koshkit_error(ec, cxt,
-                                "cannot create temporary archive",
+      report_soft_koshkit_error(ec, cxt, "cannot create temporary archive",
                                 os::last_system_error_message());
       return 1;
     }

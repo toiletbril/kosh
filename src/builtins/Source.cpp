@@ -11,8 +11,8 @@
 #include "../Builtin.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
-#include "../base/Trace.hpp"
 #include "../Utils.hpp"
+#include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
 
@@ -106,11 +106,10 @@ fn Source::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       cxt.set_positional_params(steal(params));
     }
 
-    status =
-        cxt.run_source(*contents, "the file '" + path + "'",
-                       ec.arg_location_at(path_index), StringView{path},
-                       &status_before_return, nullptr,
-                       return_handling::Consume);
+    status = cxt.run_source(*contents, "the file '" + path + "'",
+                            ec.arg_location_at(path_index), StringView{path},
+                            &status_before_return, nullptr,
+                            return_handling::Consume);
   }
 
   /* A sourced file runs in the current scope, and its finish fires the RETURN

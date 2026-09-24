@@ -71,8 +71,8 @@ static fn run_debug_completion_driver(StringView driver_line,
   let const lexical_scan_byte_count_before =
       completion::debug_shell_lexical_scan_byte_count();
   let const driver_result = completion::complete(
-      driver_line, driver_cursor, context, Path::current_directory(),
-      nullptr, false, completion::completion_mode::Listing);
+      driver_line, driver_cursor, context, Path::current_directory(), nullptr,
+      false, completion::completion_mode::Listing);
   let listing = String{heap_allocator()};
 
   for (let const &candidate : driver_result.candidates) {
@@ -127,10 +127,10 @@ static fn run_debug_highlight_driver(StringView driver_line,
 
 static fn run_debug_toiletline_allocation_driver() throws -> i32
 {
-  print("allocation-failure=" +
-        String::from(toiletline::did_debug_allocation_fail(),
-                     heap_allocator()) +
-        "\n");
+  print(
+      "allocation-failure=" +
+      String::from(toiletline::did_debug_allocation_fail(), heap_allocator()) +
+      "\n");
   flush();
   return 0;
 }
@@ -222,10 +222,9 @@ static fn run_debug_ghost_driver(StringView driver_line,
   let const directory_stat_count_before = utils::debug_directory_stat_count();
   let const directory_read_count_before = utils::debug_directory_read_count();
   context.get_program_resolver().initialize_path_map();
-  let const result = completion::complete(driver_line, driver_line.length,
-                                          context, Path::current_directory(),
-                                          nullptr, false,
-                                          completion::completion_mode::Ghost);
+  let const result = completion::complete(
+      driver_line, driver_line.length, context, Path::current_directory(),
+      nullptr, false, completion::completion_mode::Ghost);
   print("count=" + String::from(result.candidate_count, heap_allocator()) +
         "\nprefix=" + result.longest_common_prefix.view() + "\nsource-scans=" +
         String::from(result.source_candidate_scan_count, heap_allocator()) +
@@ -837,10 +836,10 @@ static fn format_document_source(StringView source, Maybe<StringView> filename,
   let replacements = ArrayList<parser_format_replacement>{heap_allocator()};
   for (let const &fragment : document.fragments) {
     let fragment_ast = String{heap_allocator()};
-    let const formatted = format_shell_source(
-        fragment.shell_source.view(), ast_arena, errors,
-        ast_output != nullptr ? &fragment_ast : nullptr, function_arena,
-        fragment.mood);
+    let const formatted =
+        format_shell_source(fragment.shell_source.view(), ast_arena, errors,
+                            ast_output != nullptr ? &fragment_ast : nullptr,
+                            function_arena, fragment.mood);
     if (!formatted.has_value()) return None;
     if (ast_output != nullptr) {
       if (!ast_output->is_empty()) ast_output->push('\n');
@@ -2021,8 +2020,7 @@ static fn replace_file_contents(const apply_file_snapshot &snapshot,
       resolved_operand->text() != snapshot.target_path.text() ||
       !current_contents.has_value() ||
       current_contents->view() != snapshot.contents.view() ||
-      !os::stat_path_following(snapshot.target_path.view(),
-                               current_status) ||
+      !os::stat_path_following(snapshot.target_path.view(), current_status) ||
       !os::file_status_matches(snapshot.status, current_status))
   {
     show_message("Refusing to replace '" + snapshot.operand_path.text() +
@@ -2235,17 +2233,18 @@ static fn run_format_operation(const ArrayList<String> &file_names,
                                 ? Maybe<StringView>{}
                                 : Maybe<StringView>{file_names[input_index]};
     let ast_output = String{heap_allocator()};
-    let formatted = format_document_source(
-        source.view(), source_name, ast_arena, errors,
-        context.show_ast() ? &ast_output : nullptr, context.function_arena(),
-        mood);
+    let formatted =
+        format_document_source(source.view(), source_name, ast_arena, errors,
+                               context.show_ast() ? &ast_output : nullptr,
+                               context.function_arena(), mood);
     if (!formatted.has_value()) {
       for (let const &error : errors)
         show_message(error.view());
       did_fail = true;
       continue;
     }
-    for (let const &warning : errors) show_message(warning.view());
+    for (let const &warning : errors)
+      show_message(warning.view());
     if (context.show_ast() && !ast_output.is_empty()) {
       print(ast_output.view());
       print("\n");
@@ -2331,10 +2330,9 @@ static fn run_lint_apply_operation(const ArrayList<String> &file_names,
     let final_source = fixed.take();
     if (should_format) {
       let errors = ArrayList<String>{heap_allocator()};
-      let formatted =
-          format_document_source(final_source.view(), file_name.view(),
-                                 ast_arena, errors, nullptr,
-                                 context.function_arena(), context.mood());
+      let formatted = format_document_source(
+          final_source.view(), file_name.view(), ast_arena, errors, nullptr,
+          context.function_arena(), context.mood());
       if (!formatted.has_value()) {
         for (let const &error : errors)
           show_message(error.view());

@@ -115,8 +115,9 @@ public:
 
   cold mustuse static fn read_directory(const Path &dir) throws
       -> Maybe<ArrayList<String>>;
-  cold mustuse static fn read_directory(const Path &dir, Allocator allocator)
-      throws -> Maybe<ArrayList<String>>;
+  cold mustuse static fn read_directory(const Path &dir,
+                                        Allocator allocator) throws
+      -> Maybe<ArrayList<String>>;
 
   /* Unknown means the caller must stat to learn the type. */
   enum class entry_kind : u8

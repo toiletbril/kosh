@@ -11,8 +11,8 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
-#include "../base/Trace.hpp"
 #include "../Utils.hpp"
+#include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
 
@@ -88,32 +88,64 @@ fn block_factor(const resource_entry &entry, mimic_mood mood) throws -> u64
 fn selected_resource() throws -> resource_selection
 {
   if (FLAG_CPU_TIME.is_enabled())
-    return {{"time(seconds)", os::resource_kind::CpuSeconds, 1}, false};
+    return {
+        {"time(seconds)", os::resource_kind::CpuSeconds, 1},
+        false
+    };
   if (FLAG_DATA_SIZE.is_enabled())
-    return {{"data(kbytes)", os::resource_kind::DataKbytes, 1024}, false};
+    return {
+        {"data(kbytes)", os::resource_kind::DataKbytes, 1024},
+        false
+    };
   if (FLAG_STACK_SIZE.is_enabled())
-    return {{"stack(kbytes)", os::resource_kind::StackKbytes, 1024}, false};
+    return {
+        {"stack(kbytes)", os::resource_kind::StackKbytes, 1024},
+        false
+    };
   if (FLAG_CORE_SIZE.is_enabled())
-    return {{"coredump(blocks)", os::resource_kind::CoreBlocks, 512}, false};
+    return {
+        {"coredump(blocks)", os::resource_kind::CoreBlocks, 512},
+        false
+    };
   if (FLAG_OPEN_FILES.is_enabled())
-    return {{"nofiles", os::resource_kind::OpenFiles, 1}, false};
+    return {
+        {"nofiles", os::resource_kind::OpenFiles, 1},
+        false
+    };
   if (FLAG_RSS_SIZE.is_enabled())
-    return {{"memory(kbytes)", os::resource_kind::ResidentKbytes, 1024},
-            false};
+    return {
+        {"memory(kbytes)", os::resource_kind::ResidentKbytes, 1024},
+        false
+    };
   if (FLAG_LOCKED_MEMORY.is_enabled())
-    return {{"locked memory(kbytes)",
-             os::resource_kind::LockedMemoryKbytes, 1024},
-            false};
+    return {
+        {"locked memory(kbytes)", os::resource_kind::LockedMemoryKbytes, 1024},
+        false
+    };
   if (FLAG_PROCESSES_P.is_enabled())
-    return {{"pipe size", os::resource_kind::OpenFiles, 512}, true};
+    return {
+        {"pipe size", os::resource_kind::OpenFiles, 512},
+        true
+    };
   if (FLAG_PROCESSES.is_enabled())
-    return {{"process", os::resource_kind::Processes, 1}, false};
+    return {
+        {"process", os::resource_kind::Processes, 1},
+        false
+    };
   if (FLAG_VIRTUAL_MEMORY.is_enabled())
-    return {{"vmemory(kbytes)", os::resource_kind::VirtualMemoryKbytes, 1024},
-            false};
+    return {
+        {"vmemory(kbytes)", os::resource_kind::VirtualMemoryKbytes, 1024},
+        false
+    };
   if (FLAG_FILE_LOCKS.is_enabled())
-    return {{"locks", os::resource_kind::FileLocks, 1}, false};
-  return {{"file(blocks)", os::resource_kind::FileBlocks, 512}, false};
+    return {
+        {"locks", os::resource_kind::FileLocks, 1},
+        false
+    };
+  return {
+      {"file(blocks)", os::resource_kind::FileBlocks, 512},
+      false
+  };
 }
 
 fn render_limit(const os::resource_limit &limit, u64 divisor,
@@ -154,7 +186,7 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     return 0;
   }
 
-  let const [resource, is_pipe_pseudo] = selected_resource();
+  let const[resource, is_pipe_pseudo] = selected_resource();
 
   if (is_pipe_pseudo) {
     if (args.count() < 2) {
@@ -174,8 +206,7 @@ cold fn Ulimit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (args.count() < 2) {
     LOG(Debug, "ulimit reading the '%s' limit", resource.label);
-    ec.print_to_stdout(render_limit(limit,
-                                    block_factor(resource, cxt.mood()),
+    ec.print_to_stdout(render_limit(limit, block_factor(resource, cxt.mood()),
                                     cxt.scratch_allocator()) +
                        "\n");
     return 0;

@@ -13,9 +13,9 @@
 #include "ParserFormats.hpp"
 
 #include "MimicMood.hpp"
-#include "base/Path.hpp"
 #include "StaticStringMap.hpp"
 #include "Utils.hpp"
+#include "base/Path.hpp"
 
 namespace koshka {
 
@@ -314,8 +314,8 @@ fn parser_format_add_indented_fragment(parsed_format_document &document,
                                        mimic_mood mood) throws -> void
 {
   parser_format_add_fragment(document, host_source, host_start, host_end,
-                             indent_length, None,
-                             parser_format_codec::Indented, mood);
+                             indent_length, None, parser_format_codec::Indented,
+                             mood);
   if (document.fragments.is_empty()) return;
 
   let &fragment = document.fragments.back();
@@ -510,8 +510,7 @@ static fn add_yaml_inline_fragment(parsed_format_document &document,
 
 fn parser_format_extract_yaml_keys(parsed_format_document &document,
                                    StringView source, const StringView *keys,
-                                   usize key_count,
-                                   mimic_mood default_mood,
+                                   usize key_count, mimic_mood default_mood,
                                    yaml_shell_selection selection) throws
     -> void
 {

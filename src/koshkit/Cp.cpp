@@ -43,8 +43,8 @@ enum class cp_recursive_mode : u8
 }
 
 static fn report_copy_error(const ExecContext &ec, EvalContext &cxt,
-                            StringView utility_name,
-                            const Error &error) throws -> void
+                            StringView utility_name, const Error &error) throws
+    -> void
 {
   if (error.detail_message().is_empty()) {
     report_soft_koshkit_util_error(ec, cxt, utility_name,
@@ -52,8 +52,7 @@ static fn report_copy_error(const ExecContext &ec, EvalContext &cxt,
     return;
   }
 
-  report_soft_koshkit_util_error(ec, cxt, utility_name,
-                                 error.message().view(),
+  report_soft_koshkit_util_error(ec, cxt, utility_name, error.message().view(),
                                  error.detail_message());
 }
 
@@ -104,12 +103,10 @@ static fn source_file_status(StringView source) throws -> Maybe<os::file_status>
 
 static fn copy_path(const ExecContext &ec, EvalContext &cxt,
                     StringView utility_name, StringView source,
-                    StringView destination,
-                    bool should_force, bool should_preserve, bool is_verbose,
-                    Allocator allocator,
+                    StringView destination, bool should_force,
+                    bool should_preserve, bool is_verbose, Allocator allocator,
                     const os::file_status *known_lstat,
-                    cp_recursive_mode recursive_mode) throws
-    -> bool
+                    cp_recursive_mode recursive_mode) throws -> bool
 {
   let const source_path = Path{source};
   let const destination_path = Path{destination};
@@ -124,9 +121,8 @@ static fn copy_path(const ExecContext &ec, EvalContext &cxt,
     };
   }
   let const is_source_symlink =
-      known_lstat != nullptr
-          ? os::file_type_letter(known_lstat->mode) == 'l'
-          : source_path.is_symbolic_link();
+      known_lstat != nullptr ? os::file_type_letter(known_lstat->mode) == 'l'
+                             : source_path.is_symbolic_link();
 
   if (is_source_symlink && recursive_mode == cp_recursive_mode::Recursive) {
     if (let const target = os::read_symlink(source, allocator)) {

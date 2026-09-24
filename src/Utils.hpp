@@ -12,12 +12,12 @@
 #pragma once
 
 #include "Builtin.hpp"
-#include "base/Common.hpp"
-#include "base/ErrorOr.hpp"
 #include "Eval.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "Tokens.hpp"
+#include "base/Common.hpp"
+#include "base/ErrorOr.hpp"
+#include "base/Path.hpp"
 
 namespace koshka {
 
@@ -177,7 +177,7 @@ struct text_position_range
   usize first;
   usize last;
 
-  pure fn operator<(const text_position_range &other) const wontthrow -> bool
+  pure fn operator<(const text_position_range &other) const wontthrow->bool
   {
     if (first != other.first) return first < other.first;
     return last < other.last;
@@ -192,8 +192,9 @@ pure fn text_position_is_selected(
 
 fn parse_tab_stop_list(StringView text, Allocator allocator) throws
     -> Maybe<ArrayList<usize>>;
-pure fn get_next_tab_column(
-    usize column, const ArrayList<usize> &tab_stops) wontthrow -> usize;
+pure fn get_next_tab_column(usize column,
+                            const ArrayList<usize> &tab_stops) wontthrow
+    -> usize;
 
 pure alwaysinline fn environment_name_is_path(StringView name) wontthrow -> bool
 {

@@ -40,9 +40,9 @@ fn parse_makefile_format(const parser_format_input &input,
     let analysis_source =
         koshkit::makefile_shell_analysis_source(input.source, range);
     let const fragment_count = document.fragments.count();
-    parser_format_add_fragment(
-        document, input.source, range.start_position, range.end_position, 1,
-        steal(analysis_source), parser_format_codec::Continued, mood);
+    parser_format_add_fragment(document, input.source, range.start_position,
+                               range.end_position, 1, steal(analysis_source),
+                               parser_format_codec::Continued, mood);
     if (document.fragments.count() != fragment_count) {
       document.fragments.back().shell_source =
           String{input.source.substring_of_length(

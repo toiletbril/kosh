@@ -9,11 +9,11 @@
 
 #include "Tokens.hpp"
 
-#include "base/Arena.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Lexer.hpp"
 #include "Optimizer.hpp"
+#include "base/Arena.hpp"
+#include "base/Debug.hpp"
 #include "base/Trace.hpp"
 
 namespace koshka {
@@ -87,9 +87,8 @@ fn WordSegment::get_eval_cache(BumpArena *cache_arena) const throws
   return *m_eval_cache;
 }
 
-fn WordSegment::set_exact_constant_arithmetic_text(StringView text,
-                                                    BumpArena *cache_arena)
-    const throws -> void
+fn WordSegment::set_exact_constant_arithmetic_text(
+    StringView text, BumpArena *cache_arena) const throws -> void
 {
   let &cache = get_eval_cache(cache_arena);
   let const arena = cache_arena;
@@ -485,10 +484,9 @@ hot fn Word::get_assignment_split() const throws -> Maybe<word_assignment_split>
 
   ASSERT(*equals_position <= first.text.count());
 
-  let const update_mode =
-      first.text[*equals_position - 1] == '+'
-          ? assignment_update_mode::Append
-          : assignment_update_mode::Replace;
+  let const update_mode = first.text[*equals_position - 1] == '+'
+                              ? assignment_update_mode::Append
+                              : assignment_update_mode::Replace;
   const usize name_length = update_mode == assignment_update_mode::Append
                                 ? *equals_position - 1
                                 : *equals_position;
@@ -565,10 +563,9 @@ cold fn Word::get_quoted_assignment_split() const throws
       !prefix_view.is_empty() && prefix_view[prefix_view.length - 1] == '+'
           ? assignment_update_mode::Append
           : assignment_update_mode::Replace;
-  let const name_length =
-      update_mode == assignment_update_mode::Append
-          ? prefix_view.length - 1
-          : prefix_view.length;
+  let const name_length = update_mode == assignment_update_mode::Append
+                              ? prefix_view.length - 1
+                              : prefix_view.length;
   if (name_length == 0) return koshka::None;
 
   if (!lexer::is_variable_name_start(prefix_view[0])) return koshka::None;

@@ -10,9 +10,9 @@
 #include "base/Path.hpp"
 
 #include "MimicMood.hpp"
-#include "base/PackedStringKey.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
+#include "base/PackedStringKey.hpp"
 #include "base/Trace.hpp"
 
 namespace koshka {
@@ -79,8 +79,7 @@ fn Path::parent() const throws -> Path
 {
   let const end = filename_offset(m_text);
   if (end == 0) return Path{{}, allocator()};
-  if (end == 1)
-    return Path{m_text.substring_of_length(0, 1), allocator()};
+  if (end == 1) return Path{m_text.substring_of_length(0, 1), allocator()};
   return Path{m_text.substring_of_length(0, end - 1), allocator()};
 }
 
@@ -149,8 +148,7 @@ fn Path::with_extension(StringView new_extension) const throws -> Path
          "extension is a suffix of the path text");
   let const prefix_length = m_text.count() - current_extension.length;
 
-  let result =
-      Path{m_text.substring_of_length(0, prefix_length), allocator()};
+  let result = Path{m_text.substring_of_length(0, prefix_length), allocator()};
   if (new_extension.length > 0 && new_extension.data[0] != '.') {
     result.m_text.push('.');
   }

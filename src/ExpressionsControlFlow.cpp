@@ -9,11 +9,8 @@
  * pipeline process machinery.
  */
 
-#include "base/Arena.hpp"
 #include "Builtin.hpp"
 #include "CLI.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
@@ -24,8 +21,11 @@
 #include "Platform.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -89,8 +89,7 @@ fn CompoundCommand::evaluate_async(EvalContext &cxt) const throws -> i64
   if (should_launch_fresh_evaluator) bootstrap = cxt.make_subshell_bootstrap();
   let const launch = os::launch_compound_stage(
       command_text, None, None, None, source_location(),
-      source != nullptr ? source->view() : StringView{},
-      0,
+      source != nullptr ? source->view() : StringView{}, 0,
       should_launch_fresh_evaluator ? &bootstrap : nullptr, cxt.shell_name(),
       cxt.last_exit_status(), os::get_shell_process_id(),
       cxt.get_subshell_depth() + 1, cxt.mood(),

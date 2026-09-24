@@ -12,10 +12,10 @@
 #include "DiagnosticsChecksInternal.hpp"
 #include "EvalOperations.hpp"
 #include "Lexer.hpp"
-#include "base/PackedStringKey.hpp"
 #include "StaticStringMap.hpp"
 #include "Tokens.hpp"
 #include "Utils.hpp"
+#include "base/PackedStringKey.hpp"
 
 namespace koshka {
 
@@ -90,13 +90,10 @@ static pure fn arithmetic_expansion_assigns(StringView expression,
   return at + 1 >= expression.length || expression[at + 1] != '=';
 }
 
-fn note_arithmetic_target_record(AnalysisContext &actx, StringView expression,
-                                 StringView target,
-                                 const SourceLocation &location,
-                                 Maybe<usize> expression_base_position,
-                                 bool is_conditional,
-                                 assignment_update_mode update_mode) throws
-    -> void
+fn note_arithmetic_target_record(
+    AnalysisContext &actx, StringView expression, StringView target,
+    const SourceLocation &location, Maybe<usize> expression_base_position,
+    bool is_conditional, assignment_update_mode update_mode) throws -> void
 {
   if (!expression_base_position.has_value()) return;
 

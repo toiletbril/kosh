@@ -9,10 +9,10 @@
 
 #pragma once
 
-#include "base/Arena.hpp"
-#include "base/Common.hpp"
 #include "Diagnostics.hpp"
 #include "MimicMood.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
 #include "base/String.hpp"
 #include "base/StringView.hpp"
 

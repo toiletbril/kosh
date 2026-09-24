@@ -11,16 +11,16 @@
 
 #pragma once
 
+#include "Builtin.hpp"
+#include "Errors.hpp"
+#include "MimicMood.hpp"
+#include "Platform.hpp"
 #include "base/Arena.hpp"
 #include "base/Bitset.hpp"
-#include "Builtin.hpp"
 #include "base/Common.hpp"
 #include "base/Containers.hpp"
-#include "Errors.hpp"
 #include "base/Maybe.hpp"
-#include "MimicMood.hpp"
 #include "base/Path.hpp"
-#include "Platform.hpp"
 
 namespace koshka {
 
@@ -254,8 +254,7 @@ struct job
   job() = default;
   explicit job(Allocator allocator)
       : earlier_pipeline_processes(allocator), command(allocator)
-  {
-  }
+  {}
 
   enum class State : u8
   {
@@ -292,12 +291,11 @@ class JobTable
 public:
   explicit JobTable(Allocator allocator)
       : m_jobs(allocator), m_detached_job_processes(allocator)
-  {
-  }
+  {}
 
   fn set_last_background_pid(i64 pid) wontthrow -> void;
-  fn register_job(os::process pid, StringView command, i64 process_group_id)
-      throws -> i32;
+  fn register_job(os::process pid, StringView command,
+                  i64 process_group_id) throws -> i32;
   fn register_pipeline_job(const ArrayList<os::process> &processes,
                            os::process primary_process, StringView command,
                            i64 process_group_id) throws -> i32;

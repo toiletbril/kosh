@@ -11,14 +11,14 @@
 
 #include "Lexer.hpp"
 
-#include "base/Arena.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -393,8 +393,7 @@ cold fn Lexer::walk_heredoc_body(usize start, StringView delimiter,
     did_find_delimiter = did_find_delimiter || is_delimiter;
 
     if (m_parse_session.should_collect_analysis_metadata() && !is_delimiter &&
-        !has_near_miss &&
-        line_length > delimiter.length)
+        !has_near_miss && line_length > delimiter.length)
     {
       usize content_start = line_offset;
       usize content_end = line_offset + line_length;
@@ -1331,9 +1330,7 @@ hot alwaysinline fn Lexer::lex_sentinel() throws -> Token *
   Token *token{};
 
 #define TOKEN_CASE_ONE(byte, t)                                                \
-  case byte:                                                                   \
-    token = arena.create<tokens::t>(here(m_cursor_position, 1));               \
-    break;
+  case byte: token = arena.create<tokens::t>(here(m_cursor_position, 1)); break;
 
 #define TOKEN_CASE_TWO(byte, t, ch, t2)                                        \
   case byte: {                                                                 \
@@ -1368,13 +1365,13 @@ hot alwaysinline fn Lexer::lex_sentinel() throws -> Token *
             here(m_cursor_position, 3));
         extra_length += 2;
       } else {
-        token = arena.create<tokens::DoubleSemicolon>(
-            here(m_cursor_position, 2));
+        token =
+            arena.create<tokens::DoubleSemicolon>(here(m_cursor_position, 2));
         extra_length++;
       }
     } else if (chop_character(1) == '&') {
-      token = arena.create<tokens::SemicolonAmpersand>(
-          here(m_cursor_position, 2));
+      token =
+          arena.create<tokens::SemicolonAmpersand>(here(m_cursor_position, 2));
       extra_length++;
     } else {
       token = arena.create<tokens::Semicolon>(here(m_cursor_position, 1));
@@ -1400,13 +1397,12 @@ hot alwaysinline fn Lexer::lex_sentinel() throws -> Token *
             here(m_cursor_position, 3));
         extra_length += 2;
       } else {
-        token = arena.create<tokens::AmpersandGreater>(
-            here(m_cursor_position, 2));
+        token =
+            arena.create<tokens::AmpersandGreater>(here(m_cursor_position, 2));
         extra_length++;
       }
     } else if (chop_character(1) == '&') {
-      token = arena.create<tokens::DoubleAmpersand>(
-          here(m_cursor_position, 2));
+      token = arena.create<tokens::DoubleAmpersand>(here(m_cursor_position, 2));
       extra_length++;
     } else {
       token = arena.create<tokens::Ampersand>(here(m_cursor_position, 1));

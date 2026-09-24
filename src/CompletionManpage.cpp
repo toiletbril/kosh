@@ -10,21 +10,21 @@
  * path.
  */
 
-#include "base/Arena.hpp"
 #include "Builtin.hpp"
 #include "CLIColors.hpp"
 #include "Completion.hpp"
 #include "CompletionInternal.hpp"
 #include "CompletionPolicy.hpp"
-#include "base/Debug.hpp"
-#include "base/HashSet.hpp"
 #include "Koshkit.hpp"
 #include "Lexer.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "Tokens.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Debug.hpp"
+#include "base/HashSet.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -285,11 +285,10 @@ static fn build_man_subcommand_index(EvalContext &context) throws -> void
 {
   MAN_SUBCOMMAND_INDEX.clear();
   for (let const &directory : manpage_section1_directories(context)) {
-      LOG(Info, "scanning man1 directory '%s'", directory.c_str());
+    LOG(Info, "scanning man1 directory '%s'", directory.c_str());
     let entries = Path::read_directory(directory);
     if (!entries.has_value()) {
-      LOG(Debug, "directory '%s' is unreadable, skipping",
-          directory.c_str());
+      LOG(Debug, "directory '%s' is unreadable, skipping", directory.c_str());
       continue;
     }
     MAN_PAGE_FILE_PATHS.reserve(MAN_PAGE_FILE_PATHS.count() + entries->count());
@@ -1247,9 +1246,11 @@ fn internal::complete_from_help(StringView line, StringView token,
   return matches;
 }
 
-fn internal::complete_from_help_subcommands(
-    StringView line, StringView token, usize token_start, EvalContext &context,
-    StringMap<String> &descriptions, completion_mode mode) throws
+fn internal::complete_from_help_subcommands(StringView line, StringView token,
+                                            usize token_start,
+                                            EvalContext &context,
+                                            StringMap<String> &descriptions,
+                                            completion_mode mode) throws
     -> Maybe<ArrayList<String>>
 {
   let const for_listing = mode == completion_mode::Listing;

@@ -8,12 +8,12 @@
  * split keeps process lifetime and job bookkeeping separate from evaluation.
  */
 
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -29,9 +29,9 @@ fn JobTable::set_last_background_pid(i64 pid) wontthrow -> void
 
 fn JobTable::take_snapshot() throws -> job_table_snapshot
 {
-  let snapshot = job_table_snapshot{m_last_background_pid, steal(m_jobs),
-                                    steal(m_detached_job_processes),
-                                    m_next_job_id};
+  let snapshot =
+      job_table_snapshot{m_last_background_pid, steal(m_jobs),
+                         steal(m_detached_job_processes), m_next_job_id};
   m_next_job_id = 1;
   return snapshot;
 }
@@ -158,10 +158,7 @@ static fn poll_owned_processes(ArrayList<os::process> &processes) wontthrow
   return stopped_status;
 }
 
-fn EvalContext::update_jobs() throws -> void
-{
-  m_job_table.update_jobs();
-}
+fn EvalContext::update_jobs() throws -> void { m_job_table.update_jobs(); }
 
 fn JobTable::update_jobs() throws -> void
 {

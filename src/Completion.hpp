@@ -10,13 +10,13 @@
 
 #pragma once
 
+#include "Highlight.hpp"
+#include "StaticStringMap.hpp"
 #include "base/Arena.hpp"
 #include "base/Common.hpp"
 #include "base/HashSet.hpp"
-#include "Highlight.hpp"
 #include "base/Maybe.hpp"
 #include "base/Path.hpp"
-#include "StaticStringMap.hpp"
 #include "base/String.hpp"
 #include "base/StringMap.hpp"
 #include "base/StringView.hpp"

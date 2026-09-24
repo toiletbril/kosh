@@ -9,10 +9,10 @@
 
 #pragma once
 
-#include "base/Containers.hpp"
 #include "Errors.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
+#include "base/Containers.hpp"
 
 namespace koshka {
 
@@ -135,11 +135,11 @@ private:
       ArrayList<expressions::Redirection> &out, bool fd_was_explicit,
       const Token *fd_allocation_name_token = nullptr) throws -> void;
 
-  fn build_both_streams_redirection(
-      const SourceLocation &op_location,
-      Maybe<SourceLocation> &first_location,
-      ArrayList<expressions::Redirection> &out,
-      assignment_update_mode update_mode) throws -> void;
+  fn build_both_streams_redirection(const SourceLocation &op_location,
+                                    Maybe<SourceLocation> &first_location,
+                                    ArrayList<expressions::Redirection> &out,
+                                    assignment_update_mode update_mode) throws
+      -> void;
 
   mustuse fn wrap_with_stderr_to_stdout(Command *command) throws -> Command *;
 

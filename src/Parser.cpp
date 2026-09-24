@@ -10,15 +10,15 @@
 
 #include "Parser.hpp"
 
-#include "base/Arena.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Expressions.hpp"
 #include "Optimizer.hpp"
 #include "ParserInternal.hpp"
 #include "Tokens.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -945,9 +945,9 @@ fn Parser::build_both_streams_redirection(
     assignment_update_mode update_mode) throws -> void
 {
   build_file_or_dup_redirection(
-      1, update_mode == assignment_update_mode::Append
-             ? Token::Kind::DoubleGreater
-             : Token::Kind::Greater,
+      1,
+      update_mode == assignment_update_mode::Append ? Token::Kind::DoubleGreater
+                                                    : Token::Kind::Greater,
       op_location, first_location, out, /*fd_was_explicit=*/true);
   out.back().is_both_streams_spelling = true;
   out.push(stderr_to_stdout_dup());
@@ -1138,11 +1138,11 @@ mustuse fn Parser::try_parse_trailing_redirection(
     let const op_kind = token->kind();
     let const op_location = token->source_location();
     m_lexer.advance_past_last_peek();
-    build_both_streams_redirection(
-        op_location, ignored_first_location, out,
-        op_kind == Token::Kind::AmpersandDoubleGreater
-            ? assignment_update_mode::Append
-            : assignment_update_mode::Replace);
+    build_both_streams_redirection(op_location, ignored_first_location, out,
+                                   op_kind ==
+                                           Token::Kind::AmpersandDoubleGreater
+                                       ? assignment_update_mode::Append
+                                       : assignment_update_mode::Replace);
     return true;
   }
 
@@ -1493,11 +1493,11 @@ hot fn Parser::parse_simple_command(const Token *leading_token) throws
       let const op_kind = token->kind();
       let const op_location = token->source_location();
       m_lexer.advance_past_last_peek();
-      build_both_streams_redirection(
-          op_location, source_location, redirections,
-          op_kind == Token::Kind::AmpersandDoubleGreater
-              ? assignment_update_mode::Append
-              : assignment_update_mode::Replace);
+      build_both_streams_redirection(op_location, source_location, redirections,
+                                     op_kind ==
+                                             Token::Kind::AmpersandDoubleGreater
+                                         ? assignment_update_mode::Append
+                                         : assignment_update_mode::Replace);
     } break;
 
     case Token::Kind::DoubleLess: {

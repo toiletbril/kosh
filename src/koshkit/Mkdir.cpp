@@ -10,9 +10,9 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
+#include "../Utils.hpp"
 #include "../base/Path.hpp"
 #include "../base/Trace.hpp"
-#include "../Utils.hpp"
 
 FLAG_LIST_DECL();
 
@@ -85,9 +85,8 @@ fn Mkdir::execute(const ExecContext &ec, EvalContext &cxt,
 
   u32 named_mode = 0777;
   if (FLAG_MKDIR_MODE.is_set()) {
-    let const parsed =
-        utils::parse_integer_in_base(FLAG_MKDIR_MODE.value(), nullptr,
-                                     int_base::octal);
+    let const parsed = utils::parse_integer_in_base(FLAG_MKDIR_MODE.value(),
+                                                    nullptr, int_base::octal);
     /* parse_integer_in_base accepts a sign and saturates on overflow without an
        error, so a sign-prefixed or oversized operand parses cleanly. The range
        check rejects it rather than truncating to an over-permissive mode. */

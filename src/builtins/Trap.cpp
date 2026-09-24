@@ -11,8 +11,8 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
-#include "../base/Trace.hpp"
 #include "../Utils.hpp"
+#include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
 
@@ -59,8 +59,7 @@ fn normalize_condition(StringView raw, Allocator allocator) throws -> String
 /* The sh mood behaves like dash. Dash knows EXIT and the real signals and
    reports DEBUG, ERR, and RETURN as a bad trap. Each of those three is also
    inert there, since every dispatch site holds them behind the mood. */
-fn is_valid_trap_condition(StringView condition, mimic_mood mood) throws
-    -> bool
+fn is_valid_trap_condition(StringView condition, mimic_mood mood) throws -> bool
 {
   static constexpr PackedStringKey SPECIAL_CONDITION_KEYS[] = {
       SSK("EXIT"),

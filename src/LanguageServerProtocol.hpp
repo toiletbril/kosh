@@ -21,10 +21,10 @@
 #include "MimicMood.hpp"
 #include "Parser.hpp"
 #include "ParserFormats.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
 #include "Utils.hpp"
+#include "base/Path.hpp"
 
 namespace koshka::language_server {
 

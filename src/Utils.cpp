@@ -13,14 +13,14 @@
 
 #include "Builtin.hpp"
 #include "CLI.hpp"
-#include "base/Containers.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
+#include "base/Containers.hpp"
+#include "base/Debug.hpp"
 #include "base/Trace.hpp"
 
 namespace koshka {
@@ -179,8 +179,9 @@ fn parse_tab_stop_list(StringView text, Allocator allocator) throws
   return stops;
 }
 
-pure fn get_next_tab_column(
-    usize column, const ArrayList<usize> &tab_stops) wontthrow -> usize
+pure fn get_next_tab_column(usize column,
+                            const ArrayList<usize> &tab_stops) wontthrow
+    -> usize
 {
   if (tab_stops.is_empty()) return column + (8 - column % 8);
 
@@ -676,8 +677,8 @@ fn locate_first_unavailable_path_component(const Path &target,
   } else
     typed_prefix.append(expanded_operand);
 
-  let const prefix = Path{
-      target.view().substring_of_length(0, unavailable->component_end)};
+  let const prefix =
+      Path{target.view().substring_of_length(0, unavailable->component_end)};
   let const is_final_component =
       expanded_component_index + 1 >= expanded_components.count();
 

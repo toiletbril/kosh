@@ -11,14 +11,14 @@
  */
 
 #include "CLI.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "EvalVariablesInternal.hpp"
 #include "Platform.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 namespace os {
@@ -832,8 +832,7 @@ static pure fn is_batch_program(StringView path) wontthrow -> bool
 }
 
 fn execute_program(ExecContext &ec, StringView, i64 process_group_id,
-                   script_fallback_policy fallback,
-                   terminal_handoff handoff,
+                   script_fallback_policy fallback, terminal_handoff handoff,
                    process_group_mode process_group) -> process
 {
   let const allow_script_fallback = fallback == script_fallback_policy::Allow;
@@ -1020,8 +1019,7 @@ static fn spawn_subshell_stage(
     Maybe<descriptor> err_fd, bool source_traces_enabled = true,
     const subshell_bootstrap *bootstrap = nullptr, StringView shell_name = {},
     i32 previous_exit_status = 0, i64 shell_process_id = 0,
-    usize subshell_depth = 0,
-    mimic_mood mood = mimic_mood::Default,
+    usize subshell_depth = 0, mimic_mood mood = mimic_mood::Default,
     process_group_mode process_group = process_group_mode::Inherit) throws
     -> Maybe<process>;
 
@@ -1127,11 +1125,12 @@ static fn send_internal_pipe(StringView path, StringView content,
   }
 }
 
-fn launch_process_substitution(
-    StringView source, bool source_traces_enabled,
-    const subshell_bootstrap *bootstrap, StringView shell_name,
-    i32 previous_exit_status, i64 shell_process_id, usize subshell_depth,
-    process_substitution_direction direction, mimic_mood mood) throws
+fn launch_process_substitution(StringView source, bool source_traces_enabled,
+                               const subshell_bootstrap *bootstrap,
+                               StringView shell_name, i32 previous_exit_status,
+                               i64 shell_process_id, usize subshell_depth,
+                               process_substitution_direction direction,
+                               mimic_mood mood) throws
     -> process_substitution_launch
 {
   let const command_writes_pipe =
@@ -1229,10 +1228,9 @@ fn release_unused_process_substitution(opaque *cleanup) wontthrow -> void
 static fn spawn_subshell_stage(
     StringView source, Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
     Maybe<descriptor> err_fd, bool source_traces_enabled,
-    const subshell_bootstrap *bootstrap,
-    StringView shell_name, i32 previous_exit_status, i64 shell_process_id,
-    usize subshell_depth, mimic_mood mood, process_group_mode process_group)
-    throws -> Maybe<process>
+    const subshell_bootstrap *bootstrap, StringView shell_name,
+    i32 previous_exit_status, i64 shell_process_id, usize subshell_depth,
+    mimic_mood mood, process_group_mode process_group) throws -> Maybe<process>
 {
   /* Windows has no fork, so a compound pipeline stage re-parses its source in a
      fresh shell, returned unwaited for the pipeline to reap. */
@@ -1405,8 +1403,8 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
                          const subshell_bootstrap *bootstrap,
                          StringView shell_name, i32 previous_exit_status,
                          i64 shell_process_id, usize subshell_depth,
-                         mimic_mood mood, process_group_mode process_group)
-    throws
+                         mimic_mood mood,
+                         process_group_mode process_group) throws
     -> compound_stage_launch
 {
   unused(diagnostic_source);
@@ -1416,10 +1414,10 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
         "A compound command in a pipeline is not supported on this platform"};
 
   unused(process_group_id);
-  let child = spawn_subshell_stage(
-      source, in_fd, out_fd, err_fd, true, bootstrap, shell_name,
-      previous_exit_status, shell_process_id, subshell_depth, mood,
-      process_group);
+  let child =
+      spawn_subshell_stage(source, in_fd, out_fd, err_fd, true, bootstrap,
+                           shell_name, previous_exit_status, shell_process_id,
+                           subshell_depth, mood, process_group);
   if (!child.has_value())
     throw ErrorWithLocation{steal(location),
                             "Could not spawn the compound pipeline stage"};
@@ -2215,8 +2213,7 @@ run_measured_with_options(const ArrayList<String> &argv, measured_output output,
 
 fn run_measured(const ArrayList<String> &argv,
                 const Maybe<descriptor> &inherited_handle,
-                measured_output output) throws
-    -> Maybe<measured_result>
+                measured_output output) throws -> Maybe<measured_result>
 {
   windows_measured_launch_options options{};
   options.inherited_handle = inherited_handle;
@@ -2295,12 +2292,11 @@ fn read_memory_status(memory_status &status) wontthrow -> bool
   status.available_kib = status.free_kib;
   status.swap_total_kib = memory.ullTotalPageFile / 1024;
   status.swap_free_kib = memory.ullAvailPageFile / 1024;
-  status.available_fields =
-      static_cast<u32>(memory_status_field::Total) |
-      static_cast<u32>(memory_status_field::Available) |
-      static_cast<u32>(memory_status_field::Free) |
-      static_cast<u32>(memory_status_field::SwapTotal) |
-      static_cast<u32>(memory_status_field::SwapFree);
+  status.available_fields = static_cast<u32>(memory_status_field::Total) |
+                            static_cast<u32>(memory_status_field::Available) |
+                            static_cast<u32>(memory_status_field::Free) |
+                            static_cast<u32>(memory_status_field::SwapTotal) |
+                            static_cast<u32>(memory_status_field::SwapFree);
   return true;
 }
 

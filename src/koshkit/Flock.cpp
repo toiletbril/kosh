@@ -65,7 +65,8 @@ fn Flock::execute(const ExecContext &ec, EvalContext &cxt,
       keeper.push(operand.clone());
 
     unused(cxt.materialize_kosh_identity());
-    let const result = os::run_measured(keeper, {}, os::measured_output::Inherit);
+    let const result =
+        os::run_measured(keeper, {}, os::measured_output::Inherit);
     return result.has_value() ? static_cast<i32>(result->exit_status) : 126;
   }
 

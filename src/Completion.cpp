@@ -11,20 +11,20 @@
 
 #include "Completion.hpp"
 
-#include "base/Arena.hpp"
 #include "Builtin.hpp"
 #include "CLIColors.hpp"
 #include "CompletionInternal.hpp"
 #include "CompletionPolicy.hpp"
-#include "base/Debug.hpp"
-#include "base/HashSet.hpp"
 #include "Koshkit.hpp"
 #include "Lexer.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "Tokens.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Debug.hpp"
+#include "base/HashSet.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -551,11 +551,11 @@ static fn open_filesystem_listing(const utils::decoded_shell_word &decoded_word,
   return filesystem_listing{parts, steal(directory), entries};
 }
 
-static fn check_filesystem_entry(const filesystem_listing &listing,
-                                 const Path::directory_child &entry,
-                                 filesystem_entry_filter filter,
-                                 Maybe<Path::entry_kind> resolved_kind = None)
-    throws
+static fn
+check_filesystem_entry(const filesystem_listing &listing,
+                       const Path::directory_child &entry,
+                       filesystem_entry_filter filter,
+                       Maybe<Path::entry_kind> resolved_kind = None) throws
     -> Maybe<eligible_filesystem_entry>
 {
   let const name = entry.name.view();
@@ -612,7 +612,7 @@ static fn build_filesystem_candidate(
     let decoded_candidate =
         String{completion_allocator(), directory_part} + entry_name;
     let candidate = rebuild_shell_syntax_candidate(raw_token, decoded_word,
-                                                    decoded_candidate.view());
+                                                   decoded_candidate.view());
     if (directory_separator != 0) candidate.push(directory_separator);
     return candidate;
   }
@@ -680,66 +680,68 @@ static fn collect_filesystem_matches(
     match_tier tier;
   };
 
-  let const do_add_matches = [&](const ArrayList<matched_entry> &matches)
-                                 throws {
-    let paths = ArrayList<Path>{completion_allocator()};
-    let statuses = ArrayList<os::file_status>{completion_allocator()};
-    let result_positions = ArrayList<usize>{completion_allocator()};
-    let batch = os::Batch{completion_allocator()};
-    paths.reserve(matches.count());
-    statuses.reserve(matches.count());
-    result_positions.reserve(matches.count());
-    batch.reserve(matches.count());
+  let const do_add_matches =
+      [&](const ArrayList<matched_entry> &matches) throws {
+        let paths = ArrayList<Path>{completion_allocator()};
+        let statuses = ArrayList<os::file_status>{completion_allocator()};
+        let result_positions = ArrayList<usize>{completion_allocator()};
+        let batch = os::Batch{completion_allocator()};
+        paths.reserve(matches.count());
+        statuses.reserve(matches.count());
+        result_positions.reserve(matches.count());
+        batch.reserve(matches.count());
 
-    for (let const &match : matches) {
-      let const &entry = (*listing->entries)[match.position];
-      result_positions.push(SIZE_MAX);
-      if (entry.kind != Path::entry_kind::Symlink) continue;
+        for (let const &match : matches) {
+          let const &entry = (*listing->entries)[match.position];
+          result_positions.push(SIZE_MAX);
+          if (entry.kind != Path::entry_kind::Symlink) continue;
 
-      let path = listing->directory.clone();
-      path.push_component(entry.name.view());
-      result_positions.back() = paths.count();
-      paths.push(steal(path));
-      statuses.push({});
-    }
-    for (usize position = 0; position < paths.count(); position++)
-      batch.add(os::batch_operation::stat(paths[position], statuses[position]));
-
-    let results = ArrayList<os::batch_result>{completion_allocator()};
-    if (!paths.is_empty()) batch.execute(results);
-
-    for (usize match_position = 0; match_position < matches.count();
-         match_position++)
-    {
-      let const &match = matches[match_position];
-      let const &entry = (*listing->entries)[match.position];
-      let resolved_kind = Maybe<Path::entry_kind>{};
-      let const result_position = result_positions[match_position];
-      if (result_position != SIZE_MAX) {
-        if (result_position >= results.count() ||
-            results[result_position].error_number != 0) {
-          resolved_kind = Path::entry_kind::Other;
-        } else {
-          switch (os::file_type_letter(statuses[result_position].mode)) {
-          case 'd': resolved_kind = Path::entry_kind::Directory; break;
-          case '-': resolved_kind = Path::entry_kind::Regular; break;
-          default: resolved_kind = Path::entry_kind::Other; break;
-          }
+          let path = listing->directory.clone();
+          path.push_component(entry.name.view());
+          result_positions.back() = paths.count();
+          paths.push(steal(path));
+          statuses.push({});
         }
-      }
+        for (usize position = 0; position < paths.count(); position++)
+          batch.add(
+              os::batch_operation::stat(paths[position], statuses[position]));
 
-      let const eligible_entry =
-          check_filesystem_entry(*listing, entry, filter, resolved_kind);
-      if (!eligible_entry.has_value()) continue;
+        let results = ArrayList<os::batch_result>{completion_allocator()};
+        if (!paths.is_empty()) batch.execute(results);
 
-      let const name = entry.name.view();
-      let candidate = build_filesystem_candidate(
-          parts.directory_part, raw_directory_part, name,
-          eligible_entry->is_directory, suffix_mode, text_mode, token,
-          decoded_word);
-      collector.add(candidate.view(), match.tier);
-    }
-  };
+        for (usize match_position = 0; match_position < matches.count();
+             match_position++)
+        {
+          let const &match = matches[match_position];
+          let const &entry = (*listing->entries)[match.position];
+          let resolved_kind = Maybe<Path::entry_kind>{};
+          let const result_position = result_positions[match_position];
+          if (result_position != SIZE_MAX) {
+            if (result_position >= results.count() ||
+                results[result_position].error_number != 0)
+            {
+              resolved_kind = Path::entry_kind::Other;
+            } else {
+              switch (os::file_type_letter(statuses[result_position].mode)) {
+              case 'd': resolved_kind = Path::entry_kind::Directory; break;
+              case '-': resolved_kind = Path::entry_kind::Regular; break;
+              default: resolved_kind = Path::entry_kind::Other; break;
+              }
+            }
+          }
+
+          let const eligible_entry =
+              check_filesystem_entry(*listing, entry, filter, resolved_kind);
+          if (!eligible_entry.has_value()) continue;
+
+          let const name = entry.name.view();
+          let candidate = build_filesystem_candidate(
+              parts.directory_part, raw_directory_part, name,
+              eligible_entry->is_directory, suffix_mode, text_mode, token,
+              decoded_word);
+          collector.add(candidate.view(), match.tier);
+        }
+      };
 
   let matches = ArrayList<matched_entry>{completion_allocator()};
   let entry_position = utils::directory_entry_name_lower_bound(
@@ -763,7 +765,8 @@ static fn collect_filesystem_matches(
   for (usize position = 0; position < listing->entries->count(); position++) {
     let const &entry = (*listing->entries)[position];
     if (!utils::directory_entry_name_has_casefold_prefix(entry.name.view(),
-                                                         parts.basename_part)) {
+                                                         parts.basename_part))
+    {
       collector.note_source_candidate();
       let const tier = candidate_match(parts.basename_part, entry.name.view(),
                                        is_case_sensitive);
@@ -922,15 +925,16 @@ static fn complete_glob(StringView token, const Path &base_directory,
   if (!paths.is_empty()) batch.execute(results);
 
   for (usize match_position = 0; match_position < matched_positions.count();
-       match_position++) {
-    let const &entry =
-        (*listing->entries)[matched_positions[match_position]];
+       match_position++)
+  {
+    let const &entry = (*listing->entries)[matched_positions[match_position]];
     let const name = entry.name.view();
     let resolved_kind = Maybe<Path::entry_kind>{};
     let const result_position = result_positions[match_position];
     if (result_position != SIZE_MAX) {
       if (result_position >= results.count() ||
-          results[result_position].error_number != 0) {
+          results[result_position].error_number != 0)
+      {
         resolved_kind = Path::entry_kind::Other;
       } else {
         switch (os::file_type_letter(statuses[result_position].mode)) {
@@ -1140,8 +1144,7 @@ fn complete(StringView line, usize cursor, EvalContext &context,
             const Path &base_directory,
             const ArrayList<StringView> *extra_command_names,
             bool should_complete_external_arguments_in_posix,
-            completion_mode mode) throws
-    -> completion_result
+            completion_mode mode) throws -> completion_result
 {
   let const for_listing = mode == completion_mode::Listing;
   COMPLETION_ARENA.reset();

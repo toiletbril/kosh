@@ -590,10 +590,11 @@ static fn decode_udev_filename(StringView filename, Allocator allocator) throws
   return decoded;
 }
 
-static fn populate_linux_volume_identity(
-    ArrayList<mounted_filesystem> &filesystems,
-    const ArrayList<Path> &canonical_sources, StringView directory,
-    bool is_uuid) throws -> void
+static fn
+populate_linux_volume_identity(ArrayList<mounted_filesystem> &filesystems,
+                               const ArrayList<Path> &canonical_sources,
+                               StringView directory, bool is_uuid) throws
+    -> void
 {
   let const allocator = heap_allocator();
   let const identity_directory = Path{directory, allocator};
@@ -653,14 +654,13 @@ append_mounted_filesystems(ArrayList<mounted_filesystem> &result) throws -> void
   canonical_sources.reserve(result.count());
   for (let const &filesystem : result) {
     let const canonical_source = canonical_path(Path{filesystem.source.view()});
-    canonical_sources.push(canonical_source.has_value()
-                               ? steal(*canonical_source)
-                               : Path{});
+    canonical_sources.push(
+        canonical_source.has_value() ? steal(*canonical_source) : Path{});
   }
   populate_linux_volume_identity(result, canonical_sources,
                                  "/dev/disk/by-label", false);
-  populate_linux_volume_identity(result, canonical_sources,
-                                 "/dev/disk/by-uuid", true);
+  populate_linux_volume_identity(result, canonical_sources, "/dev/disk/by-uuid",
+                                 true);
 #elif defined __APPLE__ || defined BSD
   struct statfs *entries = nullptr;
   let const entry_count = getmntinfo(&entries, MNT_NOWAIT);
@@ -687,9 +687,10 @@ fn mounted_filesystems() throws -> ArrayList<mounted_filesystem>
   return result;
 }
 
-static fn find_mounted_filesystem(
-    StringView path, const ArrayList<mounted_filesystem> &filesystems,
-    StringView required_type = {}) throws -> Maybe<usize>
+static fn
+find_mounted_filesystem(StringView path,
+                        const ArrayList<mounted_filesystem> &filesystems,
+                        StringView required_type = {}) throws -> Maybe<usize>
 {
   let const absolute_path = Path{path}.to_absolute();
   Maybe<usize> selected_index;
@@ -813,8 +814,9 @@ static fn read_native_filesystem_error_counters(
   return true;
 }
 
-static fn read_ext4_recorded_error_count(const mounted_filesystem &filesystem)
-    throws -> Maybe<u64>
+static fn
+read_ext4_recorded_error_count(const mounted_filesystem &filesystem) throws
+    -> Maybe<u64>
 {
   let const do_read_count = [](StringView device_name) throws -> Maybe<u64> {
     if (device_name.is_empty()) return None;
@@ -901,8 +903,7 @@ fn read_filesystem_error_counters(StringView path,
   return read_native_filesystem_error_counters(path, counters);
 }
 
-fn verify_filesystem_integrity(StringView path,
-                               u64 timeout_nanoseconds) throws
+fn verify_filesystem_integrity(StringView path, u64 timeout_nanoseconds) throws
     -> filesystem_verification_result
 {
 #if defined __APPLE__
@@ -919,8 +920,7 @@ fn verify_filesystem_integrity(StringView path,
     return filesystem_verification_result::Unavailable;
 
   let const null_descriptor = ::open("/dev/null", O_RDWR);
-  if (null_descriptor < 0)
-    return filesystem_verification_result::Unavailable;
+  if (null_descriptor < 0) return filesystem_verification_result::Unavailable;
 
   posix_spawn_file_actions_t actions;
   if (posix_spawn_file_actions_init(&actions) != 0) {
@@ -944,14 +944,12 @@ fn verify_filesystem_integrity(StringView path,
   let const mount_path = filesystems[*selected_index].target.clone();
   char *arguments[] = {const_cast<char *>(DISKUTIL_PATH),
                        const_cast<char *>("verifyVolume"),
-                       const_cast<char *>(mount_path.c_str()),
-                       nullptr};
+                       const_cast<char *>(mount_path.c_str()), nullptr};
   pid_t child = 0;
-  let const spawn_result = posix_spawn(
-      &child, DISKUTIL_PATH, &actions, nullptr, arguments, environ);
+  let const spawn_result =
+      posix_spawn(&child, DISKUTIL_PATH, &actions, nullptr, arguments, environ);
   ::close(null_descriptor);
-  if (spawn_result != 0)
-    return filesystem_verification_result::Unavailable;
+  if (spawn_result != 0) return filesystem_verification_result::Unavailable;
 
   let const do_stop_child = [&]() wontthrow {
     unused(::kill(child, SIGKILL));
@@ -1204,8 +1202,7 @@ execute_getattrlistbulk_batch(const batched_syscall *operations,
       usize group_end = group_start + 1;
       while (group_end < operation_count) {
         let const candidate_position = operation_positions[group_end];
-        if (parent_paths[candidate_position].view() != group_parent.view())
-        {
+        if (parent_paths[candidate_position].view() != group_parent.view()) {
           break;
         }
         group_end++;
@@ -1218,8 +1215,8 @@ execute_getattrlistbulk_batch(const batched_syscall *operations,
         continue;
       }
 
-    let entries = list_directory_status_bulk(group_parent.view(),
-                                               heap_allocator());
+      let entries =
+          list_directory_status_bulk(group_parent.view(), heap_allocator());
       if (entries.has_value()) {
         entries->sort([](const directory_status_entry &left,
                          const directory_status_entry &right) {

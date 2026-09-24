@@ -229,8 +229,7 @@ fn read_smart_rows(EvalContext &cxt,
   let const smart_fallback =
       platform_tools.smart_fallback_program.is_empty()
           ? Maybe<Path>{}
-          : resolve_util_program(cxt,
-                                 platform_tools.smart_fallback_program);
+          : resolve_util_program(cxt, platform_tools.smart_fallback_program);
 
   for (let const &filesystem : filesystems) {
     let row = smart_row{};
@@ -510,8 +509,7 @@ fn EvilDisk::execute(
                      colors::ansi::BOLD_CYAN);
     table.add_column("RECORDED ERRORS", report_table_alignment::Right,
                      colors::ansi::BOLD_CYAN);
-    constexpr StringView SUPPORTED_TYPES[] = {"btrfs", "ext4", "ntfs",
-                                              "ntfs3"};
+    constexpr StringView SUPPORTED_TYPES[] = {"btrfs", "ext4", "ntfs", "ntfs3"};
     for (let const &filesystem : filesystems) {
       let status = StringView{"unsupported"};
       let read_count = String{allocator, "-"};
@@ -520,16 +518,15 @@ fn EvilDisk::execute(
       let corruption_count = String{allocator, "-"};
       let generation_count = String{allocator, "-"};
       let recorded_error_count = String{allocator, "-"};
-      if (let const evidence = os::read_filesystem_integrity_evidence(
-              filesystem.target.view());
+      if (let const evidence =
+              os::read_filesystem_integrity_evidence(filesystem.target.view());
           evidence.has_value())
       {
         switch (evidence->kind) {
         case os::filesystem_integrity_kind::BtrfsDeviceErrorCounters:
           status = "device counters";
           read_count = String::from(evidence->counters.read_count, allocator);
-          write_count =
-              String::from(evidence->counters.write_count, allocator);
+          write_count = String::from(evidence->counters.write_count, allocator);
           flush_count = String::from(evidence->counters.flush_count, allocator);
           corruption_count =
               String::from(evidence->counters.corruption_count, allocator);
@@ -542,8 +539,8 @@ fn EvilDisk::execute(
               String::from(evidence->recorded_error_count, allocator);
           break;
         case os::filesystem_integrity_kind::NtfsDirtyFlag:
-          status = evidence->is_dirty ? StringView{"dirty"}
-                                      : StringView{"clean"};
+          status =
+              evidence->is_dirty ? StringView{"dirty"} : StringView{"clean"};
           break;
         }
       } else {
@@ -557,7 +554,7 @@ fn EvilDisk::execute(
       cells.push({filesystem.target.view(), colors::ansi::BOLD_GREEN});
       cells.push({filesystem.type.view(), colors::ansi::BOLD_MAGENTA});
       cells.push({status, status == "dirty" ? colors::ansi::BOLD_RED
-                                             : colors::ansi::RESET});
+                                            : colors::ansi::RESET});
       cells.push({read_count.view(), colors::ansi::RESET});
       cells.push({write_count.view(), colors::ansi::RESET});
       cells.push({flush_count.view(), colors::ansi::RESET});

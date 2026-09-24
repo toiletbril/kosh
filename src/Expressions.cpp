@@ -11,13 +11,10 @@
 
 #include "Expressions.hpp"
 
-#include "base/Arena.hpp"
 #include "Builtin.hpp"
 #include "CLI.hpp"
 #include "CLIColors.hpp"
-#include "base/Common.hpp"
 #include "Completion.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "ExpressionsInternal.hpp"
@@ -30,8 +27,11 @@
 #include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -1011,12 +1011,10 @@ fn AnalysisContext::note_variable_binding_record(StringView name,
       is_conditional, assignment_update_mode::Replace, false});
 }
 
-fn AnalysisContext::note_variable_occurrence(StringView name,
-                                             const SourceLocation &location,
-                                             variable_occurrence_kind kind,
-                                             bool is_unresolved,
-                                             assignment_update_mode update_mode)
-    throws -> void
+fn AnalysisContext::note_variable_occurrence(
+    StringView name, const SourceLocation &location,
+    variable_occurrence_kind kind, bool is_unresolved,
+    assignment_update_mode update_mode) throws -> void
 {
   if (name.is_empty() || location.length == 0) return;
 
@@ -1041,7 +1039,8 @@ fn AnalysisContext::note_variable_occurrence(StringView name,
 
   if (kind == variable_occurrence_kind::Assignment) {
     if (update_mode == assignment_update_mode::Append &&
-        symbol_records != nullptr) {
+        symbol_records != nullptr)
+    {
       let const *prior_state = variable_occurrence_assignments.find(name);
       if (prior_state == nullptr)
         prior_state = inherited_variable_occurrence_assignments.find(name);

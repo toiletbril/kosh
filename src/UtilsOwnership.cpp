@@ -58,8 +58,7 @@ static fn change_path_ownership_recursive(
 
   let const is_symlink = os::file_type_letter(path_status.mode) == 'l';
   let const does_follow = !is_symlink || should_follow_symlink;
-  if (!os::set_file_owner(path.view(), owner_id, group_id, does_follow))
-  {
+  if (!os::set_file_owner(path.view(), owner_id, group_id, does_follow)) {
     koshkit::report_soft_koshkit_error(
         ec, cxt,
         utility_name + ": cannot change ownership of '" + path.text() +
@@ -175,10 +174,9 @@ static fn change_path_ownership_recursive(
 
     if (!change_path_ownership_recursive(
             ec, cxt, utility_name, child_paths[child_position], owner_id,
-            group_id, true,
-            should_follow_nested_symlinks, should_follow_nested_symlinks,
-            active_directories, child_status, known_child_followed_status,
-            was_child_followed_status_queried))
+            group_id, true, should_follow_nested_symlinks,
+            should_follow_nested_symlinks, active_directories, child_status,
+            known_child_followed_status, was_child_followed_status_queried))
       did_succeed = false;
   }
 

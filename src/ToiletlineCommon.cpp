@@ -313,8 +313,10 @@ fn get_display_width(StringView text) -> usize
                                               nullptr);
 }
 
-fn get_byte_offset_at_or_before_display_cell(
-    StringView text, usize cell_position, usize &actual_cell_position) -> usize
+fn get_byte_offset_at_or_before_display_cell(StringView text,
+                                             usize cell_position,
+                                             usize &actual_cell_position)
+    -> usize
 {
   usize byte_offset = 0;
   actual_cell_position =

@@ -8,22 +8,22 @@
  * the full parser.
  */
 
-#include "base/Arena.hpp"
 #include "Builtin.hpp"
 #include "CLIColors.hpp"
 #include "Completion.hpp"
 #include "CompletionInternal.hpp"
 #include "CompletionPolicy.hpp"
-#include "base/Debug.hpp"
-#include "base/HashSet.hpp"
 #include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "MimicMood.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "Tokens.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Debug.hpp"
+#include "base/HashSet.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -707,7 +707,8 @@ fn internal::complete_from_builtin_flags(StringView line, StringView token,
 
     if (util_for_flags.has_value()) {
       if (*util_for_flags == koshkit::Utility::Kind::Which && wants_operand &&
-          !os::has_directory_separator(token)) {
+          !os::has_directory_separator(token))
+      {
         if (token.is_empty() && mode != completion_mode::Listing) return None;
 
         let names =
@@ -839,8 +840,8 @@ fn internal::complete_from_builtin_flags(StringView line, StringView token,
   if (builtin_kind.has_value() && *builtin_kind == Builtin::Kind::Export &&
       wants_operand)
   {
-    let const is_value_after_equals = token_start > 0 &&
-                                      line[token_start - 1] == '=';
+    let const is_value_after_equals =
+        token_start > 0 && line[token_start - 1] == '=';
     if (!is_value_after_equals) {
       let names = ArrayList<String>{heap_allocator()};
       push_variable_name_candidates(token, context, names);

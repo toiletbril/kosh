@@ -10,8 +10,8 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../base/Path.hpp"
 #include "../Platform.hpp"
+#include "../base/Path.hpp"
 #include "Mode.hpp"
 
 FLAG_LIST_DECL();
@@ -37,8 +37,7 @@ enum class chmod_traversal_mode : u8
 static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
                       StringView expression,
                       const os::file_status *known_status,
-                      chmod_traversal_mode traversal_mode) throws
-    -> bool
+                      chmod_traversal_mode traversal_mode) throws -> bool
 {
   os::file_status status{};
   if (known_status != nullptr) {
@@ -132,12 +131,12 @@ fn Chmod::execute(const ExecContext &ec, EvalContext &cxt,
 
   for (usize index = 1; index < operands.count(); index++) {
     if (os::INTERRUPT_REQUESTED) return 130;
-    if (!change_mode(
-            ec, cxt, Path{operands[index].view(), cxt.scratch_allocator()},
-            expression, nullptr,
-            FLAG_CHMOD_RECURSIVE.is_enabled()
-                ? chmod_traversal_mode::Recursive
-                : chmod_traversal_mode::SinglePath))
+    if (!change_mode(ec, cxt,
+                     Path{operands[index].view(), cxt.scratch_allocator()},
+                     expression, nullptr,
+                     FLAG_CHMOD_RECURSIVE.is_enabled()
+                         ? chmod_traversal_mode::Recursive
+                         : chmod_traversal_mode::SinglePath))
       status = 1;
     if (os::INTERRUPT_REQUESTED) return 130;
   }

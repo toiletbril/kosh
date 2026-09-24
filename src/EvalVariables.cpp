@@ -9,24 +9,24 @@
  * from aggregate expansion in EvalArrays.cpp.
  */
 
-#include "base/Arena.hpp"
 #include "CLI.hpp"
 #include "CLIColors.hpp"
-#include "base/Common.hpp"
 #include "Completion.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -304,9 +304,8 @@ pure fn EvalContext::is_dynamic_reader_unset(StringView name) const wontthrow
 
   let const id = dynamic_reader_of(name);
 
-  return id.has_value() &&
-         (variable_store().unset_dynamic_readers() & dynamic_reader_mask(*id)) !=
-         0;
+  return id.has_value() && (variable_store().unset_dynamic_readers() &
+                            dynamic_reader_mask(*id)) != 0;
 }
 
 fn EvalContext::unset_dynamic_reader(StringView name) wontthrow -> void
@@ -326,9 +325,8 @@ pure fn EvalContext::is_dynamic_write_owner(StringView name) const wontthrow
 
   let const id = dynamic_reader_of(name);
 
-  return id.has_value() &&
-         (variable_store().unset_dynamic_readers() & dynamic_reader_mask(*id)) ==
-         0;
+  return id.has_value() && (variable_store().unset_dynamic_readers() &
+                            dynamic_reader_mask(*id)) == 0;
 }
 
 hot fn EvalContext::write_dynamic_variable(StringView name,
@@ -467,8 +465,9 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
           return String::from(*trigger_line, heap_allocator());
         }
 
-        return String::from(line_number_at_location(source_store().m_current_location),
-                            heap_allocator());
+        return String::from(
+            line_number_at_location(source_store().m_current_location),
+            heap_allocator());
       }
       case dynamic_var::KOSH_GIT_BRANCH: {
         if (m_git_branch_command_index != m_command_evaluation_index) {

@@ -8,12 +8,12 @@
  * callbacks that the evaluator core does not otherwise include.
  */
 
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 

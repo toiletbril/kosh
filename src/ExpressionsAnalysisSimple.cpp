@@ -9,13 +9,10 @@
  * simple-command storage and execution.
  */
 
-#include "base/Arena.hpp"
 #include "Builtin.hpp"
 #include "CLI.hpp"
 #include "CLIColors.hpp"
-#include "base/Common.hpp"
 #include "Completion.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
@@ -28,8 +25,11 @@
 #include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -480,7 +480,8 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       actx.mark_working_directory_unknown();
 
     if (actx.is_posix_sh_shebang &&
-        var.get_update_mode() == assignment_update_mode::Append) {
+        var.get_update_mode() == assignment_update_mode::Append)
+    {
       actx.report_diagnostic(diagnostic_id::sc3024, var.get_location(),
                              {var.get_name()});
     }
@@ -489,10 +490,10 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
         scan_assignment_value(actx, var.get_value(), var.get_location());
     check_assignment_value_shape(
         actx,
-        assignment_lint_input{
-            var.get_name(), analysis_source_text(actx, var.get_location()),
-            var.get_location(), var.get_update_mode(), is_command_prefix,
-            shape});
+        assignment_lint_input{var.get_name(),
+                              analysis_source_text(actx, var.get_location()),
+                              var.get_location(), var.get_update_mode(),
+                              is_command_prefix, shape});
 
     if (prefix_outlives_command) {
       let const name_location =

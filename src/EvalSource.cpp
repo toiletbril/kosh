@@ -9,19 +9,19 @@
  * delegation outside ordinary evaluator operations.
  */
 
-#include "base/Arena.hpp"
 #include "CLI.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -56,11 +56,11 @@ static fn mimicked_error_status(const std::exception_ptr &error,
     std::rethrow_exception(error);
   } catch (const ErrorBase &caught_error) {
     let const status = caught_error.command_status();
-    return static_cast<i32>(
-        status == 1 && mode == mimicked_error_status_mode::Posix &&
-                caught_error.is_script_fatal()
-            ? 2
-            : status);
+    return static_cast<i32>(status == 1 &&
+                                    mode == mimicked_error_status_mode::Posix &&
+                                    caught_error.is_script_fatal()
+                                ? 2
+                                : status);
   } catch (...) {
     return 1;
   }
@@ -99,14 +99,16 @@ fn EvalContext::run_program_fallback(ExecContext &ec, mimic_mood mode,
       current_source(), String{heap_allocator(), current_origin().view()});
   fallback_context.source_store().set_mimicry_depth(
       source_store().mimicry_depth());
-  fallback_context.source_store().m_retained_source_generation = source_store().m_retained_source_generation;
+  fallback_context.source_store().m_retained_source_generation =
+      source_store().m_retained_source_generation;
   fallback_context.set_shell_executable_path(String{shell_executable_path()});
   fallback_context.set_koshkit(koshkit());
   fallback_context.set_mimicry(mimicry());
   fallback_context.set_warning_level(warning_level());
   fallback_context.set_diagnostics_disabled(diagnostics_disabled());
   fallback_context.set_source_traces_enabled(should_print_source_traces());
-  fallback_context.source_store().m_source_frames.reserve(source_store().m_source_frames.count());
+  fallback_context.source_store().m_source_frames.reserve(
+      source_store().m_source_frames.count());
   for (let const &frame : source_store().m_source_frames) {
     fallback_context.source_store().m_source_frames.push(source_frame{
         String{frame.origin.view()}, frame.call_site, frame.parent_source,
@@ -114,33 +116,42 @@ fn EvalContext::run_program_fallback(ExecContext &ec, mimic_mood mode,
         frame.is_cli_root, frame.is_only_root_source});
     fallback_context.source_store().m_source_frames.back().function_call_depth =
         frame.function_call_depth;
-    fallback_context.source_store().m_source_frames.back().was_printed = frame.was_printed;
+    fallback_context.source_store().m_source_frames.back().was_printed =
+        frame.was_printed;
     fallback_context.source_store().m_source_frames.back().should_defer_trace =
         frame.should_defer_trace;
     fallback_context.source_store().m_source_frames.back().has_deferred_trace =
         frame.has_deferred_trace;
-    fallback_context.source_store().m_source_frames.back().deferred_trace_location =
-        frame.deferred_trace_location;
+    fallback_context.source_store()
+        .m_source_frames.back()
+        .deferred_trace_location = frame.deferred_trace_location;
   }
   defer
   {
     let const shared_frame_count =
-        source_store().m_source_frames.count() < fallback_context.source_store().m_source_frames.count()
+        source_store().m_source_frames.count() <
+                fallback_context.source_store().m_source_frames.count()
             ? source_store().m_source_frames.count()
             : fallback_context.source_store().m_source_frames.count();
     for (usize frame_index = 0; frame_index < shared_frame_count; frame_index++)
     {
       source_store().m_source_frames[frame_index].was_printed =
           source_store().m_source_frames[frame_index].was_printed ||
-          fallback_context.source_store().m_source_frames[frame_index].was_printed;
+          fallback_context.source_store()
+              .m_source_frames[frame_index]
+              .was_printed;
       source_store().m_source_frames[frame_index].has_deferred_trace =
           source_store().m_source_frames[frame_index].has_deferred_trace ||
-          fallback_context.source_store().m_source_frames[frame_index].has_deferred_trace;
-      if (fallback_context.source_store().m_source_frames[frame_index]
+          fallback_context.source_store()
+              .m_source_frames[frame_index]
+              .has_deferred_trace;
+      if (fallback_context.source_store()
+              .m_source_frames[frame_index]
               .deferred_trace_location.has_value())
       {
         source_store().m_source_frames[frame_index].deferred_trace_location =
-            fallback_context.source_store().m_source_frames[frame_index]
+            fallback_context.source_store()
+                .m_source_frames[frame_index]
                 .deferred_trace_location;
       }
     }
@@ -252,10 +263,10 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
       is_mimic_strict ? "kosh" : "lax");
 
   let const script_filename = ec.program_path().view();
-  source_store().m_source_frames.push(source_frame{String{ec.program().view()},
-                                    ec.source_location(), current_source(),
-                                    source_generation_for(current_source()),
-                                    String{script_filename}, false, false});
+  source_store().m_source_frames.push(
+      source_frame{String{ec.program().view()}, ec.source_location(),
+                   current_source(), source_generation_for(current_source()),
+                   String{script_filename}, false, false});
   source_store().m_source_frames.back().should_defer_trace = true;
   source_store().m_source_frames.back().function_call_depth =
       function_store().call_names().count();
@@ -364,10 +375,9 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
 
   /* The kernel hands a shebang interpreter the resolved script path, so $0 and
      BASH_SOURCE read that path rather than the word as typed. */
-  m_shell_name =
-      String{heap_allocator(), ec.should_use_fallback_argv0
-                                   ? ec.args()[0].view()
-                                   : ec.program_path().view()};
+  m_shell_name = String{heap_allocator(), ec.should_use_fallback_argv0
+                                              ? ec.args()[0].view()
+                                              : ec.program_path().view()};
   set_current_source(&*contents, String{ec.program().view()});
   source_store().m_current_location = SourceLocation{};
   source_store().mimicry_depth()++;
@@ -499,7 +509,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
   enter_source(call_site ? *call_site : SourceLocation{0, 0});
   defer { leave_source(); };
 
-  let const parent_source = call_site ? source_store().m_current_source : nullptr;
+  let const parent_source =
+      call_site ? source_store().m_current_source : nullptr;
   let const frame_is_sourced_file =
       consume_return && filename.has_value() && !filename->is_empty();
 
@@ -518,7 +529,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
       : String{heap_allocator()},
       false, false
   });
-  source_store().m_source_frames.back().should_defer_trace = frame_is_sourced_file;
+  source_store().m_source_frames.back().should_defer_trace =
+      frame_is_sourced_file;
   source_store().m_source_frames.back().function_call_depth =
       function_store().call_names().count();
   if (reject_return)
@@ -554,8 +566,10 @@ fn EvalContext::run_source(StringView source, StringView origin,
 
       let const parsed_ast = parser.construct_ast();
       ASSERT(parsed_ast != nullptr);
-      source_store().m_retained_source_asts.reserve(source_store().m_retained_source_asts.count() + 1);
-      source_store().m_retained_sources.reserve(source_store().m_retained_sources.count() + 1);
+      source_store().m_retained_source_asts.reserve(
+          source_store().m_retained_source_asts.count() + 1);
+      source_store().m_retained_sources.reserve(
+          source_store().m_retained_sources.count() + 1);
 
       /* Keep a copy of the source alive for as long as the AST, so a
          control-flow jump made inside it can point a caret at the right text
@@ -575,8 +589,10 @@ fn EvalContext::run_source(StringView source, StringView origin,
     }
     source = retained_source->view();
 
-    let const previous_history_recording_root = source_store().m_history_recording_root;
-    let const previous_history_recording_source = source_store().m_history_recording_source;
+    let const previous_history_recording_root =
+        source_store().m_history_recording_root;
+    let const previous_history_recording_source =
+        source_store().m_history_recording_source;
     if (history == history_recording::Enabled) {
       source_store().m_history_recording_root = ast;
       source_store().m_history_recording_source = source;
@@ -584,7 +600,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
     defer
     {
       source_store().m_history_recording_root = previous_history_recording_root;
-      source_store().m_history_recording_source = previous_history_recording_source;
+      source_store().m_history_recording_source =
+          previous_history_recording_source;
     };
 
     let const previous_source = source_store().m_current_source;
@@ -669,7 +686,8 @@ fn EvalContext::resolve_source_path(StringView path,
 fn EvalContext::clear_retained_sources() wontthrow -> void
 {
   LOG(All, "dropping %zu retained sources and %zu retained asts",
-      source_store().m_retained_sources.count(), source_store().m_retained_source_asts.count());
+      source_store().m_retained_sources.count(),
+      source_store().m_retained_source_asts.count());
 
 #if !defined NDEBUG
   for (let const &frame : source_store().m_source_frames) {
@@ -686,7 +704,8 @@ fn EvalContext::clear_retained_sources() wontthrow -> void
   /* A stashed source view or location may index a buffer freed just below, so
      both drop to the unlocated rendering. */
   for (process_substitution &sub :
-       expansion_store().pending_process_substitutions()) {
+       expansion_store().pending_process_substitutions())
+  {
     sub.source = StringView{};
     sub.location = SourceLocation{};
   }
@@ -734,7 +753,8 @@ EvalContext::scan_source_generation(const String *source) const wontthrow -> u64
 pure fn EvalContext::source_generation_for(const String *source) const wontthrow
     -> u64
 {
-  if (source == source_store().m_current_source) return source_store().m_current_source_generation;
+  if (source == source_store().m_current_source)
+    return source_store().m_current_source_generation;
 
   return scan_source_generation(source);
 }
@@ -743,7 +763,8 @@ pure fn EvalContext::borrowed_frame_source(
     const source_frame &frame) const wontthrow -> const String *
 {
   if (frame.parent_source_generation != EXTERNAL_SOURCE_GENERATION &&
-      frame.parent_source_generation != source_store().m_retained_source_generation)
+      frame.parent_source_generation !=
+          source_store().m_retained_source_generation)
   {
     return nullptr;
   }

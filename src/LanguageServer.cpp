@@ -804,9 +804,9 @@ fn Server::format_document(const JsonValue *id, const JsonValue *params) throws
   let errors = ArrayList<String>{heap_allocator()};
   let formatted = Maybe<String>{};
   if (!document->format.is_host_format) {
-    formatted = format_shell_source(
-        document->normalized_source.view(), m_ast_arena, errors, nullptr,
-        m_context.function_arena(), document->mood);
+    formatted = format_shell_source(document->normalized_source.view(),
+                                    m_ast_arena, errors, nullptr,
+                                    m_context.function_arena(), document->mood);
   } else {
     let replacements = ArrayList<parser_format_replacement>{heap_allocator()};
     for (let const &fragment : document->format.fragments) {

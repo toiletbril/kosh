@@ -211,11 +211,8 @@ constexpr set_option_descriptor SET_OPTIONS[] = {
      "extended-arithmetic", "Use arbitrary-precision integers and finite decimal values."},
     {shell_option_id::Koshkit, set_option_behavior::Stored, '\0', "koshkit",
      "Resolve the bundled koshkit utility names directly as commands."},
-    {shell_option_id::SpaceAfterCompletion,
-     set_option_behavior::Stored,
-     '\0',
-     "space-after-completion",
-     "Insert a space after an accepted non-directory completion."},
+    {shell_option_id::SpaceAfterCompletion, set_option_behavior::Stored, '\0',
+     "space-after-completion", "Insert a space after an accepted non-directory completion."},
     {shell_option_id::Vi,
      set_option_behavior::Vi,
      '\0', "vi",
@@ -985,7 +982,8 @@ fn Set::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
           unavailable_error.set_command_status(2);
           throw unavailable_error;
         }
-        apply_or_reject_option(cxt, SET_OPTIONS[*option_position], enable, true);
+        apply_or_reject_option(cxt, SET_OPTIONS[*option_position], enable,
+                               true);
       }
       continue;
     }

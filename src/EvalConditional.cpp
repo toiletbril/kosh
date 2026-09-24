@@ -10,15 +10,15 @@
  */
 
 #include "Builtin.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -494,8 +494,7 @@ struct conditional_evaluator
                 ascii_lower_copy(cxt.scratch_allocator(), left.view());
             let const is_matched =
                 utils::glob_matches(match_pattern.view(), match_value.view(),
-                                    active, 0,
-                                    cxt.get_extglob_mode());
+                                    active, 0, cxt.get_extglob_mode());
             return *selected_binary_operator ==
                            BinaryOperatorKind::PatternNotEqual
                        ? !is_matched
@@ -591,8 +590,7 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws
   key += is_case_insensitive ? 'i' : 's';
   key += pattern;
 
-  if (CompiledRegex *cached =
-          expansion_store().find_cached_regex(key.view());
+  if (CompiledRegex *cached = expansion_store().find_cached_regex(key.view());
       cached != nullptr)
   {
     LOG(All, "regex cache hit for the pattern '%.*s'",
@@ -610,10 +608,10 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws
       static_cast<int>(pattern.length), pattern.data);
   let const pattern_text = String{scratch_allocator(), pattern};
   os::compiled_regex compiled;
-  if (os::compile_regex(
-          pattern_text.view(), compiled,
-          is_case_insensitive ? os::case_sensitivity::Insensitive
-                              : os::case_sensitivity::Sensitive) !=
+  if (os::compile_regex(pattern_text.view(), compiled,
+                        is_case_insensitive
+                            ? os::case_sensitivity::Insensitive
+                            : os::case_sensitivity::Sensitive) !=
       os::regex_compile_result::Ok)
   {
     let reason = String{scratch_allocator()};
@@ -623,7 +621,8 @@ fn EvalContext::cached_compiled_regex(StringView pattern) throws
     fail_conditional(reason.view(),
                      "The pattern must be a valid extended regular expression");
   }
-  return expansion_store().store_regex(key.view(), CompiledRegex{compiled})
+  return expansion_store()
+      .store_regex(key.view(), CompiledRegex{compiled})
       ->get();
 }
 

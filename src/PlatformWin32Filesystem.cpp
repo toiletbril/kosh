@@ -11,13 +11,13 @@
  */
 
 #include "CLI.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -43,8 +43,7 @@ fn canonical_path(const Path &path) wontthrow -> Maybe<Path>
   let const do_resolve_direct =
       [](const Path &candidate, bool should_preserve_extended_prefix)
           wontthrow -> Maybe<Path> {
-    let const wide_candidate =
-        utf8_to_wide(candidate.view(), heap_allocator());
+    let const wide_candidate = utf8_to_wide(candidate.view(), heap_allocator());
     if (!wide_candidate.has_value()) return koshka::None;
     let const handle = CreateFileW(
         wide_candidate->begin(), 0,
@@ -638,9 +637,9 @@ cold fn list_directory_typed(StringView dir, Allocator allocator) throws
 
   let entries = ArrayList<Path::directory_child>{allocator};
   do {
-    let name = wide_to_utf8(data.cFileName,
-                            static_cast<usize>(lstrlenW(data.cFileName)),
-                            allocator);
+    let name =
+        wide_to_utf8(data.cFileName,
+                     static_cast<usize>(lstrlenW(data.cFileName)), allocator);
     if (!name.has_value()) return None;
     if (name->view() == StringView{"."} || name->view() == StringView{".."})
       continue;
@@ -810,8 +809,7 @@ fn write_to_named_temp_file(const Path &directory, StringView prefix,
     return None;
   }
 
-  let const wide_directory =
-      utf8_to_wide(directory.view(), heap_allocator());
+  let const wide_directory = utf8_to_wide(directory.view(), heap_allocator());
   if (!wide_directory.has_value()) return None;
   let const wide_prefix = utf8_to_wide(prefix, heap_allocator());
   if (!wide_prefix.has_value()) return None;
@@ -884,8 +882,7 @@ fn make_temp_directory(const Path &directory, StringView prefix) throws
     directory_name += String::from(attempt, heap_allocator()).view();
     let candidate = Path{directory.text()};
     candidate.append(directory_name.view());
-    let const wide_candidate =
-        utf8_to_wide(candidate.view(), heap_allocator());
+    let const wide_candidate = utf8_to_wide(candidate.view(), heap_allocator());
     if (wide_candidate.has_value() &&
         CreateDirectoryW(wide_candidate->begin(), nullptr) != 0)
     {
@@ -1422,8 +1419,7 @@ fn read_filesystem_integrity_evidence(StringView path) throws
   return evidence;
 }
 
-fn verify_filesystem_integrity(StringView path,
-                               u64 timeout_nanoseconds) throws
+fn verify_filesystem_integrity(StringView path, u64 timeout_nanoseconds) throws
     -> filesystem_verification_result
 {
   unused(path);

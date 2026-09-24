@@ -10,14 +10,14 @@
 #include "CLI.hpp"
 
 #include "CLIColors.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -627,8 +627,7 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
                                     is_long, base_position, arg_locations));
 
           let value = StringView{value_offset};
-          if (!value.is_empty() && value[0] == '=')
-            value = value.substring(1);
+          if (!value.is_empty() && value[0] == '=') value = value.substring(1);
           if (!value.is_empty() && optional_flag->should_accept_value(value)) {
             optional_flag->set(value);
             optional_flag->set_value_location(attached_flag_value_location(
@@ -804,11 +803,11 @@ fn parse_util_operands(const FlagList &flags, const ArrayList<String> &args,
     -> util_operands_result
 {
   let operand_locations = ArrayList<SourceLocation>{allocator};
-  let operands =
-      parse_flags_vec(flags, args, 0, nullptr, arg_locations, &operand_locations,
-                      {}, should_accept_negative_number_operand,
-                      should_allow_options_after_operands,
-                      should_accept_unknown_flag_operand, allocator);
+  let operands = parse_flags_vec(flags, args, 0, nullptr, arg_locations,
+                                 &operand_locations, {},
+                                 should_accept_negative_number_operand,
+                                 should_allow_options_after_operands,
+                                 should_accept_unknown_flag_operand, allocator);
   ASSERT(operands.allocator() == allocator);
   ASSERT(operand_locations.allocator() == allocator);
   ASSERT(operands.count() == operand_locations.count());
@@ -1171,7 +1170,10 @@ fn ReportTable::add(StringView name, StringView value, StringView style) throws
 fn ReportTable::add_column(StringView heading, report_table_alignment alignment,
                            StringView style) throws -> void
 {
-  m_columns.push({String{m_columns.allocator(), heading}, alignment, style});
+  m_columns.push({
+      String{m_columns.allocator(), heading},
+      alignment, style
+  });
 }
 
 fn ReportTable::add_row(const ArrayList<report_table_cell_view> &cells) throws
@@ -1180,22 +1182,23 @@ fn ReportTable::add_row(const ArrayList<report_table_cell_view> &cells) throws
   let row = ArrayList<report_table_cell>{m_grid_rows.allocator()};
   row.reserve(cells.count());
   for (let const &cell : cells)
-    row.push({String{row.allocator(), cell.text}, cell.style});
+    row.push({
+        String{row.allocator(), cell.text},
+        cell.style
+    });
   m_grid_rows.push(steal(row));
 }
 
-static fn append_report_grid(String &output,
-                             const ArrayList<report_table_column> &columns,
-                             const ArrayList<ArrayList<report_table_cell>> &rows,
-                             bool should_color, StringView indentation,
-                             bool should_show_header,
-                             usize column_gap_space_count) throws
-    -> void
+static fn append_report_grid(
+    String &output, const ArrayList<report_table_column> &columns,
+    const ArrayList<ArrayList<report_table_cell>> &rows, bool should_color,
+    StringView indentation, bool should_show_header,
+    usize column_gap_space_count) throws -> void
 {
   let widths = ArrayList<usize>{columns.allocator()};
   widths.reserve(columns.count());
-  for (let const &column : columns) widths.push(toiletline::get_display_width(
-      column.heading.view()));
+  for (let const &column : columns)
+    widths.push(toiletline::get_display_width(column.heading.view()));
 
   for (let const &row : rows) {
     for (usize index = 0; index < columns.count(); index++) {
@@ -1218,8 +1221,8 @@ static fn append_report_grid(String &output,
   let const append_row = [&](const ArrayList<report_table_cell> &row) throws {
     output += indentation;
     for (usize index = 0; index < columns.count(); index++) {
-      let const text = index < row.count() ? row[index].text.view()
-                                           : StringView{};
+      let const text =
+          index < row.count() ? row[index].text.view() : StringView{};
       let const style = index < row.count() && !row[index].style.is_empty()
                             ? row[index].style
                             : columns[index].style;
@@ -1236,10 +1239,14 @@ static fn append_report_grid(String &output,
     let header = ArrayList<report_table_cell>{columns.allocator()};
     header.reserve(columns.count());
     for (let const &column : columns)
-      header.push({String{header.allocator(), column.heading.view()}, {}});
+      header.push({
+          String{header.allocator(), column.heading.view()},
+          {}
+      });
     append_row(header);
   }
-  for (let const &row : rows) append_row(row);
+  for (let const &row : rows)
+    append_row(row);
 }
 
 fn ReportTable::to_string(bool should_color,
@@ -1256,10 +1263,7 @@ fn ReportTable::to_string(bool should_color,
   return output;
 }
 
-fn ReportTable::to_string() const throws -> String
-{
-  return to_string(false);
-}
+fn ReportTable::to_string() const throws -> String { return to_string(false); }
 
 fn append_titled_report_table(String &output, StringView title,
                               const ReportTable &table,
@@ -1452,8 +1456,8 @@ fn show_cursor(const ExecContext &ec) wontthrow -> void
 }
 
 fn append_live_controls_bar(String &output, StringView sample_label,
-                            StringView refresh_label, bool should_color)
-    throws -> void
+                            StringView refresh_label, bool should_color) throws
+    -> void
 {
   append_report_text(output,
                      "ctrl+c to exit. cumulative stats over " + sample_label +

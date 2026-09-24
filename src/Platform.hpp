@@ -681,8 +681,7 @@ enum class filesystem_verification_result : u8
   Unavailable,
 };
 
-fn verify_filesystem_integrity(StringView path,
-                               u64 timeout_nanoseconds) throws
+fn verify_filesystem_integrity(StringView path, u64 timeout_nanoseconds) throws
     -> filesystem_verification_result;
 
 fn sync_filesystems() wontthrow -> bool;
@@ -1371,7 +1370,8 @@ constexpr bool HAS_REGEX_ENGINE = true;
 fn compile_regex(StringView pattern, compiled_regex &out,
                  case_sensitivity sensitivity) throws -> regex_compile_result;
 fn compile_basic_regex(StringView pattern, compiled_regex &out,
-                       case_sensitivity sensitivity) throws -> regex_compile_result;
+                       case_sensitivity sensitivity) throws
+    -> regex_compile_result;
 
 fn execute_regex(compiled_regex &compiled, StringView subject,
                  ArrayList<regex_span> &spans, String &error_message,
@@ -1383,7 +1383,8 @@ fn free_regex(compiled_regex &compiled) wontthrow -> void;
 
 /* Compiles a basic search pattern with no capture for line-at-a-time grep. */
 fn compile_search_regex(StringView pattern, compiled_regex &out,
-                        case_sensitivity sensitivity) throws -> regex_compile_result;
+                        case_sensitivity sensitivity) throws
+    -> regex_compile_result;
 
 fn regex_matches(compiled_regex &compiled, StringView subject) throws -> bool;
 fn regex_matches_null_terminated(compiled_regex &compiled,
@@ -1928,8 +1929,7 @@ fn write_system_log(StringView tag, StringView priority, StringView message,
 /* Script fallback returns KOSH_INVALID_PROCESS when it is allowed and the file
    has no executable format. */
 fn execute_program(
-    ExecContext &ec,
-    StringView source = {}, i64 process_group_id = 0,
+    ExecContext &ec, StringView source = {}, i64 process_group_id = 0,
     script_fallback_policy fallback = script_fallback_policy::Reject,
     terminal_handoff handoff = terminal_handoff::Keep,
     process_group_mode process_group = process_group_mode::Inherit) throws
@@ -2000,11 +2000,12 @@ private:
   fn close_owned_processes() wontthrow -> void;
 };
 
-fn launch_process_substitution(
-    StringView source, bool source_traces_enabled,
-    const subshell_bootstrap *bootstrap, StringView shell_name,
-    i32 previous_exit_status, i64 shell_process_id, usize subshell_depth,
-    process_substitution_direction direction, mimic_mood mood) throws
+fn launch_process_substitution(StringView source, bool source_traces_enabled,
+                               const subshell_bootstrap *bootstrap,
+                               StringView shell_name, i32 previous_exit_status,
+                               i64 shell_process_id, usize subshell_depth,
+                               process_substitution_direction direction,
+                               mimic_mood mood) throws
     -> process_substitution_launch;
 fn release_unused_process_substitution(opaque *cleanup) wontthrow -> void;
 
@@ -2028,10 +2029,9 @@ fn launch_compound_stage(
     StringView source, Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
     Maybe<descriptor> err_fd, SourceLocation location = {},
     StringView diagnostic_source = {}, i64 process_group_id = 0,
-    const subshell_bootstrap *bootstrap = nullptr,
-    StringView shell_name = {}, i32 previous_exit_status = 0,
-    i64 shell_process_id = 0, usize subshell_depth = 0,
-    mimic_mood mood = static_cast<mimic_mood>(0),
+    const subshell_bootstrap *bootstrap = nullptr, StringView shell_name = {},
+    i32 previous_exit_status = 0, i64 shell_process_id = 0,
+    usize subshell_depth = 0, mimic_mood mood = static_cast<mimic_mood>(0),
     process_group_mode process_group = process_group_mode::Inherit) throws
     -> compound_stage_launch;
 

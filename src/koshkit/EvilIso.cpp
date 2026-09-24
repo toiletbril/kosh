@@ -11,17 +11,17 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../base/Path.hpp"
 #include "../Platform.hpp"
 #include "../Toiletline.hpp"
 #include "../Utils.hpp"
+#include "../base/Path.hpp"
 
 #include <cstdlib>
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL(
-    "[-a] [-n] [-c] [-s] [-r] [-k] [--kubernetes] [--container] [--containers]");
+HELP_SYNOPSIS_DECL("[-a] [-n] [-c] [-s] [-r] [-k] [--kubernetes] [--container] "
+                   "[--containers]");
 
 HELP_DESCRIPTION_DECL(
     "The eviliso utility reports namespaces, cgroups, sessions, remote "
@@ -38,8 +38,7 @@ FLAG(EVILISO_RUNTIME, Bool, 'k', "runtime",
      "Report container runtime evidence.");
 FLAG(EVILISO_KUBERNETES, Bool, '\0', "kubernetes",
      "Report Kubernetes evidence.");
-FLAG(EVILISO_CONTAINER, Bool, '\0', "container",
-     "Report detected containers.");
+FLAG(EVILISO_CONTAINER, Bool, '\0', "container", "Report detected containers.");
 FLAG(EVILISO_CONTAINERS, Bool, '\0', "containers",
      "Report detected containers.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
@@ -119,8 +118,8 @@ fn eviliso_namespace_process_override(Allocator allocator) throws
       let const name = remainder.substring_of_length(0, *name_end);
       let const role = remainder.substring(*name_end + 1);
       if (role != "self" && role != "other") continue;
-      processes.push(namespace_process{process_id.value(), name,
-                                       role == "self", allocator});
+      processes.push(namespace_process{process_id.value(), name, role == "self",
+                                       allocator});
     }
     return processes;
   }
@@ -129,8 +128,8 @@ fn eviliso_namespace_process_override(Allocator allocator) throws
   return None;
 }
 
-fn eviliso_namespace_proc_path(StringView suffix,
-                               Allocator allocator) throws -> String
+fn eviliso_namespace_proc_path(StringView suffix, Allocator allocator) throws
+    -> String
 {
 #ifndef NDEBUG
   if (let const *root = std::getenv("KOSH_TEST_EVILISO_NAMESPACE_PROC");
@@ -147,8 +146,7 @@ fn eviliso_namespace_proc_path(StringView suffix,
   return path;
 }
 
-fn namespace_identifier(StringView target, Allocator allocator) throws
-    -> String
+fn namespace_identifier(StringView target, Allocator allocator) throws -> String
 {
   let const open = target.find_character('[');
   if (!open.has_value()) return String{allocator, target};
@@ -167,11 +165,10 @@ fn append_namespace_report(String &output, bool should_color,
   constexpr usize NAME_COUNT = sizeof(names) / sizeof(*names);
   let const allocator = processes.allocator();
   let const namespace_path = eviliso_namespace_proc_path("self/ns", allocator);
-  if (!Path{namespace_path.view(), allocator}.is_directory())
-  {
+  if (!Path{namespace_path.view(), allocator}.is_directory()) {
     processes.clear();
-    processes.push(namespace_process{os::get_current_process_id(), "-", true,
-                                     allocator});
+    processes.push(
+        namespace_process{os::get_current_process_id(), "-", true, allocator});
   }
   let relations = ArrayList<namespace_relation>{allocator};
   relations.reserve(processes.count() * NAME_COUNT);
@@ -208,29 +205,30 @@ fn append_namespace_report(String &output, bool should_color,
           identifier_value.is_error() ? 0 : identifier_value.value();
       relation.process_id = process.process_id;
       relation.name = String{allocator, process.name.view()};
-      relation.role = process.is_self ? StringView{"self"} : StringView{"other"};
+      relation.role =
+          process.is_self ? StringView{"self"} : StringView{"other"};
       relation.is_identifier_numeric = !identifier_value.is_error();
       relation.is_available = target.has_value();
       relations.push(steal(relation));
     }
   }
 
-  relations.sort([](const namespace_relation &left,
-                    const namespace_relation &right) {
-    if (left.type_index != right.type_index)
-      return left.type_index < right.type_index;
-    if (left.is_available != right.is_available) return left.is_available;
-    if (left.is_identifier_numeric != right.is_identifier_numeric)
-      return left.is_identifier_numeric;
-    if (left.is_identifier_numeric &&
-        left.identifier_value != right.identifier_value)
-    {
-      return left.identifier_value < right.identifier_value;
-    }
-    if (left.identifier != right.identifier)
-      return left.identifier < right.identifier;
-    return left.process_id < right.process_id;
-  });
+  relations.sort(
+      [](const namespace_relation &left, const namespace_relation &right) {
+        if (left.type_index != right.type_index)
+          return left.type_index < right.type_index;
+        if (left.is_available != right.is_available) return left.is_available;
+        if (left.is_identifier_numeric != right.is_identifier_numeric)
+          return left.is_identifier_numeric;
+        if (left.is_identifier_numeric &&
+            left.identifier_value != right.identifier_value)
+        {
+          return left.identifier_value < right.identifier_value;
+        }
+        if (left.identifier != right.identifier)
+          return left.identifier < right.identifier;
+        return left.process_id < right.process_id;
+      });
 
   let table = ReportTable{allocator};
   table.add_column("TYPE", report_table_alignment::Left,
@@ -293,8 +291,7 @@ fn append_namespace_report(String &output, bool should_color,
 struct cgroup_membership
 {
   cgroup_membership(StringView hierarchy, u64 hierarchy_value,
-                    StringView controller, StringView path,
-                    Allocator allocator)
+                    StringView controller, StringView path, Allocator allocator)
       : hierarchy(allocator, hierarchy), hierarchy_value(hierarchy_value),
         controller(allocator, controller), path(allocator, path)
   {}
@@ -344,8 +341,7 @@ fn kubernetes_service_account_path(StringView name, Allocator allocator) throws
     -> String
 {
 #ifndef NDEBUG
-  if (let const *root =
-          std::getenv("KOSH_TEST_EVILISO_SERVICE_ACCOUNT_ROOT");
+  if (let const *root = std::getenv("KOSH_TEST_EVILISO_SERVICE_ACCOUNT_ROOT");
       root != nullptr && root[0] != '\0')
   {
     let path = String{allocator, root};
@@ -354,8 +350,8 @@ fn kubernetes_service_account_path(StringView name, Allocator allocator) throws
     return path;
   }
 #endif
-  let path = String{allocator,
-                    "/var/run/secrets/kubernetes.io/serviceaccount/"};
+  let path =
+      String{allocator, "/var/run/secrets/kubernetes.io/serviceaccount/"};
   path += name;
   return path;
 }
@@ -371,8 +367,7 @@ fn parse_cgroup_memberships(StringView text, Allocator allocator) throws
     let const second_separator = remainder.find_character(':');
     if (!second_separator.has_value()) continue;
     let const hierarchy = line.substring_of_length(0, *first_separator);
-    let const controller =
-        remainder.substring_of_length(0, *second_separator);
+    let const controller = remainder.substring_of_length(0, *second_separator);
     let const path = remainder.substring(*second_separator + 1);
     if (hierarchy.is_empty() || path.is_empty()) continue;
     let const hierarchy_value = hierarchy.to<u64>();
@@ -390,8 +385,8 @@ fn parse_cgroup_memberships(StringView text, Allocator allocator) throws
       }
     }
     if (is_known) continue;
-    memberships.push(cgroup_membership{
-        hierarchy, hierarchy_value.value(), controller_name, path, allocator});
+    memberships.push(cgroup_membership{hierarchy, hierarchy_value.value(),
+                                       controller_name, path, allocator});
   }
   return memberships;
 }
@@ -407,8 +402,8 @@ enum class process_snapshot_status : u8
   Unverifiable,
 };
 
-pure fn process_snapshot_identity_is_valid(process_snapshot_status status)
-    wontthrow -> bool
+pure fn process_snapshot_identity_is_valid(
+    process_snapshot_status status) wontthrow -> bool
 {
   return status != process_snapshot_status::Exited &&
          status != process_snapshot_status::Reused &&
@@ -471,8 +466,7 @@ pure fn scoped_container_id(StringView component, StringView prefix) wontthrow
   if (!component.starts_with(prefix) || !has_suffix(component, SUFFIX) ||
       component.length != prefix.length + 64 + SUFFIX.length)
     return None;
-  let const identifier =
-      component.substring_of_length(prefix.length, 64);
+  let const identifier = component.substring_of_length(prefix.length, 64);
   return is_hexadecimal_id(identifier) ? Maybe<StringView>{identifier} : None;
 }
 
@@ -485,10 +479,10 @@ pure fn normalized_pod_uid(StringView component, Allocator allocator) throws
     StringView suffix;
   };
   static constexpr pod_component_form FORMS[] = {
-      {"pod",                       ""      },
-      {"kubepods-pod",              ".slice"},
-      {"kubepods-burstable-pod",    ".slice"},
-      {"kubepods-besteffort-pod",   ".slice"},
+      {"pod",                     ""      },
+      {"kubepods-pod",            ".slice"},
+      {"kubepods-burstable-pod",  ".slice"},
+      {"kubepods-besteffort-pod", ".slice"},
   };
   let identifier = StringView{};
   for (let const &form : FORMS) {
@@ -506,8 +500,8 @@ pure fn normalized_pod_uid(StringView component, Allocator allocator) throws
   for (usize index = 0; index < identifier.length; index++) {
     let byte = identifier[index];
     if (byte == '_') byte = '-';
-    let const should_be_separator = index == 8 || index == 13 || index == 18 ||
-                                     index == 23;
+    let const should_be_separator =
+        index == 8 || index == 13 || index == 18 || index == 23;
     let const is_valid = should_be_separator
                              ? byte == '-'
                              : (byte >= '0' && byte <= '9') ||
@@ -533,20 +527,17 @@ fn parse_cgroup_identity(StringView path, Allocator allocator) throws
     }
     let const separator = remaining.find_character('/');
     let const component = separator.has_value()
-                               ? remaining.substring_of_length(0, *separator)
-                               : remaining;
-    remaining = separator.has_value()
-                    ? remaining.substring(*separator + 1)
-                    : StringView{};
+                              ? remaining.substring_of_length(0, *separator)
+                              : remaining;
+    remaining = separator.has_value() ? remaining.substring(*separator + 1)
+                                      : StringView{};
 
     if (component == "docker" || component == "containerd" ||
         component == "crio" || component == "libpod")
     {
-      result.runtime =
-          component == "crio"
-              ? String{allocator, "cri-o"}
-              : component == "libpod" ? String{allocator, "podman"}
-                                        : String{allocator, component};
+      result.runtime = component == "crio"     ? String{allocator, "cri-o"}
+                       : component == "libpod" ? String{allocator, "podman"}
+                                               : String{allocator, component};
     }
 
     struct scoped_runtime
@@ -561,8 +552,7 @@ fn parse_cgroup_identity(StringView path, Allocator allocator) throws
         {"libpod-",         "podman"    },
     };
     for (let const &candidate : SCOPED_RUNTIMES) {
-      let const identifier =
-          scoped_container_id(component, candidate.prefix);
+      let const identifier = scoped_container_id(component, candidate.prefix);
       if (!identifier.has_value()) continue;
       result.runtime = String{allocator, candidate.runtime};
       result.container_id = String{allocator, *identifier};
@@ -577,12 +567,10 @@ fn parse_cgroup_identity(StringView path, Allocator allocator) throws
     let pod_uid = normalized_pod_uid(component, allocator);
     let const has_pod_uid = pod_uid != "-";
     if (has_pod_uid) result.pod_uid = steal(pod_uid);
-    if (component == "burstable" ||
-        component == "kubepods-burstable.slice" ||
+    if (component == "burstable" || component == "kubepods-burstable.slice" ||
         (has_pod_uid && component.starts_with("kubepods-burstable-pod")))
       result.qos = "burstable";
-    if (component == "besteffort" ||
-        component == "kubepods-besteffort.slice" ||
+    if (component == "besteffort" || component == "kubepods-besteffort.slice" ||
         (has_pod_uid && component.starts_with("kubepods-besteffort-pod")))
       result.qos = "besteffort";
     if (component == "kubepods" || component == "kubepods.slice") {
@@ -599,8 +587,7 @@ fn collect_process_cgroup_snapshot(Allocator allocator,
                                    eviliso_collection_mode collection) throws
     -> ArrayList<process_cgroup_snapshot>
 {
-  let candidates =
-      os::enumerate_processes(os::process_detail::ResourceStats);
+  let candidates = os::enumerate_processes(os::process_detail::ResourceStats);
   let snapshot = ArrayList<process_cgroup_snapshot>{allocator};
   snapshot.reserve(candidates.count());
   for (let const &process : candidates) {
@@ -641,10 +628,10 @@ fn collect_process_cgroup_snapshot(Allocator allocator,
   }
 
   let current = os::enumerate_processes(os::process_detail::ResourceStats);
-  current.sort([](const os::process_entry &left,
-                  const os::process_entry &right) {
-    return left.pid < right.pid;
-  });
+  current.sort(
+      [](const os::process_entry &left, const os::process_entry &right) {
+        return left.pid < right.pid;
+      });
   for (let &candidate : snapshot) {
     usize lower = 0;
     usize upper = current.count();
@@ -655,8 +642,7 @@ fn collect_process_cgroup_snapshot(Allocator allocator,
       else
         upper = middle;
     }
-    if (lower == current.count() ||
-        current[lower].pid != candidate.process_id)
+    if (lower == current.count() || current[lower].pid != candidate.process_id)
     {
       candidate.status = process_snapshot_status::Exited;
       candidate.memberships.clear();
@@ -706,8 +692,8 @@ struct cgroup_report_row
   StringView status;
 };
 
-pure fn process_snapshot_status_name(process_snapshot_status status)
-    wontthrow -> StringView
+pure fn process_snapshot_status_name(process_snapshot_status status) wontthrow
+    -> StringView
 {
   switch (status) {
   case process_snapshot_status::Available: return "available";
@@ -780,8 +766,7 @@ fn append_cgroup_report(String &output, bool should_color,
     }
   }
 
-  rows.sort([](const cgroup_report_row &left,
-               const cgroup_report_row &right) {
+  rows.sort([](const cgroup_report_row &left, const cgroup_report_row &right) {
     if (left.hierarchy_value != right.hierarchy_value)
       return left.hierarchy_value < right.hierarchy_value;
     if (left.controller != right.controller)
@@ -822,8 +807,7 @@ fn append_cgroup_report(String &output, bool should_color,
                                   : colors::ansi::BOLD_YELLOW});
     report.add_row(cells);
   }
-  append_titled_report_table(output, "Cgroup membership", report,
-                             should_color);
+  append_titled_report_table(output, "Cgroup membership", report, should_color);
 }
 
 fn eviliso_sessions() throws -> ArrayList<os::user_session>
@@ -842,13 +826,12 @@ fn eviliso_sessions() throws -> ArrayList<os::user_session>
       let const terminal_end = remainder.find_character('|');
       if (!terminal_end.has_value()) continue;
       let const user = line.substring_of_length(0, *user_end);
-      let const terminal =
-          remainder.substring_of_length(0, *terminal_end);
+      let const terminal = remainder.substring_of_length(0, *terminal_end);
       let const login_time = remainder.substring(*terminal_end + 1).to<i64>();
       if (user.is_empty() || terminal.is_empty() || login_time.is_error())
         continue;
       sessions.push({
-          String{heap_allocator(), user},
+          String{heap_allocator(), user    },
           String{heap_allocator(), terminal},
           login_time.value(),
       });
@@ -874,22 +857,23 @@ fn append_session_report(String &output, bool should_color, Allocator allocator,
                          eviliso_detail_mode detail) throws -> void
 {
   let sessions = eviliso_sessions();
-  sessions.sort([](const os::user_session &left,
-                   const os::user_session &right) {
-    if (left.user != right.user) return left.user < right.user;
-    if (left.terminal != right.terminal) return left.terminal < right.terminal;
-    return left.login_time < right.login_time;
-  });
+  sessions.sort(
+      [](const os::user_session &left, const os::user_session &right) {
+        if (left.user != right.user) return left.user < right.user;
+        if (left.terminal != right.terminal)
+          return left.terminal < right.terminal;
+        return left.login_time < right.login_time;
+      });
 
   let rows = ArrayList<session_report_row>{allocator};
   for (let const &session : sessions) {
     let login_time = String{allocator};
     if (detail == eviliso_detail_mode::All) {
-      login_time = session.login_time == 0
-                       ? String{allocator, "unavailable"}
-                       : String{allocator,
-                               utils::format_unix_timestamp(
-                                   session.login_time, "%Y-%m-%d %H:%M:%S")};
+      login_time =
+          session.login_time == 0
+              ? String{allocator, "unavailable"}
+              : String{allocator, utils::format_unix_timestamp(
+                                      session.login_time, "%Y-%m-%d %H:%M:%S")};
     }
     let row = session_report_row{allocator};
     row.user = String{allocator, session.user.view()};
@@ -989,18 +973,17 @@ fn remote_table_text(StringView text, usize maximum_cells,
     usize actual_cells = 0;
     let const kept_bytes =
         toiletline::get_byte_offset_at_or_before_display_cell(
-        result.view(), maximum_cells - 3, actual_cells);
+            result.view(), maximum_cells - 3, actual_cells);
     result.truncate(kept_bytes);
     result += "...";
   }
   return result;
 }
 
-fn append_remote_report(
-    String &output, bool should_color,
-    const ArrayList<process_cgroup_snapshot> &snapshot, Allocator allocator,
-    eviliso_remote_rows_mode rows_mode, eviliso_detail_mode detail) throws
-    -> void
+fn append_remote_report(String &output, bool should_color,
+                        const ArrayList<process_cgroup_snapshot> &snapshot,
+                        Allocator allocator, eviliso_remote_rows_mode rows_mode,
+                        eviliso_detail_mode detail) throws -> void
 {
   let table = ReportTable{allocator};
   if (!os::has_network_socket_listing()) {
@@ -1062,11 +1045,9 @@ fn append_remote_report(
       zero_identity_count + do_count_unique(socket_identities);
   let const remote_count =
       remote_zero_identity_count + do_count_unique(remote_identities);
-  table.add("Remote sockets",
-            String::from(remote_count, allocator).view(),
+  table.add("Remote sockets", String::from(remote_count, allocator).view(),
             colors::ansi::BOLD_CYAN);
-  table.add("Total sockets",
-            String::from(socket_count, allocator).view(),
+  table.add("Total sockets", String::from(socket_count, allocator).view(),
             colors::ansi::BOLD_CYAN);
   append_titled_report_table(output, "Socket summary", table, should_color);
   if (rows_mode == eviliso_remote_rows_mode::Hide) return;
@@ -1195,10 +1176,9 @@ fn append_remote_report(
       row.user = "-";
       row.name = "-";
       row.command = "-";
-      row.net_namespace =
-          self_net_namespace.has_value()
-              ? String{allocator, self_net_namespace->view()}
-              : String{allocator, "-"};
+      row.net_namespace = self_net_namespace.has_value()
+                              ? String{allocator, self_net_namespace->view()}
+                              : String{allocator, "-"};
       row.orchestrator = "-";
       row.runtime = "-";
       row.container = "-";
@@ -1209,7 +1189,8 @@ fn append_remote_report(
 
       let process_context_index = Maybe<usize>{None};
       for (usize context_index = 0; context_index < process_contexts.count();
-           context_index++) {
+           context_index++)
+      {
         let const &context = process_contexts[context_index];
         if (context.process_id == socket.process_id &&
             context.start_token == socket.owner_start_token)
@@ -1230,17 +1211,15 @@ fn append_remote_report(
               !process_snapshot_identity_is_valid(process.status))
             break;
           context.owner_id = process.owner_id;
-          context.name = remote_table_text(process.name.view(), 48,
-                                           allocator);
-          context.command = remote_table_text(process.command.view(), 96,
-                                              allocator);
-          let net_namespace_suffix =
-              String::from(socket.process_id, allocator);
+          context.name = remote_table_text(process.name.view(), 48, allocator);
+          context.command =
+              remote_table_text(process.command.view(), 96, allocator);
+          let net_namespace_suffix = String::from(socket.process_id, allocator);
           net_namespace_suffix += "/ns/net";
-          if (let net_namespace = os::read_symlink(
-                  eviliso_namespace_proc_path(net_namespace_suffix.view(),
-                                              allocator),
-                  allocator);
+          if (let net_namespace =
+                  os::read_symlink(eviliso_namespace_proc_path(
+                                       net_namespace_suffix.view(), allocator),
+                                   allocator);
               net_namespace.has_value())
           {
             context.net_namespace = steal(*net_namespace);
@@ -1262,8 +1241,8 @@ fn append_remote_report(
                 cgroup_copy_limit - context.cgroups.length();
             let const path = membership.path.view();
             context.cgroups += path.substring_of_length(
-                0, path.length < remaining_bytes ? path.length
-                                                 : remaining_bytes);
+                0,
+                path.length < remaining_bytes ? path.length : remaining_bytes);
           }
           for (let const &evidence : process.evidence) {
             if (context.runtime.is_empty() && evidence.runtime != "-")
@@ -1286,11 +1265,11 @@ fn append_remote_report(
         process_context_index = process_contexts.count() - 1;
       }
       if (process_context_index.has_value() &&
-          process_contexts[*process_context_index].is_available) {
+          process_contexts[*process_context_index].is_available)
+      {
         let const &process_context = process_contexts[*process_context_index];
         if (!socket.has_owner_id) {
-          row.owner_id =
-              String::from(process_context.owner_id, allocator);
+          row.owner_id = String::from(process_context.owner_id, allocator);
           row.user = do_get_user(socket.process_id, process_context.owner_id);
         }
         row.name = process_context.name;
@@ -1393,8 +1372,7 @@ fn append_runtime_evidence_report(
     explicit runtime_report_row(Allocator allocator)
         : runtime(allocator), source(allocator), process_id(allocator),
           name(allocator), role(allocator), evidence(allocator)
-    {
-    }
+    {}
   };
 
   let rows = ArrayList<runtime_report_row>{allocator};
@@ -1408,7 +1386,8 @@ fn append_runtime_evidence_report(
         if (row.runtime != evidence.runtime || row.evidence != evidence.path)
           continue;
         if (detail != eviliso_detail_mode::All ||
-            row.process_id_value == process.process_id) {
+            row.process_id_value == process.process_id)
+        {
           is_duplicate = true;
           break;
         }
@@ -1449,13 +1428,14 @@ fn append_runtime_evidence_report(
     rows.push(steal(row));
   }
 
-  rows.sort([](const runtime_report_row &left,
-               const runtime_report_row &right) {
-    if (left.runtime != right.runtime) return left.runtime < right.runtime;
-    if (left.source != right.source) return left.source < right.source;
-    if (left.evidence != right.evidence) return left.evidence < right.evidence;
-    return left.process_id_value < right.process_id_value;
-  });
+  rows.sort(
+      [](const runtime_report_row &left, const runtime_report_row &right) {
+        if (left.runtime != right.runtime) return left.runtime < right.runtime;
+        if (left.source != right.source) return left.source < right.source;
+        if (left.evidence != right.evidence)
+          return left.evidence < right.evidence;
+        return left.process_id_value < right.process_id_value;
+      });
 
   let table = ReportTable{allocator};
   table.add_column("RUNTIME", report_table_alignment::Left,
@@ -1484,14 +1464,13 @@ fn append_runtime_evidence_report(
     cells.push({row.evidence.view(), colors::ansi::RESET});
     table.add_row(cells);
   }
-  append_titled_report_table(output, "Container runtimes", table,
-                             should_color);
+  append_titled_report_table(output, "Container runtimes", table, should_color);
 }
 
-fn append_container_report(
-    String &output, bool should_color,
-    const ArrayList<process_cgroup_snapshot> &snapshot, Allocator allocator,
-    eviliso_detail_mode detail) throws -> void
+fn append_container_report(String &output, bool should_color,
+                           const ArrayList<process_cgroup_snapshot> &snapshot,
+                           Allocator allocator,
+                           eviliso_detail_mode detail) throws -> void
 {
   struct container_summary_row
   {
@@ -1501,8 +1480,7 @@ fn append_container_report(
 
     explicit container_summary_row(Allocator allocator)
         : runtime(allocator), identifier(allocator)
-    {
-    }
+    {}
   };
   struct container_detail_row
   {
@@ -1517,8 +1495,7 @@ fn append_container_report(
     explicit container_detail_row(Allocator allocator)
         : runtime(allocator), identifier(allocator), process_id(allocator),
           name(allocator), role(allocator), cgroup(allocator)
-    {
-    }
+    {}
   };
 
   let summary_rows = ArrayList<container_summary_row>{allocator};
@@ -1586,15 +1563,15 @@ fn append_container_report(
     if (left.runtime != right.runtime) return left.runtime < right.runtime;
     return left.identifier < right.identifier;
   });
-  detail_rows.sort([](const container_detail_row &left,
-                      const container_detail_row &right) {
-    if (left.runtime != right.runtime) return left.runtime < right.runtime;
-    if (left.identifier != right.identifier)
-      return left.identifier < right.identifier;
-    if (left.process_id_value != right.process_id_value)
-      return left.process_id_value < right.process_id_value;
-    return left.cgroup < right.cgroup;
-  });
+  detail_rows.sort(
+      [](const container_detail_row &left, const container_detail_row &right) {
+        if (left.runtime != right.runtime) return left.runtime < right.runtime;
+        if (left.identifier != right.identifier)
+          return left.identifier < right.identifier;
+        if (left.process_id_value != right.process_id_value)
+          return left.process_id_value < right.process_id_value;
+        return left.cgroup < right.cgroup;
+      });
 
   let table = ReportTable{allocator};
   table.add_column("RUNTIME", report_table_alignment::Left,
@@ -1649,7 +1626,7 @@ fn sanitize_kubernetes_metadata(StringView text, Allocator allocator) throws
     let const byte = text[index];
     if (byte == '\r' || byte == '\n') break;
     result.push(static_cast<unsigned char>(byte) < 32 || byte == 127 ? ' '
-                                                                    : byte);
+                                                                     : byte);
   }
   return String{allocator, result.view().trim_blanks()};
 }
@@ -1658,8 +1635,8 @@ fn read_kubernetes_metadata(StringView name, Allocator allocator) throws
     -> String
 {
   let const path = kubernetes_service_account_path(name, allocator);
-  let const descriptor = os::open_file_descriptor(path.view(),
-                                                   os::file_open_mode::Read);
+  let const descriptor =
+      os::open_file_descriptor(path.view(), os::file_open_mode::Read);
   if (!descriptor.has_value()) return String{allocator};
   defer { unused(os::close_fd(*descriptor)); };
 
@@ -1670,15 +1647,14 @@ fn read_kubernetes_metadata(StringView name, Allocator allocator) throws
                                       allocator);
 }
 
-fn append_kubernetes_report(
-    String &output, bool should_color,
-    const ArrayList<process_cgroup_snapshot> &snapshot, Allocator allocator,
-    eviliso_detail_mode detail) throws -> void
+fn append_kubernetes_report(String &output, bool should_color,
+                            const ArrayList<process_cgroup_snapshot> &snapshot,
+                            Allocator allocator,
+                            eviliso_detail_mode detail) throws -> void
 {
   let const self_process_id = os::get_current_process_id();
   let kubernetes_host = String{allocator};
-  if (let const value =
-          os::get_environment_variable("KUBERNETES_SERVICE_HOST");
+  if (let const value = os::get_environment_variable("KUBERNETES_SERVICE_HOST");
       value.has_value())
     kubernetes_host = sanitize_kubernetes_metadata(value->view(), allocator);
   let namespace_name = String{allocator};
@@ -1701,9 +1677,9 @@ fn append_kubernetes_report(
     let cells = ArrayList<report_table_cell_view>{allocator};
     cells.push({"environment", colors::ansi::RESET});
     cells.push({kubernetes_host.view(), colors::ansi::BOLD_GREEN});
-    cells.push({namespace_name.is_empty() ? StringView{"-"}
-                                         : namespace_name.view(),
-                colors::ansi::RESET});
+    cells.push(
+        {namespace_name.is_empty() ? StringView{"-"} : namespace_name.view(),
+         colors::ansi::RESET});
     cells.push({"KUBERNETES_SERVICE_HOST", colors::ansi::RESET});
     evidence_table.add_row(cells);
   }
@@ -1711,9 +1687,9 @@ fn append_kubernetes_report(
     let cells = ArrayList<report_table_cell_view>{allocator};
     cells.push({"cgroup", colors::ansi::RESET});
     cells.push({"-", colors::ansi::RESET});
-    cells.push({namespace_name.is_empty() ? StringView{"-"}
-                                         : namespace_name.view(),
-                colors::ansi::RESET});
+    cells.push(
+        {namespace_name.is_empty() ? StringView{"-"} : namespace_name.view(),
+         colors::ansi::RESET});
     cells.push({"kubepods component", colors::ansi::RESET});
     evidence_table.add_row(cells);
   }
@@ -1739,8 +1715,7 @@ fn append_kubernetes_report(
     explicit kubernetes_row(Allocator allocator)
         : pod_uid(allocator), qos(allocator), runtime(allocator),
           container_id(allocator)
-    {
-    }
+    {}
   };
   let rows = ArrayList<kubernetes_row>{allocator};
   for (let const &process : snapshot) {
@@ -1847,7 +1822,7 @@ fn append_kubernetes_report(
         cells.push({process_id.view(), colors::ansi::YELLOW});
         cells.push({process.name.view(), colors::ansi::RESET});
         cells.push({process.process_id == self_process_id ? StringView{"self"}
-                                                         : StringView{"other"},
+                                                          : StringView{"other"},
                     colors::ansi::BOLD_MAGENTA});
         cells.push({evidence.path.view(), colors::ansi::RESET});
         workload_table.add_row(cells);
@@ -1886,7 +1861,8 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
       FLAG_EVILISO_NAMESPACES.is_enabled() ||
       FLAG_EVILISO_CGROUPS.is_enabled() || FLAG_EVILISO_SESSIONS.is_enabled() ||
       FLAG_EVILISO_REMOTE.is_enabled() || FLAG_EVILISO_RUNTIME.is_enabled() ||
-      FLAG_EVILISO_KUBERNETES.is_enabled() || FLAG_EVILISO_CONTAINER.is_enabled() ||
+      FLAG_EVILISO_KUBERNETES.is_enabled() ||
+      FLAG_EVILISO_CONTAINER.is_enabled() ||
       FLAG_EVILISO_CONTAINERS.is_enabled();
   let const show_namespaces =
       !any_selector || FLAG_EVILISO_NAMESPACES.is_enabled();
@@ -1896,30 +1872,28 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
   let const detail = FLAG_EVILISO_ALL.is_enabled()
                          ? eviliso_detail_mode::All
                          : eviliso_detail_mode::Summary;
-  let const show_runtime =
-      !any_selector || FLAG_EVILISO_RUNTIME.is_enabled();
+  let const show_runtime = !any_selector || FLAG_EVILISO_RUNTIME.is_enabled();
   let const show_kubernetes =
       !any_selector || FLAG_EVILISO_KUBERNETES.is_enabled();
-  let const show_container =
-      !any_selector || FLAG_EVILISO_CONTAINER.is_enabled() ||
-      FLAG_EVILISO_CONTAINERS.is_enabled();
+  let const show_container = !any_selector ||
+                             FLAG_EVILISO_CONTAINER.is_enabled() ||
+                             FLAG_EVILISO_CONTAINERS.is_enabled();
   let const should_color = koshkit_should_color();
   let output = String{cxt.scratch_allocator()};
   let process_cgroups =
       ArrayList<process_cgroup_snapshot>{cxt.scratch_allocator()};
-  let const collection =
-      show_cgroups || detail == eviliso_detail_mode::All || show_runtime ||
-              show_kubernetes || show_container
-          ? eviliso_collection_mode::Collect
-          : eviliso_collection_mode::Skip;
-  if (show_namespaces || collection == eviliso_collection_mode::Collect)
-  {
-    process_cgroups = collect_process_cgroup_snapshot(cxt.scratch_allocator(),
-                                                      collection);
+  let const collection = show_cgroups || detail == eviliso_detail_mode::All ||
+                                 show_runtime || show_kubernetes ||
+                                 show_container
+                             ? eviliso_collection_mode::Collect
+                             : eviliso_collection_mode::Skip;
+  if (show_namespaces || collection == eviliso_collection_mode::Collect) {
+    process_cgroups =
+        collect_process_cgroup_snapshot(cxt.scratch_allocator(), collection);
   }
   if (show_namespaces) {
-    let namespace_processes = ArrayList<namespace_process>{
-        cxt.scratch_allocator()};
+    let namespace_processes =
+        ArrayList<namespace_process>{cxt.scratch_allocator()};
     if (let override =
             eviliso_namespace_process_override(cxt.scratch_allocator());
         override.has_value())

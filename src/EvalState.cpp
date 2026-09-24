@@ -10,22 +10,22 @@
  * expression execution.
  */
 
-#include "base/Arena.hpp"
 #include "CLI.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -157,8 +157,9 @@ fn EvalContext::request_loop_control(control_flow::Kind kind, i64 level,
     level = static_cast<i64>(m_loop_depth);
   LOG(All, "loop control requested, level %lld of depth %zu", (long long) level,
       m_loop_depth);
-  m_control_flow = control_flow{kind, level, location, source_store().m_current_source,
-                                String{source_store().m_current_origin}};
+  m_control_flow =
+      control_flow{kind, level, location, source_store().m_current_source,
+                   String{source_store().m_current_origin}};
 }
 
 fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
@@ -178,14 +179,16 @@ fn EvalContext::request_return(i64 status, SourceLocation location) throws
   LOG(Debug, "return requested, status %lld", (long long) status);
   trap_store().m_status_before_return = m_last_exit_status;
   m_control_flow = control_flow{control_flow::Kind::Return, status, location,
-                                source_store().m_current_source, String{source_store().m_current_origin}};
+                                source_store().m_current_source,
+                                String{source_store().m_current_origin}};
 }
 
 fn EvalContext::request_exit(i64 status, SourceLocation location) throws -> void
 {
   LOG(Debug, "exit requested, status %lld", (long long) status);
   m_control_flow = control_flow{control_flow::Kind::Exit, status, location,
-                                source_store().m_current_source, String{source_store().m_current_origin}};
+                                source_store().m_current_source,
+                                String{source_store().m_current_origin}};
 }
 
 pure fn EvalContext::has_pending_control_flow() const wontthrow -> bool
@@ -263,7 +266,8 @@ fn EvalContext::push_root_source_frame(const String *parent_source,
 
 fn EvalContext::pop_root_source_frame() wontthrow -> void
 {
-  if (!source_store().m_source_frames.is_empty()) source_store().m_source_frames.pop_back();
+  if (!source_store().m_source_frames.is_empty())
+    source_store().m_source_frames.pop_back();
 }
 
 fn EvalContext::print_source_backtrace(Maybe<SourceLocation> error_location,
@@ -333,8 +337,8 @@ fn EvalContext::print_source_backtrace(Maybe<SourceLocation> error_location,
     }
 
     let is_repeated_frame = false;
-    for (usize other_index = source_store().m_source_frames.count(); other_index > i;
-         other_index--)
+    for (usize other_index = source_store().m_source_frames.count();
+         other_index > i; other_index--)
     {
       let const &other = source_store().m_source_frames[other_index - 1];
       if (!do_frame_render(other) || !do_frame_identity_match(frame, other)) {
@@ -383,8 +387,8 @@ static fn guard_located_depth(usize current_depth, usize cap,
 
 fn EvalContext::enter_source(const SourceLocation &location) throws -> void
 {
-  guard_located_depth(source_store().source_depth(), MAX_SOURCE_DEPTH,
-                      "source", location);
+  guard_located_depth(source_store().source_depth(), MAX_SOURCE_DEPTH, "source",
+                      location);
   source_store().set_source_depth(source_store().source_depth() + 1);
 }
 
@@ -435,7 +439,8 @@ pure fn EvalContext::get_substitution_depth() const wontthrow -> usize
 fn EvalContext::enter_parameter_expansion() throws -> void
 {
   if (expansion_store().parameter_expansion_depth() >=
-      MAX_PARAMETER_EXPANSION_DEPTH) {
+      MAX_PARAMETER_EXPANSION_DEPTH)
+  {
     LOG(Debug, "parameter expansion depth %zu exceeds cap %zu",
         expansion_store().parameter_expansion_depth(),
         MAX_PARAMETER_EXPANSION_DEPTH);
@@ -599,8 +604,8 @@ fn EvalContext::mark_loop_redirect_fds() const wontthrow
 fn EvalContext::cleanup_loop_redirect_fds(loop_redirect_fd_mark mark) wontthrow
     -> void
 {
-  for (usize i = expansion_store().loop_redirect_fds().count();
-       i > mark.count; i--)
+  for (usize i = expansion_store().loop_redirect_fds().count(); i > mark.count;
+       i--)
     os::close_fd(expansion_store().loop_redirect_fds()[i - 1].fd);
 
   while (expansion_store().loop_redirect_fds().count() > mark.count)
@@ -627,8 +632,7 @@ fn EvalContext::retain_loop_redirect_fd(i32 target_fd, const String &path,
                                         os::file_open_mode mode,
                                         os::descriptor fd) throws -> bool
 {
-  if (expansion_store().loop_redirect_fds().count() >=
-      MAX_LOOP_REDIRECT_FDS)
+  if (expansion_store().loop_redirect_fds().count() >= MAX_LOOP_REDIRECT_FDS)
     return false;
 
   expansion_store().loop_redirect_fds().push(loop_redirect_fd{
@@ -720,16 +724,19 @@ fn EvalContext::sorted_variable_assignments() const throws -> ArrayList<String>
   assignments.reserve(m_variable_store.shell_variables().count());
   m_variable_store.shell_variables().for_each(
       [&](StringView name, const String &value) {
-    let entry = String{heap_allocator(), name};
-    entry.push('=');
-    entry.append(value);
-    assignments.push(steal(entry));
-  });
+        let entry = String{heap_allocator(), name};
+        entry.push('=');
+        entry.append(value);
+        assignments.push(steal(entry));
+      });
   assignments.sort();
   return assignments;
 }
 
-fn EvalContext::clear_functions() wontthrow -> void { function_store().definitions().clear(); }
+fn EvalContext::clear_functions() wontthrow -> void
+{
+  function_store().definitions().clear();
+}
 
 fn EvalContext::snapshot_state() throws -> eval_state_snapshot
 {
@@ -870,13 +877,14 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   /* A signal the subshell trapped that the parent does not is returned to
      default before the parent's dispositions are reinstalled. */
   if (trap_store().actions().count() != 0 || snapshot.traps.count() != 0) {
-    trap_store().actions().for_each([&](StringView condition, const String &action) {
-      unused(action);
-      if (condition == "EXIT") return;
-      if (snapshot.traps.find(condition) != nullptr) return;
-      if (let const number = os::signal_number_from_name(condition))
-        os::clear_trap_handler(*number);
-    });
+    trap_store().actions().for_each(
+        [&](StringView condition, const String &action) {
+          unused(action);
+          if (condition == "EXIT") return;
+          if (snapshot.traps.find(condition) != nullptr) return;
+          if (let const number = os::signal_number_from_name(condition))
+            os::clear_trap_handler(*number);
+        });
     trap_store().actions() = steal(snapshot.traps);
     install_trap_dispositions();
   } else {
@@ -1286,9 +1294,10 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
     append_subshell_bootstrap_text(body, name.view());
 
   let completion_names = ArrayList<String>{heap_allocator()};
-  completion_store().specs().for_each([&](StringView command, const completion_spec &) {
-    completion_names.push_managed(command);
-  });
+  completion_store().specs().for_each(
+      [&](StringView command, const completion_spec &) {
+        completion_names.push_managed(command);
+      });
   completion_names.sort();
   append_subshell_bootstrap_u32(body,
                                 static_cast<u32>(completion_names.count()));
@@ -1319,8 +1328,8 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
     return process_index;
   };
 
-  append_subshell_bootstrap_u32(
-      body, static_cast<u32>(m_job_table.m_jobs.count()));
+  append_subshell_bootstrap_u32(body,
+                                static_cast<u32>(m_job_table.m_jobs.count()));
   for (let const &child_job : m_job_table.m_jobs) {
     append_subshell_bootstrap_i32(body, child_job.id);
     append_subshell_bootstrap_text(body, child_job.command.view());
@@ -1644,7 +1653,8 @@ fn EvalContext::apply_subshell_bootstrap(
   replay_runtime.set_option(shell_option_id::Verbose, false);
   replay_runtime.set_option(shell_option_id::Xtrace, false);
   replay_runtime.restore(*this);
-  variable_store().disabled_bash_special_arrays() = disabled_bash_special_arrays;
+  variable_store().disabled_bash_special_arrays() =
+      disabled_bash_special_arrays;
   variable_store().unset_dynamic_readers() = unset_dynamic_readers;
   {
     trap_store().m_is_replaying_inherited_state = true;

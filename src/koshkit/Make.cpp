@@ -11,10 +11,10 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../base/Path.hpp"
 #include "../Platform.hpp"
 #include "../StaticStringMap.hpp"
 #include "../Utils.hpp"
+#include "../base/Path.hpp"
 
 #include <cstdio>
 
@@ -57,9 +57,10 @@ static pure fn is_make_job_count(koshka::StringView value) wontthrow -> bool
 {
   return !value.is_empty() && value.is_all_decimal_digits();
 }
-FLAG_OPTIONAL(MAKE_JOBS, 'j', "jobs",
-              "Accept an optional job count and propagate it through MAKEFLAGS.",
-              is_make_job_count);
+FLAG_OPTIONAL(
+    MAKE_JOBS, 'j', "jobs",
+    "Accept an optional job count and propagate it through MAKEFLAGS.",
+    is_make_job_count);
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(Make);
@@ -232,7 +233,7 @@ constexpr builtin_rule_entry BUILTIN_RULE_ENTRIES[] = {
       nullptr}                                                                 },
     {".f.a",
      {"$(FC) -c $(FFLAGS) $<", "$(AR) $(ARFLAGS) $@ $*.o", "rm -f $*.o",
-      nullptr}                                                                   },
+      nullptr}                                                                 },
 };
 
 enum class make_variable_origin : u8
@@ -2470,7 +2471,7 @@ static fn parse_makefile(EvalContext &cxt,
   }
   if (should_use_builtin_rules)
     for (let const *suffix : {".o", ".c", ".y", ".l", ".a", ".sh", ".f", ".c~",
-                               ".y~", ".l~", ".sh~", ".f~"})
+                              ".y~", ".l~", ".sh~", ".f~"})
       mk.suffixes.push(String{cxt.scratch_allocator(), suffix});
   for (let const &assignment : command_assignments) {
     let const equals = assignment.view().find_character('=');
@@ -3099,8 +3100,8 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     i32 status = 0;
     try {
       status = cxt.run_source(subshell_command.view(), "make",
-                              ec.source_location(), StringView{"make"},
-                              nullptr, nullptr, return_handling::Consume);
+                              ec.source_location(), StringView{"make"}, nullptr,
+                              nullptr, return_handling::Consume);
       if (os::INTERRUPT_REQUESTED || status == 130) {
         os::INTERRUPT_REQUESTED = 0;
         let interrupt_error = InterruptErrorWithLocation{ec.source_location()};
@@ -3410,7 +3411,7 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
   if (let inherited_makeflags = os::get_environment_variable("MAKEFLAGS");
       inherited_makeflags.has_value())
     for (let const &word : split_makeflags_words(inherited_makeflags->view(),
-                                                    cxt.scratch_allocator()))
+                                                 cxt.scratch_allocator()))
     {
       if (word.is_empty()) continue;
       if (is_command_line_assignment(word.view())) {
@@ -3768,8 +3769,8 @@ fn collect_makefile_targets(EvalContext &cxt, const Path &makefile) throws
 
   let const command_assignments = ArrayList<String>{cxt.scratch_allocator()};
   let sources = ArrayList<make_source_document>{cxt.scratch_allocator()};
-  sources.push(make_source_document{
-      steal(*source), intern_source_name(makefile.view())});
+  sources.push(make_source_document{steal(*source),
+                                    intern_source_name(makefile.view())});
   let const mk = parse_makefile(cxt, sources, command_assignments, false, true);
   for (let const &rule : mk.rules) {
     let const name = rule.target.view();

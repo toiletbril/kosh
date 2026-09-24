@@ -8,21 +8,21 @@
  * split keeps argument formation separate from segment and parameter expansion.
  */
 
-#include "base/Arena.hpp"
 #include "CLI.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
-#include "base/PackedStringKey.hpp"
 #include "Parser.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/PackedStringKey.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -461,11 +461,11 @@ constexpr static_string_entry<u8> DECLARATION_COMMAND_ENTRIES[] = {
 };
 constexpr StaticStringMap DECLARATION_COMMANDS{DECLARATION_COMMAND_ENTRIES};
 
-hot fn EvalContext::process_args(
-    const ArrayList<const Token *> &args,
-    ArrayList<SourceLocation> *expanded_locations,
-    argument_lifetime lifetime,
-    argument_context context) throws -> ArrayList<String>
+hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
+                                 ArrayList<SourceLocation> *expanded_locations,
+                                 argument_lifetime lifetime,
+                                 argument_context context) throws
+    -> ArrayList<String>
 {
   let const args_are_transient = lifetime == argument_lifetime::Transient;
   let const is_array_literal = context == argument_context::ArrayLiteral;
@@ -575,7 +575,8 @@ hot fn EvalContext::process_args(
           } else {
             assignment += '=';
             if (assignment_token->get_update_mode() ==
-                assignment_update_mode::Append) {
+                assignment_update_mode::Append)
+            {
               let const existing = get_variable_value(assignment_token->key());
               if (existing.has_value()) assignment.append(existing->view());
             }

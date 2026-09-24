@@ -10,13 +10,13 @@
 
 #pragma once
 
-#include "base/Common.hpp"
-#include "base/Containers.hpp"
 #include "Diagnostics.hpp"
 #include "MimicMood.hpp"
+#include "Tokens.hpp"
+#include "base/Common.hpp"
+#include "base/Containers.hpp"
 #include "base/String.hpp"
 #include "base/StringView.hpp"
-#include "Tokens.hpp"
 
 namespace koshka {
 
@@ -35,10 +35,7 @@ public:
       : m_syntax_arena(&syntax_arena), m_active_arena(&syntax_arena)
   {}
 
-  pure fn get_arena() const wontthrow -> BumpArena &
-  {
-    return *m_active_arena;
-  }
+  pure fn get_arena() const wontthrow -> BumpArena & { return *m_active_arena; }
 
   pure fn get_syntax_arena() const wontthrow -> BumpArena &
   {
@@ -226,8 +223,7 @@ public:
     return m_parse_session.get_allocation_kind();
   }
   fn set_arena(BumpArena &arena,
-               ParseSession::AllocationKind allocation_kind) wontthrow
-      -> void;
+               ParseSession::AllocationKind allocation_kind) wontthrow -> void;
   fn drop_peek_cache() wontthrow -> void;
   fn advance_past_last_peek() throws -> usize;
 

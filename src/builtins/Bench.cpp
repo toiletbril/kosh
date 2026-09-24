@@ -12,8 +12,8 @@
 #include "../Completion.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
-#include "../base/Trace.hpp"
 #include "../Utils.hpp"
+#include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
 
@@ -399,8 +399,9 @@ fn sample_command(StringView shell_binary, StringView command,
       draw_progress(command, percent, allocator);
     }
 
-    let const measured = os::run_measured(
-        child_argv, {}, should_suppress_output ? os::measured_output::Suppress
+    let const measured =
+        os::run_measured(child_argv, {},
+                         should_suppress_output ? os::measured_output::Suppress
                                                 : os::measured_output::Inherit);
     if (!measured.has_value())
       throw Error{StringView{"Unable to run '"} + command +
@@ -640,8 +641,7 @@ cold fn Bench::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let out = String{cxt.scratch_allocator()};
   for (usize i = 0; i < results.count(); i++) {
     if (i > 0) out += "\n";
-    append_summary(out, results[i], should_color, cxt,
-                   cxt.scratch_allocator());
+    append_summary(out, results[i], should_color, cxt, cxt.scratch_allocator());
   }
 
   if (results.count() > 1) {

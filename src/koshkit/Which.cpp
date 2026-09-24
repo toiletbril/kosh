@@ -10,10 +10,10 @@
 #include "../CLI.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../base/Path.hpp"
 #include "../Platform.hpp"
-#include "../base/Trace.hpp"
 #include "../Utils.hpp"
+#include "../base/Path.hpp"
+#include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
 
@@ -54,7 +54,8 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
   for (let const &program_name : operands) {
     LOG(Debug, "which resolving '%s' against builtins and PATH",
         program_name.c_str());
-    if (let const alias = cxt.get_alias(program_name.view()); alias.has_value()) {
+    if (let const alias = cxt.get_alias(program_name.view()); alias.has_value())
+    {
       if (!is_quiet) {
         output += "alias ";
         output += program_name;
@@ -63,14 +64,16 @@ fn Which::execute(const ExecContext &ec, EvalContext &cxt,
         output += "'\n";
       }
     } else if (cxt.has_functions() &&
-               cxt.find_function(program_name.view()) != nullptr) {
+               cxt.find_function(program_name.view()) != nullptr)
+    {
       if (!is_quiet) {
         output += program_name;
         output += '\n';
       }
     } else if (let const kind = search_builtin(program_name.view());
                kind.has_value() &&
-               !builtin_is_hidden_by_mood(*kind, cxt.mood())) {
+               !builtin_is_hidden_by_mood(*kind, cxt.mood()))
+    {
       if (!is_quiet) {
         output += program_name;
         if (os::is_stdout_a_tty()) output += ": Shell builtin";

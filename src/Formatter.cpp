@@ -9,12 +9,12 @@
 
 #include "Formatter.hpp"
 
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
+#include "base/Debug.hpp"
 
 namespace koshka {
 
@@ -343,17 +343,22 @@ fn scan_format_pieces(StringView source) throws -> ArrayList<format_piece>
           }
         }
       }
-      pieces.push(format_piece{StringView{"\n", 1}, position,
-                               format_piece_kind::Newline, !has_code_on_line});
+      pieces.push(format_piece{
+          StringView{"\n", 1},
+          position, format_piece_kind::Newline,
+          !has_code_on_line
+      });
       position++;
       if (pending_heredocs.is_empty() && has_comment_on_line &&
-          position < source.length &&
-          source[position] == '\n')
+          position < source.length && source[position] == '\n')
       {
-        pieces.push(format_piece{StringView{"\n", 1}, position,
-                                 format_piece_kind::Newline, true, false,
-                                 true});
-        while (position < source.length && source[position] == '\n') position++;
+        pieces.push(format_piece{
+            StringView{"\n", 1},
+            position, format_piece_kind::Newline, true,
+            false, true
+        });
+        while (position < source.length && source[position] == '\n')
+          position++;
       }
       has_code_on_line = false;
       has_comment_on_line = false;
@@ -809,11 +814,13 @@ fn append_long_string_warnings(StringView source,
     }
 
     let warning_name = filename.has_value() ? *filename : StringView{"<stdin>"};
-    warnings.push(String{
-        heap_allocator(), warning_name + ":" + String::from(line, heap_allocator()) +
-        ":" + String::from(column, heap_allocator()) +
-        ": warning: unbreakable word exceeds 78 columns; consider making it "
-        "shorter or splitting it"});
+    warnings.push(String{heap_allocator(),
+                         warning_name + ":" +
+                             String::from(line, heap_allocator()) + ":" +
+                             String::from(column, heap_allocator()) +
+                             ": warning: unbreakable word exceeds 78 columns; "
+                             "consider making it "
+                             "shorter or splitting it"});
   }
 }
 
@@ -1706,8 +1713,8 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
 
 fn validate_formatted_source(StringView source, BumpArena &arena,
                              ArrayList<String> &errors, String *ast_output,
-                             BumpArena *function_arena,
-                             mimic_mood mood) throws -> bool
+                             BumpArena *function_arena, mimic_mood mood) throws
+    -> bool
 {
   let const mark = arena.mark();
   let const function_mark = function_arena != nullptr

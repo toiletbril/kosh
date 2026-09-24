@@ -8,9 +8,9 @@
  * syntax trees.
  */
 
+#include "Eval.hpp"
 #include "base/Allocator.hpp"
 #include "base/Debug.hpp"
-#include "Eval.hpp"
 
 namespace koshka {
 

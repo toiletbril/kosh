@@ -109,9 +109,7 @@ fn BumpArena::owns_live_pointer(const opaque *pointer) wontthrow -> bool
 {
   if (pointer == nullptr) return false;
   let const lock = live_arenas_lock{};
-  for (let *arena = LIVE_ARENAS; arena != nullptr;
-       arena = arena->m_next_live)
-  {
+  for (let *arena = LIVE_ARENAS; arena != nullptr; arena = arena->m_next_live) {
     if (arena->owns(pointer)) return true;
   }
   return false;

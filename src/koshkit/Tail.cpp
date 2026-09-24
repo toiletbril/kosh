@@ -10,8 +10,8 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../base/Path.hpp"
 #include "../Utils.hpp"
+#include "../base/Path.hpp"
 
 FLAG_LIST_DECL();
 
@@ -92,8 +92,8 @@ struct regular_tail_state
 
 static fn read_regular_tails(ArrayList<regular_tail_state> &states,
                              ArrayList<Maybe<String>> &outputs,
-                             ArrayList<i32> &errors,
-                             Allocator allocator) throws -> void
+                             ArrayList<i32> &errors, Allocator allocator) throws
+    -> void
 {
   let batch = os::Batch{allocator};
   let results = ArrayList<os::batch_result>{allocator};
@@ -145,8 +145,8 @@ static fn read_regular_tails(ArrayList<regular_tail_state> &states,
 
     batch.execute(results);
     if (os::INTERRUPT_REQUESTED) return;
-    for (usize result_index = 0; result_index < results.count();
-         result_index++) {
+    for (usize result_index = 0; result_index < results.count(); result_index++)
+    {
       let &state = states[operation_states[result_index]];
       let const &result = results[result_index];
       if (result.error_number != 0) {
@@ -197,13 +197,12 @@ static fn read_regular_tails(ArrayList<regular_tail_state> &states,
     let output = String{allocator};
     for (usize block_index = state.blocks.count(); block_index-- > 0;) {
       let const &block = state.blocks[block_index];
-      if (block.offset + block.content.length() <= state.start_offset)
-        continue;
+      if (block.offset + block.content.length() <= state.start_offset) continue;
 
-      let const skip_count = state.start_offset > block.offset
-                                 ? static_cast<usize>(state.start_offset -
-                                                       block.offset)
-                                 : usize{0};
+      let const skip_count =
+          state.start_offset > block.offset
+              ? static_cast<usize>(state.start_offset - block.offset)
+              : usize{0};
       output += block.content.substring(skip_count);
     }
     outputs[state.source_index] = steal(output);
@@ -224,10 +223,10 @@ struct forward_tail_state
   ArrayList<char> buffer{heap_allocator()};
 };
 
-static fn read_regular_forward_tails(
-    ArrayList<forward_tail_state> &states,
-    ArrayList<Maybe<String>> &outputs, ArrayList<i32> &errors,
-    Allocator allocator) throws -> void
+static fn read_regular_forward_tails(ArrayList<forward_tail_state> &states,
+                                     ArrayList<Maybe<String>> &outputs,
+                                     ArrayList<i32> &errors,
+                                     Allocator allocator) throws -> void
 {
   let batch = os::Batch{allocator};
   let results = ArrayList<os::batch_result>{allocator};
@@ -261,9 +260,9 @@ static fn read_regular_forward_tails(
                                  ? TAIL_BLOCK_BYTE_COUNT
                                  : static_cast<usize>(remaining);
       state.read_byte_count = block_size;
-      batch.add(os::batch_operation::read(
-          state.descriptor, state.buffer.begin(), block_size,
-          state.next_offset));
+      batch.add(os::batch_operation::read(state.descriptor,
+                                          state.buffer.begin(), block_size,
+                                          state.next_offset));
       operation_states.push(state_index);
       has_pending = true;
     }
@@ -271,8 +270,8 @@ static fn read_regular_forward_tails(
 
     batch.execute(results);
     if (os::INTERRUPT_REQUESTED) return;
-    for (usize result_index = 0; result_index < results.count();
-         result_index++) {
+    for (usize result_index = 0; result_index < results.count(); result_index++)
+    {
       let &state = states[operation_states[result_index]];
       let const &result = results[result_index];
       if (result.error_number != 0) {
@@ -329,10 +328,11 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
   /* -c takes precedence over -n when both are given, matching GNU tail. */
-  let const unit = FLAG_TAIL_BYTES.is_set() ? tail_unit::Bytes
-                                            : tail_unit::Lines;
+  let const unit =
+      FLAG_TAIL_BYTES.is_set() ? tail_unit::Bytes : tail_unit::Lines;
   let parsed_count = Maybe<parsed_tail_count>{
-      parsed_tail_count{count_origin::FromEnd, 10}};
+      parsed_tail_count{count_origin::FromEnd, 10}
+  };
   if (unit == tail_unit::Bytes) {
     parsed_count = parse_tail_count(FLAG_TAIL_BYTES.value());
     if (!parsed_count.has_value()) {
@@ -354,7 +354,7 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       };
     }
   }
-  let const [origin, count] = *parsed_count;
+  let const[origin, count] = *parsed_count;
 
   let const sources =
       source_list_from_operands(operands, cxt.scratch_allocator());
@@ -403,15 +403,15 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
     positioned_errors.push(0);
   }
   if (origin == count_origin::FromEnd) {
-    for (usize source_index = 0; source_index < sources.count();
-         source_index++) {
+    for (usize source_index = 0; source_index < sources.count(); source_index++)
+    {
       if (sources[source_index] == "" || sources[source_index] == "-" ||
           metadata_errors[source_index] != 0 ||
           os::file_type_letter(statuses[source_index].mode) != '-')
         continue;
 
-      let const descriptor = os::open_file_descriptor(
-          sources[source_index], os::file_open_mode::Read);
+      let const descriptor = os::open_file_descriptor(sources[source_index],
+                                                      os::file_open_mode::Read);
       if (!descriptor.has_value()) continue;
       let const file_size = os::regular_descriptor_file_size(*descriptor);
       if (!file_size.has_value()) {
@@ -441,19 +441,19 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       }
     }
     if (regular_states.count() != 0)
-      read_regular_tails(regular_states, positioned_contents,
-                         positioned_errors, allocator);
+      read_regular_tails(regular_states, positioned_contents, positioned_errors,
+                         allocator);
     if (os::INTERRUPT_REQUESTED) return 130;
   } else {
-    for (usize source_index = 0; source_index < sources.count();
-         source_index++) {
+    for (usize source_index = 0; source_index < sources.count(); source_index++)
+    {
       if (sources[source_index] == "" || sources[source_index] == "-" ||
           metadata_errors[source_index] != 0 ||
           os::file_type_letter(statuses[source_index].mode) != '-')
         continue;
 
-      let const descriptor = os::open_file_descriptor(
-          sources[source_index], os::file_open_mode::Read);
+      let const descriptor = os::open_file_descriptor(sources[source_index],
+                                                      os::file_open_mode::Read);
       if (!descriptor.has_value()) continue;
       let const file_size = os::regular_descriptor_file_size(*descriptor);
       if (!file_size.has_value()) {
@@ -467,17 +467,16 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
       state.descriptor = *descriptor;
       state.file_size = *file_size;
       state.unit = unit;
-      state.next_offset = unit == tail_unit::Bytes
-                              ? (count == 0
-                                     ? 0
-                                     : (static_cast<u64>(count - 1) < *file_size
-                                            ? static_cast<u64>(count - 1)
-                                            : *file_size))
-                              : 0;
-      state.skipped_newlines =
-          unit != tail_unit::Bytes && count > 0
-              ? static_cast<u64>(count - 1)
+      state.next_offset =
+          unit == tail_unit::Bytes
+              ? (count == 0 ? 0
+                            : (static_cast<u64>(count - 1) < *file_size
+                                   ? static_cast<u64>(count - 1)
+                                   : *file_size))
               : 0;
+      state.skipped_newlines = unit != tail_unit::Bytes && count > 0
+                                   ? static_cast<u64>(count - 1)
+                                   : 0;
       state.buffer = ArrayList<char>{allocator};
       state.buffer.reserve(TAIL_BLOCK_BYTE_COUNT);
       forward_states.push(steal(state));

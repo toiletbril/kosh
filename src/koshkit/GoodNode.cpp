@@ -12,10 +12,10 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../base/Path.hpp"
 #include "../Platform.hpp"
 #include "../StaticStringMap.hpp"
 #include "../Utils.hpp"
+#include "../base/Path.hpp"
 
 FLAG_LIST_DECL();
 
@@ -141,9 +141,9 @@ fn append_node_report(String &output, const ExecContext &ec, StringView path,
           errors.read_count != 0 || errors.write_count != 0 ||
           errors.flush_count != 0 || errors.corruption_count != 0 ||
           errors.generation_count != 0;
-      do_append_field("Integrity", has_errors
-                                       ? StringView{"device errors recorded"}
-                                       : StringView{"no device errors recorded"});
+      do_append_field("Integrity",
+                      has_errors ? StringView{"device errors recorded"}
+                                 : StringView{"no device errors recorded"});
       if (!has_errors) break;
 
       let error_text = String{allocator, "read "};
@@ -179,8 +179,8 @@ fn append_node_report(String &output, const ExecContext &ec, StringView path,
   if (verification == goodnode_verification_mode::Verify) {
     constexpr u64 VERIFICATION_TIMEOUT_NANOSECONDS = 300'000'000'000;
     let verification = StringView{"unavailable"};
-    switch (os::verify_filesystem_integrity(
-        path, VERIFICATION_TIMEOUT_NANOSECONDS))
+    switch (
+        os::verify_filesystem_integrity(path, VERIFICATION_TIMEOUT_NANOSECONDS))
     {
     case os::filesystem_verification_result::Passed:
       verification = "passed";
@@ -283,8 +283,8 @@ fn GoodNode::execute(
   }
 
   if (FLAG_GOODNODE_INODE.is_set()) {
-    let const parsed = utils::parse_integer_in_base(
-        FLAG_GOODNODE_INODE.value(), nullptr, int_base::decimal);
+    let const parsed = utils::parse_integer_in_base(FLAG_GOODNODE_INODE.value(),
+                                                    nullptr, int_base::decimal);
     if (parsed.is_error() || parsed.value() < 0) {
       KOSHKIT_REPORT_ERROR_AT(FLAG_GOODNODE_INODE.value_location(),
                               "invalid inode",

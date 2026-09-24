@@ -7,15 +7,15 @@
  * totals.
  */
 
-#include "../base/Arena.hpp"
 #include "../CLI.hpp"
 #include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
-#include "../base/HashSet.hpp"
 #include "../Koshkit.hpp"
-#include "../base/Path.hpp"
 #include "../Utils.hpp"
+#include "../base/Arena.hpp"
+#include "../base/HashSet.hpp"
+#include "../base/Path.hpp"
 
 FLAG_LIST_DECL();
 
@@ -68,7 +68,9 @@ struct du_stat_work
 fn append_output_row(ArrayList<du_output_row> &rows, u64 size, StringView path,
                      Allocator allocator) throws -> void
 {
-  rows.push({size, String{allocator, path}});
+  rows.push({
+      size, String{allocator, path}
+  });
 }
 
 static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
@@ -131,9 +133,11 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
   stat_work.reserve(512);
   stat_batch.reserve(512);
   batch_results.reserve(512);
-  frames.push(du_directory_frame{Path{path.view(), allocator}, SIZE_MAX,
-                                 allocated_size_bytes, 0, 0, false, false,
-                                 false});
+  frames.push(du_directory_frame{
+      Path{path.view(), allocator},
+      SIZE_MAX, allocated_size_bytes, 0, 0, false,
+      false, false
+  });
   directory_queue.push(0);
   bool is_root_complete = false;
   du_size_result root_result{0, false};
@@ -162,10 +166,9 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
 
         let &parent = frames[frame.parent_index];
         if (frame.total_bytes > UINT64_MAX - parent.total_bytes) {
-          report_soft_koshkit_util_error(
-              ec, cxt, "du",
-              "cannot read '" + frame.path.text() +
-                  "': the total size is too large");
+          report_soft_koshkit_util_error(ec, cxt, "du",
+                                         "cannot read '" + frame.path.text() +
+                                             "': the total size is too large");
           parent.has_failure = true;
           has_failure = true;
         } else {
@@ -181,8 +184,7 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
 
       let const parent_index = frame.parent_index;
       let &parent = frames[parent_index];
-      if (parent.pending_directory_count != 0)
-        parent.pending_directory_count--;
+      if (parent.pending_directory_count != 0) parent.pending_directory_count--;
       frame_index = parent_index;
     }
   };
@@ -201,8 +203,8 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
         os::set_last_system_error(batch_results[index].error_number);
         report_soft_koshkit_util_error(
             ec, cxt, "du",
-            "cannot read '" + work.path.text() + "': " +
-                os::last_system_error_message());
+            "cannot read '" + work.path.text() +
+                "': " + os::last_system_error_message());
         frames[parent_index].has_failure = true;
         has_failure = true;
         frames[parent_index].pending_stat_count--;
@@ -223,9 +225,9 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
         }
       }
       if (status.blocks > UINT64_MAX / 512) {
-        report_soft_koshkit_util_error(
-            ec, cxt, "du",
-            "cannot read '" + work.path.text() + "': the total size is too large");
+        report_soft_koshkit_util_error(ec, cxt, "du",
+                                       "cannot read '" + work.path.text() +
+                                           "': the total size is too large");
         frames[parent_index].has_failure = true;
         has_failure = true;
         frames[parent_index].pending_stat_count--;
@@ -236,18 +238,19 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
       let const allocated_size_bytes = status.blocks * 512;
       if (type == 'd') {
         frames[parent_index].pending_directory_count++;
-        frames.push(du_directory_frame{Path{work.path.view(), allocator},
-                                       work.parent_index,
-                                       allocated_size_bytes, 0, 0, false, false,
-                                       false});
+        frames.push(du_directory_frame{
+            Path{work.path.view(), allocator},
+            work.parent_index,
+            allocated_size_bytes, 0, 0, false, false, false
+        });
         directory_queue.push(frames.count() - 1);
       } else {
         if (allocated_size_bytes >
-            UINT64_MAX - frames[parent_index].total_bytes) {
-          report_soft_koshkit_util_error(
-              ec, cxt, "du",
-              "cannot read '" + work.path.text() +
-                  "': the total size is too large");
+            UINT64_MAX - frames[parent_index].total_bytes)
+        {
+          report_soft_koshkit_util_error(ec, cxt, "du",
+                                         "cannot read '" + work.path.text() +
+                                             "': the total size is too large");
           frames[parent_index].has_failure = true;
           has_failure = true;
         } else {
@@ -267,10 +270,9 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
 
   usize directory_index = 0;
   while (directory_index < directory_queue.count() && !is_root_complete) {
-    let const frontier_end =
-        directory_index + 32 < directory_queue.count()
-            ? directory_index + 32
-            : directory_queue.count();
+    let const frontier_end = directory_index + 32 < directory_queue.count()
+                                 ? directory_index + 32
+                                 : directory_queue.count();
     for (; directory_index < frontier_end; directory_index++) {
       if (os::INTERRUPT_REQUESTED) return None;
       let const list_mark = list_arena.mark();
@@ -281,8 +283,8 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
       if (!children.has_value()) {
         report_soft_koshkit_util_error(
             ec, cxt, "du",
-            "cannot read '" + frames[frame_index].path.text() + "': " +
-                os::last_system_error_message());
+            "cannot read '" + frames[frame_index].path.text() +
+                "': " + os::last_system_error_message());
         frames[frame_index].has_failure = true;
         frames[frame_index].is_enumerated = true;
         has_failure = true;
@@ -296,8 +298,7 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
       frames[frame_index].pending_stat_count += children->count();
       frames[frame_index].is_enumerated = true;
       for (let const &child : *children) {
-        let child_path =
-            Path{frames[frame_index].path.view(), wave_allocator};
+        let child_path = Path{frames[frame_index].path.view(), wave_allocator};
         child_path.append(child.name.view());
         stat_work.push(du_stat_work{steal(child_path), frame_index});
         if (stat_work.count() == 512) do_flush_stat_work();

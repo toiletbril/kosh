@@ -11,10 +11,10 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Parser.hpp"
-#include "../base/Path.hpp"
 #include "../Platform.hpp"
 #include "../Toiletline.hpp"
 #include "../Utils.hpp"
+#include "../base/Path.hpp"
 
 FLAG_LIST_DECL();
 
@@ -351,10 +351,9 @@ static fn edit_fc_commands(const ExecContext &ec, EvalContext &cxt,
     let const saved_terminal_exec = cxt.terminal_exec_allowed();
     cxt.set_terminal_exec_allowed(false);
     defer { cxt.set_terminal_exec_allowed(saved_terminal_exec); };
-    editor_status = cxt.run_source(editor_command.view(), "fc editor",
-                                   ec.source_location(), StringView{"fc"},
-                                   nullptr, nullptr,
-                                   return_handling::Propagate);
+    editor_status = cxt.run_source(
+        editor_command.view(), "fc editor", ec.source_location(),
+        StringView{"fc"}, nullptr, nullptr, return_handling::Propagate);
   }
 
   if (editor_status != 0) {
@@ -402,10 +401,9 @@ static fn edit_fc_commands(const ExecContext &ec, EvalContext &cxt,
     if (should_end_transaction) cxt.end_history_transaction();
   };
 
-  let const status =
-      cxt.run_source(edited->view(), "fc", ec.source_location(),
-                     StringView{"fc"}, nullptr, nullptr,
-                     return_handling::Consume, history_recording::Enabled);
+  let const status = cxt.run_source(
+      edited->view(), "fc", ec.source_location(), StringView{"fc"}, nullptr,
+      nullptr, return_handling::Consume, history_recording::Enabled);
   if (should_end_transaction) {
     cxt.end_history_transaction();
     should_end_transaction = false;
@@ -413,8 +411,7 @@ static fn edit_fc_commands(const ExecContext &ec, EvalContext &cxt,
 
   if (should_replace_active) {
     let const &active = events[*active_index];
-    if (!toiletline::rewrite_history_event(active.number,
-                                           active.command.view(),
+    if (!toiletline::rewrite_history_event(active.number, active.command.view(),
                                            recorded_commands))
     {
       report_soft_builtin_error(ec, cxt, ec.source_location(),

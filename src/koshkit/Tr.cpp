@@ -176,8 +176,7 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
                            "Supply SET1 and SET2, or use `-d` with one set"};
   }
 
-  let const set1 =
-      expand_set(operands[0].view(), cxt.scratch_allocator());
+  let const set1 = expand_set(operands[0].view(), cxt.scratch_allocator());
   if (!set1.has_value()) {
     KOSHKIT_REPORT_ERROR_AT(
         operand_locations[0], "reverse range in set '" + operands[0] + "'",
@@ -187,8 +186,7 @@ fn Tr::execute(const ExecContext &ec, EvalContext &cxt,
 
   let set2 = String{cxt.scratch_allocator()};
   if (!is_deleting) {
-    let expanded_set2 =
-        expand_set(operands[1].view(), cxt.scratch_allocator());
+    let expanded_set2 = expand_set(operands[1].view(), cxt.scratch_allocator());
     if (!expanded_set2.has_value()) {
       KOSHKIT_REPORT_ERROR_AT(
           operand_locations[1], "reverse range in set '" + operands[1] + "'",

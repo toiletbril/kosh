@@ -9,8 +9,8 @@
 
 #pragma once
 
-#include "base/Common.hpp"
 #include "StaticStringMap.hpp"
+#include "base/Common.hpp"
 
 namespace koshka {
 

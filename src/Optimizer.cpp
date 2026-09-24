@@ -9,11 +9,11 @@
 #include "Optimizer.hpp"
 
 #include "Builtin.hpp"
-#include "base/Common.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
 #include "Tokens.hpp"
+#include "base/Common.hpp"
 #include "base/Trace.hpp"
 
 namespace koshka {

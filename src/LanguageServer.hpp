@@ -9,8 +9,8 @@
 
 #pragma once
 
-#include "base/Arena.hpp"
 #include "Eval.hpp"
+#include "base/Arena.hpp"
 
 namespace koshka::language_server {
 

@@ -9,18 +9,18 @@
  * outside the word-expansion coordinator.
  */
 
-#include "base/Arena.hpp"
 #include "CLI.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Debug.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -226,14 +226,15 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
       return os::launch_process_substitution(
           substitution_source.view(), should_print_source_traces(),
           should_launch_fresh_evaluator ? &bootstrap : nullptr, shell_name(),
-          last_exit_status(), os::get_shell_process_id(), get_subshell_depth() + 1,
+          last_exit_status(), os::get_shell_process_id(),
+          get_subshell_depth() + 1,
           command_writes_the_pipe
               ? os::process_substitution_direction::CommandWrites
               : os::process_substitution_direction::CommandReads,
           mood());
     } catch (const ErrorBase &error) {
-      let const location =
-          segment.get_source_location(source_store().m_current_location.source_name_index);
+      let const location = segment.get_source_location(
+          source_store().m_current_location.source_name_index);
       if (!location.has_value() || current_source() == nullptr) {
         throw;
       }
@@ -280,8 +281,9 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
   ASSERT(launch.retained_fd.has_value());
   ASSERT(launch.child != KOSH_INVALID_PROCESS);
   let const location = source_store().m_current_location;
-  let const source =
-      source_store().m_current_source != nullptr ? source_store().m_current_source->view() : StringView{};
+  let const source = source_store().m_current_source != nullptr
+                         ? source_store().m_current_source->view()
+                         : StringView{};
   expansion_store().pending_process_substitutions().push(process_substitution{
       *launch.retained_fd, launch.child, launch.cleanup, location, source});
 
@@ -381,12 +383,13 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
       !cache_arena->is_lifetime_valid(cache.substitution_lifetime))
   {
     LOG(Debug, "command substitution ast cache miss, reparsing");
-    let const allocation_kind =
-        segment.is_substitution_cache_in_function_arena
-            ? ParseSession::AllocationKind::FunctionBody
-            : ParseSession::AllocationKind::Syntax;
-    let parser = Parser{Lexer{segment.text.view(), *cache_arena, false, None,
-                              mood(), allocation_kind}};
+    let const allocation_kind = segment.is_substitution_cache_in_function_arena
+                                    ? ParseSession::AllocationKind::FunctionBody
+                                    : ParseSession::AllocationKind::Syntax;
+    let parser = Parser{
+        Lexer{segment.text.view(), *cache_arena, false, None, mood(),
+              allocation_kind}
+    };
     try {
       cache.substitution_ast = parser.construct_ast();
     } catch (ErrorWithLocation &error) {
@@ -410,8 +413,8 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
 fn EvalContext::push_substitution_source_frame(const WordSegment &segment,
                                                StringView origin) throws -> bool
 {
-  let const location =
-      segment.get_source_location(source_store().m_current_location.source_name_index);
+  let const location = segment.get_source_location(
+      source_store().m_current_location.source_name_index);
   if (!location.has_value()) return false;
   return push_substitution_source_frame(*location, origin);
 }
@@ -756,12 +759,13 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
       !cache_arena->is_lifetime_valid(cache.substitution_lifetime))
   {
     LOG(Debug, "function substitution ast cache miss, reparsing");
-    let const allocation_kind =
-        segment.is_substitution_cache_in_function_arena
-            ? ParseSession::AllocationKind::FunctionBody
-            : ParseSession::AllocationKind::Syntax;
-    let parser = Parser{Lexer{segment.text.view(), *cache_arena, false, None,
-                              mood(), allocation_kind}};
+    let const allocation_kind = segment.is_substitution_cache_in_function_arena
+                                    ? ParseSession::AllocationKind::FunctionBody
+                                    : ParseSession::AllocationKind::Syntax;
+    let parser = Parser{
+        Lexer{segment.text.view(), *cache_arena, false, None, mood(),
+              allocation_kind}
+    };
     try {
       cache.substitution_ast = parser.construct_ast();
     } catch (...) {

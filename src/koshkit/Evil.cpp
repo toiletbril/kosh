@@ -11,9 +11,9 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../base/Path.hpp"
 #include "../Platform.hpp"
 #include "../StaticStringMap.hpp"
+#include "../base/Path.hpp"
 
 FLAG_LIST_DECL();
 
@@ -90,9 +90,9 @@ fn format_limit_value(u64 value, Allocator allocator) throws -> String
   return String::from(value, allocator);
 }
 
-fn append_resource_limit(String &output, StringView name,
-                         Allocator allocator, bool should_color,
-                         os::resource_kind kind) throws -> void
+fn append_resource_limit(String &output, StringView name, Allocator allocator,
+                         bool should_color, os::resource_kind kind) throws
+    -> void
 {
   os::resource_limit limit{};
   if (!os::get_resource_limit(limit, kind)) return;
@@ -143,9 +143,8 @@ fn append_anomaly_report(String &output, EvalContext &cxt,
     return;
   }
 
-  let const files =
-      os::list_process_open_files(os::get_current_process_id(), allocator,
-                                  true);
+  let const files = os::list_process_open_files(os::get_current_process_id(),
+                                                allocator, true);
   let executable_path = StringView{};
   bool is_mapping_evidence_available = true;
   for (let const &file : files) {
@@ -168,9 +167,8 @@ fn append_anomaly_report(String &output, EvalContext &cxt,
     let const filename = Path{file.path.view(), allocator}.filename();
     let const shared_object_marker = filename.find_substring(".so");
     let const marker = filename.find_substring(".so.");
-    if (file.is_deleted &&
-        (shared_object_marker.has_value() ||
-         file.path.view() == executable_path))
+    if (file.is_deleted && (shared_object_marker.has_value() ||
+                            file.path.view() == executable_path))
       deleted_mapping_count++;
     if (!marker.has_value()) continue;
 
@@ -179,11 +177,9 @@ fn append_anomaly_report(String &output, EvalContext &cxt,
            filename[version_end] <= '9')
       version_end++;
     if (version_end == *marker + 4) continue;
-    if (version_end < filename.length && filename[version_end] != '.')
-      continue;
+    if (version_end < filename.length && filename[version_end] != '.') continue;
     let const abi_version =
-        filename.substring_of_length(*marker + 4,
-                                     version_end - (*marker + 4))
+        filename.substring_of_length(*marker + 4, version_end - (*marker + 4))
             .to<u64>();
     if (abi_version.is_error()) continue;
 
@@ -194,7 +190,8 @@ fn append_anomaly_report(String &output, EvalContext &cxt,
       family_index++;
     if (family_index == families.count()) {
       families.push(mapped_library_family{
-          String{allocator, family}, abi_version.value(), false
+          String{allocator, family},
+          abi_version.value(), false
       });
     } else if (families[family_index].abi_version != abi_version.value() &&
                !families[family_index].has_version_mix)
@@ -228,74 +225,66 @@ fn append_procfs_report(String &output, bool should_color,
       u64 os::system_activity_status::*value;
     };
     static constexpr activity_metric METRICS[] = {
-        {os::system_activity_field::Cpu, "CPU user units",
-         &os::system_activity_status::cpu_user_units},
-        {os::system_activity_field::Cpu, "CPU system units",
-         &os::system_activity_status::cpu_system_units},
-        {os::system_activity_field::Cpu, "CPU idle units",
-         &os::system_activity_status::cpu_idle_units},
-        {os::system_activity_field::CpuWait, "CPU wait units",
-         &os::system_activity_status::cpu_wait_units},
-        {os::system_activity_field::CpuStolen, "CPU stolen units",
-         &os::system_activity_status::cpu_stolen_units},
-        {os::system_activity_field::Faults, "Page faults",
-         &os::system_activity_status::page_fault_count},
-        {os::system_activity_field::MajorFaults, "Major page faults",
-         &os::system_activity_status::major_page_fault_count},
-        {os::system_activity_field::PageInput, "Page input bytes",
-         &os::system_activity_status::page_input_bytes},
-        {os::system_activity_field::PageOutput, "Page output bytes",
-         &os::system_activity_status::page_output_bytes},
-        {os::system_activity_field::Runnable, "Runnable processes",
-         &os::system_activity_status::runnable_process_count},
-        {os::system_activity_field::Blocked, "Blocked processes",
-         &os::system_activity_status::blocked_process_count},
-        {os::system_activity_field::Interrupts, "Interrupts",
-         &os::system_activity_status::interrupt_count},
-        {os::system_activity_field::ContextSwitches, "Context switches",
-         &os::system_activity_status::context_switch_count},
-        {os::system_activity_field::ProcessCreations, "Processes created",
-         &os::system_activity_status::process_creation_count},
-        {os::system_activity_field::SoftInterrupts, "Soft interrupts",
-         &os::system_activity_status::soft_interrupt_count},
+        {os::system_activity_field::Cpu,                   "CPU user units",
+         &os::system_activity_status::cpu_user_units                                                                                                 },
+        {os::system_activity_field::Cpu,                   "CPU system units",
+         &os::system_activity_status::cpu_system_units                                                                                               },
+        {os::system_activity_field::Cpu,                   "CPU idle units",
+         &os::system_activity_status::cpu_idle_units                                                                                                 },
+        {os::system_activity_field::CpuWait,               "CPU wait units",
+         &os::system_activity_status::cpu_wait_units                                                                                                 },
+        {os::system_activity_field::CpuStolen,             "CPU stolen units",
+         &os::system_activity_status::cpu_stolen_units                                                                                               },
+        {os::system_activity_field::Faults,                "Page faults",
+         &os::system_activity_status::page_fault_count                                                                                               },
+        {os::system_activity_field::MajorFaults,           "Major page faults",
+         &os::system_activity_status::major_page_fault_count                                                                                         },
+        {os::system_activity_field::PageInput,             "Page input bytes",
+         &os::system_activity_status::page_input_bytes                                                                                               },
+        {os::system_activity_field::PageOutput,            "Page output bytes",
+         &os::system_activity_status::page_output_bytes                                                                                              },
+        {os::system_activity_field::Runnable,              "Runnable processes",
+         &os::system_activity_status::runnable_process_count                                                                                         },
+        {os::system_activity_field::Blocked,               "Blocked processes",
+         &os::system_activity_status::blocked_process_count                                                                                          },
+        {os::system_activity_field::Interrupts,            "Interrupts",
+         &os::system_activity_status::interrupt_count                                                                                                },
+        {os::system_activity_field::ContextSwitches,       "Context switches",
+         &os::system_activity_status::context_switch_count                                                                                           },
+        {os::system_activity_field::ProcessCreations,      "Processes created",
+         &os::system_activity_status::process_creation_count                                                                                         },
+        {os::system_activity_field::SoftInterrupts,        "Soft interrupts",
+         &os::system_activity_status::soft_interrupt_count                                                                                           },
         {os::system_activity_field::CpuSomeStall,
-         "CPU partial stall microseconds",
-         &os::system_activity_status::cpu_some_stall_microseconds},
-        {os::system_activity_field::CpuFullStall,
-         "CPU full stall microseconds",
-         &os::system_activity_status::cpu_full_stall_microseconds},
+         "CPU partial stall microseconds",                                                &os::system_activity_status::cpu_some_stall_microseconds   },
+        {os::system_activity_field::CpuFullStall,          "CPU full stall microseconds",
+         &os::system_activity_status::cpu_full_stall_microseconds                                                                                    },
         {os::system_activity_field::MemorySomeStall,
-         "Memory partial stall microseconds",
-         &os::system_activity_status::memory_some_stall_microseconds},
+         "Memory partial stall microseconds",                                             &os::system_activity_status::memory_some_stall_microseconds},
         {os::system_activity_field::MemoryFullStall,
-         "Memory full stall microseconds",
-         &os::system_activity_status::memory_full_stall_microseconds},
+         "Memory full stall microseconds",                                                &os::system_activity_status::memory_full_stall_microseconds},
         {os::system_activity_field::IoSomeStall,
-         "IO partial stall microseconds",
-         &os::system_activity_status::io_some_stall_microseconds},
-        {os::system_activity_field::IoFullStall,
-         "IO full stall microseconds",
-         &os::system_activity_status::io_full_stall_microseconds},
-        {os::system_activity_field::PageScan, "Pages scanned",
-         &os::system_activity_status::page_scan_count},
-        {os::system_activity_field::PageSteal, "Pages reclaimed",
-         &os::system_activity_status::page_steal_count},
-        {os::system_activity_field::DirectReclaim, "Direct reclaim stalls",
-         &os::system_activity_status::direct_reclaim_count},
-        {os::system_activity_field::CompactionStall, "Compaction stalls",
-         &os::system_activity_status::compaction_stall_count},
-        {os::system_activity_field::DirtyPages, "Dirty pages",
-         &os::system_activity_status::dirty_page_count},
-        {os::system_activity_field::WritebackPages, "Writeback pages",
-         &os::system_activity_status::writeback_page_count},
-        {os::system_activity_field::OomKills, "OOM kills",
-         &os::system_activity_status::oom_kill_count},
+         "IO partial stall microseconds",                                                 &os::system_activity_status::io_some_stall_microseconds    },
+        {os::system_activity_field::IoFullStall,           "IO full stall microseconds",
+         &os::system_activity_status::io_full_stall_microseconds                                                                                     },
+        {os::system_activity_field::PageScan,              "Pages scanned",
+         &os::system_activity_status::page_scan_count                                                                                                },
+        {os::system_activity_field::PageSteal,             "Pages reclaimed",
+         &os::system_activity_status::page_steal_count                                                                                               },
+        {os::system_activity_field::DirectReclaim,         "Direct reclaim stalls",
+         &os::system_activity_status::direct_reclaim_count                                                                                           },
+        {os::system_activity_field::CompactionStall,       "Compaction stalls",
+         &os::system_activity_status::compaction_stall_count                                                                                         },
+        {os::system_activity_field::DirtyPages,            "Dirty pages",
+         &os::system_activity_status::dirty_page_count                                                                                               },
+        {os::system_activity_field::WritebackPages,        "Writeback pages",
+         &os::system_activity_status::writeback_page_count                                                                                           },
+        {os::system_activity_field::OomKills,              "OOM kills",
+         &os::system_activity_status::oom_kill_count                                                                                                 },
         {os::system_activity_field::NamespaceCount,
-         "Current-process namespaces",
-         &os::system_activity_status::namespace_count},
+         "Current-process namespaces",                                                    &os::system_activity_status::namespace_count               },
         {os::system_activity_field::CgroupMembershipCount,
-         "Current-process cgroup memberships",
-         &os::system_activity_status::cgroup_membership_count},
+         "Current-process cgroup memberships",                                            &os::system_activity_status::cgroup_membership_count       },
     };
     for (let const &metric : METRICS) {
       if (!activity.has_field(metric.field)) continue;
@@ -315,8 +304,7 @@ fn append_procfs_report(String &output, bool should_color,
     }
     if (!activity.has_field(os::system_activity_field::CgroupMembershipCount)) {
       append_report_field(output, "Current-process cgroup memberships",
-                          "unavailable", colors::ansi::BOLD_CYAN,
-                          should_color);
+                          "unavailable", colors::ansi::BOLD_CYAN, should_color);
     }
   }
 
@@ -459,8 +447,7 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
                           colors::ansi::BOLD_CYAN, should_color);
     }
   }
-  append_report_field(output, "Directory",
-                      os::read_current_directory().view(),
+  append_report_field(output, "Directory", os::read_current_directory().view(),
                       colors::ansi::BOLD_CYAN, should_color);
   if (FLAG_EVIL_ALL.is_enabled()) {
     append_report_field(
@@ -551,8 +538,7 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
 
   os::memory_status memory{};
   if (os::read_memory_status(memory) &&
-      memory.has_field(os::memory_status_field::Total) &&
-      memory.total_kib > 0)
+      memory.has_field(os::memory_status_field::Total) && memory.total_kib > 0)
   {
     let memory_line = String{allocator};
     if (memory.has_field(os::memory_status_field::Available) ||
@@ -569,16 +555,15 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
                         colors::ansi::BOLD_CYAN, should_color);
     if (FLAG_EVIL_ALL.is_enabled()) {
       let const do_append_memory_size =
-          [&](StringView name, os::memory_status_field field,
-              u64 value_kib) throws -> void {
+          [&](StringView name, os::memory_status_field field, u64 value_kib)
+              throws -> void {
         if (!memory.has_field(field)) return;
 
-        let const value_bytes = value_kib > UINT64_MAX / 1024
-                                    ? UINT64_MAX
-                                    : value_kib * 1024;
-        append_report_field(
-            output, name, format_human_size(value_bytes, allocator).view(),
-            colors::ansi::BOLD_CYAN, should_color);
+        let const value_bytes =
+            value_kib > UINT64_MAX / 1024 ? UINT64_MAX : value_kib * 1024;
+        append_report_field(output, name,
+                            format_human_size(value_bytes, allocator).view(),
+                            colors::ansi::BOLD_CYAN, should_color);
       };
 
       if (memory.has_field(os::memory_status_field::Available)) {
@@ -594,12 +579,10 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
             colors::ansi::BOLD_CYAN, should_color);
       }
 
-      do_append_memory_size("Memory buffers",
-                            os::memory_status_field::Buffers,
+      do_append_memory_size("Memory buffers", os::memory_status_field::Buffers,
                             memory.buffer_kib);
       do_append_memory_size("Memory page cache",
-                            os::memory_status_field::Cached,
-                            memory.cached_kib);
+                            os::memory_status_field::Cached, memory.cached_kib);
       do_append_memory_size("Memory reclaimable slab",
                             os::memory_status_field::ReclaimableSlab,
                             memory.reclaimable_slab_kib);
@@ -735,13 +718,11 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
     append_system_configuration(output, "Page size",
                                 os::system_configuration_key::PageSize,
                                 allocator, should_color);
-    append_resource_limit(output, "Open file limit",
-                          allocator, should_color,
+    append_resource_limit(output, "Open file limit", allocator, should_color,
                           os::resource_kind::OpenFiles);
     append_resource_limit(output, "Process limit", allocator, should_color,
                           os::resource_kind::Processes);
-    append_resource_limit(output, "Core size limit",
-                          allocator, should_color,
+    append_resource_limit(output, "Core size limit", allocator, should_color,
                           os::resource_kind::CoreBlocks);
     append_procfs_report(output, should_color, allocator);
     append_anomaly_report(output, cxt, should_color);

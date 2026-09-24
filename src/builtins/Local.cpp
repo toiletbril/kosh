@@ -131,10 +131,9 @@ fn Local::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                    : arg.view();
     /* process_args passes a local append through as name+=value, so a trailing
        plus on the name marks the append and is stripped before the binding. */
-    let const update_mode =
-        !name.is_empty() && name[name.count() - 1] == '+'
-            ? assignment_update_mode::Append
-            : assignment_update_mode::Replace;
+    let const update_mode = !name.is_empty() && name[name.count() - 1] == '+'
+                                ? assignment_update_mode::Append
+                                : assignment_update_mode::Replace;
     if (update_mode == assignment_update_mode::Append)
       name = name.substring_of_length(0, name.count() - 1);
 

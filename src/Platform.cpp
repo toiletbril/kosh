@@ -269,7 +269,8 @@ fn compile_regex(StringView pattern, compiled_regex &out,
 }
 
 fn compile_basic_regex(StringView pattern, compiled_regex &out,
-                       case_sensitivity sensitivity) throws -> regex_compile_result
+                       case_sensitivity sensitivity) throws
+    -> regex_compile_result
 {
   let const is_case_insensitive = sensitivity == case_sensitivity::Insensitive;
   let const pattern_text = String{heap_allocator(), pattern};
@@ -322,7 +323,8 @@ fn free_regex(compiled_regex &compiled) wontthrow -> void
 }
 
 fn compile_search_regex(StringView pattern, compiled_regex &out,
-                        case_sensitivity sensitivity) throws -> regex_compile_result
+                        case_sensitivity sensitivity) throws
+    -> regex_compile_result
 {
   let const is_case_insensitive = sensitivity == case_sensitivity::Insensitive;
   const String pattern_text{heap_allocator(), pattern};

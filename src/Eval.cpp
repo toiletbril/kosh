@@ -11,23 +11,23 @@
 
 #include "Eval.hpp"
 
-#include "base/Arena.hpp"
 #include "CLI.hpp"
 #include "CLIColors.hpp"
-#include "base/Common.hpp"
 #include "Completion.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Expressions.hpp"
 #include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -138,7 +138,8 @@ fn EvalContext::end_command() wontthrow -> void
 fn EvalContext::record_history_event(StringView command) throws -> bool
 {
   if (!source_store().m_history_transaction_stack.is_empty()) {
-    source_store().m_history_transaction_stack.back()->push(String{heap_allocator(), command});
+    source_store().m_history_transaction_stack.back()->push(
+        String{heap_allocator(), command});
     return true;
   }
 
@@ -193,9 +194,8 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
     if (previous != nullptr) saved = String{previous->view()};
     let const saved_definition = special_variable_definition_location(name);
 
-    m_confined_write_log.push(environment_undo_entry{
-        String{name}, steal(saved), saved_definition
-    });
+    m_confined_write_log.push(
+        environment_undo_entry{String{name}, steal(saved), saved_definition});
   }
 
   if (is_field_separator_name) set_field_separators(value);
@@ -647,7 +647,8 @@ cold fn EvalContext::show_runtime_warning_at(
     let warning = WarningWithLocationAndDetails{location, message, note};
     warning.set_line_offset(line_offset);
     show_message(warning.to_string(resolved_source.text->view(), this));
-    if (!source_store().m_source_frames.is_empty()) print_source_backtrace(trace_location);
+    if (!source_store().m_source_frames.is_empty())
+      print_source_backtrace(trace_location);
   } catch (...) {
     LOG(Debug, "formatting a runtime warning failed, the error is swallowed");
   }
@@ -675,7 +676,8 @@ cold fn EvalContext::show_runtime_error_at(SourceLocation location,
     let error = ErrorWithLocation{location, message};
     error.set_line_offset(line_offset);
     show_message(error.to_string(resolved_source.text->view(), this));
-    if (!source_store().m_source_frames.is_empty()) print_source_backtrace(trace_location);
+    if (!source_store().m_source_frames.is_empty())
+      print_source_backtrace(trace_location);
   } catch (...) {
     LOG(Debug, "formatting a runtime error failed, the error is swallowed");
   }
@@ -818,7 +820,8 @@ fn EvalContext::warn_or_throw(bool fatal, bool explicitly_requested,
   {
     try {
       let warning = WarningWithLocationAndDetails{location, message, note};
-      show_message(warning.to_string(source_store().m_current_source->view(), this));
+      show_message(
+          warning.to_string(source_store().m_current_source->view(), this));
     } catch (...) {
       LOG(Debug, "showing a located warning failed, the error is swallowed");
     }
@@ -854,10 +857,8 @@ pure fn EvalContext::special_variable_definition_location(
 fn EvalContext::record_environment_change(StringView name) throws -> void
 {
   if (m_subshell_depth == 0) return;
-  m_environment_undo_log.push(
-      environment_undo_entry{
-          String{name}, os::get_environment_variable(name), None
-      });
+  m_environment_undo_log.push(environment_undo_entry{
+      String{name}, os::get_environment_variable(name), None});
 }
 
 static constexpr usize EXPORTED_NAME_FOLD_BYTES = 64;
@@ -933,10 +934,9 @@ fn EvalContext::unexport_shell_variable(StringView name) throws -> void
 {
   let const has_shell_binding =
       m_variable_store.shell_variables().find(name) != nullptr ||
-                                indexed_arrays().find(name) != nullptr ||
-                                associative_names().contains(name) ||
-                                is_local_in_current_scope(name) ||
-                                variable_requires_dynamic_lookup(name);
+      indexed_arrays().find(name) != nullptr ||
+      associative_names().contains(name) || is_local_in_current_scope(name) ||
+      variable_requires_dynamic_lookup(name);
   let const environment_value =
       has_shell_binding ? Maybe<String>{} : os::get_environment_variable(name);
   record_environment_change(name);
@@ -1124,7 +1124,8 @@ fn EvalContext::enter_bash_source_argument_frame(
         append_bash_argument_frame(source_path);
       frame_context.set_flag(BashArgumentFrameFlag::DidEnter);
     } else if (arguments == nullptr) {
-      initialize_bash_argument_arrays(variable_store().bash_argument_frame_context_ref() == nullptr);
+      initialize_bash_argument_arrays(
+          variable_store().bash_argument_frame_context_ref() == nullptr);
       append_bash_argument_frame(source_path);
       frame_context.set_flag(BashArgumentFrameFlag::DidEnter);
     } else if (variable_store().bash_argument_arrays_ref() == nullptr) {
@@ -1194,7 +1195,7 @@ fn EvalContext::push_function_call_name(
 {
   let owned_name = String{heap_allocator(), name};
   function_store().call_names().reserve(function_store().call_names().count() +
-                                         1);
+                                        1);
   function_store().call_storages().reserve(
       function_store().call_storages().count() + 1);
   function_store().call_locations().reserve(
@@ -1263,12 +1264,14 @@ pure fn EvalContext::merged_frame_at(
       source_index++;
     }
 
-    let const has_source = source_index < source_store().m_source_frames.count();
+    let const has_source =
+        source_index < source_store().m_source_frames.count();
     let const has_function = function_index < function_count;
     if (!has_source && !has_function) break;
 
     if (has_source &&
-        source_store().m_source_frames[source_index].function_call_depth <= function_index)
+        source_store().m_source_frames[source_index].function_call_depth <=
+            function_index)
     {
       if (emitted_count == target) {
         if (script_source_index.has_value() &&
@@ -1369,9 +1372,9 @@ pure fn EvalContext::bash_source_frame_at(usize index) const wontthrow
   let const frame = merged_frame_at(index, total, script_source_index);
   switch (frame.kind) {
   case MergedFrame::Kind::Function: {
-    let const *info =
-        function_store().call_storages()[frame.storage_index]
-            .get_definition_info();
+    let const *info = function_store()
+                          .call_storages()[frame.storage_index]
+                          .get_definition_info();
     if (info != nullptr) {
       if (let const name = source_name_at(info->source_name_index);
           name.has_value())
@@ -1383,7 +1386,9 @@ pure fn EvalContext::bash_source_frame_at(usize index) const wontthrow
     return m_shell_name.view();
   }
   case MergedFrame::Kind::Source:
-    return source_store().m_source_frames[frame.storage_index].source_path.view();
+    return source_store()
+        .m_source_frames[frame.storage_index]
+        .source_path.view();
   case MergedFrame::Kind::Main: break;
   }
 
@@ -1396,7 +1401,8 @@ pure fn EvalContext::bash_source_frame_count(
   usize frame_count = function_store().call_names().count();
 
   for (usize i = 0; i < source_store().m_source_frames.count(); i++) {
-    if (!source_store().m_source_frames[i].source_path.is_empty()) frame_count++;
+    if (!source_store().m_source_frames[i].source_path.is_empty())
+      frame_count++;
   }
 
   if (source_store().is_script_run() && !script_source_index.has_value())
@@ -1668,8 +1674,7 @@ fn ExecContext::make_from(const SourceLocation &location, StringView source,
                           bool should_check_hash,
                           ProgramResolver &program_resolver,
                           ArrayList<SourceLocation> &&arg_locations,
-                          mimic_mood mood) throws
-    -> ExecContext
+                          mimic_mood mood) throws -> ExecContext
 {
   ASSERT(args.count() > 0);
 

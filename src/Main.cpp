@@ -7,12 +7,9 @@
  * the interactive loop.
  */
 
-#include "base/Arena.hpp"
 #include "CLI.hpp"
 #include "CLIColors.hpp"
-#include "base/Common.hpp"
 #include "Completion.hpp"
-#include "base/Debug.hpp"
 #include "Diagnostics.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
@@ -22,14 +19,17 @@
 #include "Koshkit.hpp"
 #include "LanguageServer.hpp"
 #include "Lexer.hpp"
-#include "base/PackedStringKey.hpp"
 #include "Parser.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/PackedStringKey.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 FLAG_LIST_DECL();
 
@@ -1287,9 +1287,8 @@ fn kosh_main(int argc, char **argv) -> int
                                       ? toiletline::edit_mode::Vi
                                       : toiletline::edit_mode::Emacs);
         toiletline::set_tab_selector(context.tab_selector());
-        toiletline::set_space_after_completion(
-            context.shell_option_state(
-                koshka::shell_option_id::SpaceAfterCompletion));
+        toiletline::set_space_after_completion(context.shell_option_state(
+            koshka::shell_option_id::SpaceAfterCompletion));
         toiletline::set_history_limit(
             context.get_history_limit("KOSH_HISTORY_SIZE", 4096));
 

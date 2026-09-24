@@ -159,7 +159,7 @@ static fn compile_sed_expression(StringView expression,
           ? os::compile_regex(expression, compiled,
                               os::case_sensitivity::Sensitive)
           : os::compile_basic_regex(expression, compiled,
-                                     os::case_sensitivity::Sensitive);
+                                    os::case_sensitivity::Sensitive);
   if (result != os::regex_compile_result::Ok) {
     throw SedParseError{
         position, "invalid regular expression '" + String{expression} + "'",
@@ -234,16 +234,14 @@ static fn parse_sed_script(StringView script, Allocator allocator,
 
     sed_address address{};
     defer { free_sed_address(address); };
-    unused(
-        parse_sed_address(script, position, allocator, address, regex_mode));
+    unused(parse_sed_address(script, position, allocator, address, regex_mode));
     sed_address second_address{};
     defer { free_sed_address(second_address); };
     bool has_second_address = false;
     if (position < script.length && script[position] == ',') {
       position++;
-      has_second_address =
-          parse_sed_address(script, position, allocator, second_address,
-                            regex_mode);
+      has_second_address = parse_sed_address(script, position, allocator,
+                                             second_address, regex_mode);
       if (!has_second_address)
         throw SedParseError{position, "missing second address",
                             "write an address after the comma"};
@@ -589,10 +587,9 @@ fn Sed::execute(const ExecContext &ec, EvalContext &cxt,
       free_sed_command(command);
   };
   try {
-    parse_sed_script(
-        script.view(), cxt.scratch_allocator(), commands,
-        FLAG_SED_EXTENDED.is_enabled() ? sed_regex_mode::Extended
-                                       : sed_regex_mode::Basic);
+    parse_sed_script(script.view(), cxt.scratch_allocator(), commands,
+                     FLAG_SED_EXTENDED.is_enabled() ? sed_regex_mode::Extended
+                                                    : sed_regex_mode::Basic);
   } catch (SedParseError &error) {
     KOSHKIT_REPORT_ERROR_AT(
         get_sed_script_location(script_parts, error.get_position()),

@@ -11,16 +11,16 @@
  * are shared even when an array has no ordinary indexed-array allocation.
  */
 
-#include "base/Arena.hpp"
 #include "Builtin.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -141,10 +141,9 @@ static fn parse_explicit_array_index(StringView element,
   return false;
 }
 
-fn EvalContext::assign_indexed_array_elements(StringView name,
-                                              const ArrayList<String> &elements,
-                                              assignment_update_mode update_mode)
-    throws -> void
+fn EvalContext::assign_indexed_array_elements(
+    StringView name, const ArrayList<String> &elements,
+    assignment_update_mode update_mode) throws -> void
 {
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
@@ -389,8 +388,8 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
     }
 
     if (resolved_index == 0)
-    if (let const *scalar = m_variable_store.shell_variables().find(name);
-        scalar != nullptr)
+      if (let const *scalar = m_variable_store.shell_variables().find(name);
+          scalar != nullptr)
         return String{scalar->view()};
 
     return None;
@@ -654,7 +653,8 @@ fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
 
   let previous_value = Maybe<String>{};
   if (let const *scalar = m_variable_store.shell_variables().find(name);
-      scalar != nullptr) {
+      scalar != nullptr)
+  {
     previous_value = *scalar;
   } else if (previous_array.has_value() && !previous_array->is_empty()) {
     previous_value = previous_array->front();

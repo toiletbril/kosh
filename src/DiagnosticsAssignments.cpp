@@ -9,10 +9,10 @@
 
 #include "DiagnosticsChecksInternal.hpp"
 #include "Lexer.hpp"
-#include "base/PackedStringKey.hpp"
 #include "StaticStringMap.hpp"
 #include "Tokens.hpp"
 #include "Utils.hpp"
+#include "base/PackedStringKey.hpp"
 
 namespace koshka {
 
@@ -910,8 +910,7 @@ fn check_assignment_value_shape(AnalysisContext &actx,
      path, shellcheck SC2123. An expanded value may already hold a path list. */
   if (input.name == "PATH" &&
       input.update_mode != assignment_update_mode::Append &&
-      !value.is_empty() &&
-      input.shape.has_only_literal_segments &&
+      !value.is_empty() && input.shape.has_only_literal_segments &&
       !value.find_character(':').has_value() &&
       !view_contains(value, StringView{"PATH"}))
   {
@@ -947,8 +946,7 @@ fn check_assignment_value_shape(AnalysisContext &actx,
       input.is_command_prefix && COMMAND_VALUED_VARIABLES.contains(input.name);
 
   if (input.update_mode != assignment_update_mode::Append &&
-      !is_deliberate_command_prefix &&
-      input.shape.has_bare_literal_value &&
+      !is_deliberate_command_prefix && input.shape.has_bare_literal_value &&
       word_names_a_command_as_a_value(value) &&
       actx.should_report(diagnostic_id::sc2209))
   {
@@ -969,10 +967,9 @@ fn check_assignment_value_shape(AnalysisContext &actx,
     if (actx.array_valued_names.count() != 0 &&
         actx.array_valued_names.contains(input.name))
     {
-      let const id =
-          input.update_mode == assignment_update_mode::Append
-              ? diagnostic_id::sc2179
-              : diagnostic_id::sc2178;
+      let const id = input.update_mode == assignment_update_mode::Append
+                         ? diagnostic_id::sc2179
+                         : diagnostic_id::sc2178;
       actx.report_diagnostic(id, input.location, {input.name});
     }
 

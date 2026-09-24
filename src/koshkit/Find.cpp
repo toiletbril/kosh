@@ -10,15 +10,15 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../base/Path.hpp"
 #include "../StaticStringMap.hpp"
-#include "../base/Trace.hpp"
 #include "../Utils.hpp"
+#include "../base/Path.hpp"
+#include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL(
-    "[path ...] [-name glob] [-iname glob] [-type fdl] [-maxdepth n] [-mindepth n]");
+HELP_SYNOPSIS_DECL("[path ...] [-name glob] [-iname glob] [-type fdl] "
+                   "[-maxdepth n] [-mindepth n]");
 
 HELP_DESCRIPTION_DECL(
     "The find utility walks each path and prints every entry under it.");
@@ -122,8 +122,7 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
                     const find_options &options, String &output,
                     i32 &exit_status, Allocator allocator,
                     const os::file_status *known_status = nullptr,
-                    char known_type_letter = 0) throws
-    -> void
+                    char known_type_letter = 0) throws -> void
 {
   let const directory_scratch = cxt.scratch_mark();
   defer { cxt.scratch_release(directory_scratch); };
@@ -132,11 +131,12 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
      marker '\0' that matches no -type filter and is not descended. */
   os::file_status queried_status{};
   if (known_status == nullptr && known_type_letter == 0) {
-    if (os::stat_path(path_text, queried_status)) known_status = &queried_status;
+    if (os::stat_path(path_text, queried_status))
+      known_status = &queried_status;
   }
-  let const type_letter =
-      known_status != nullptr ? os::file_type_letter(known_status->mode)
-      : known_type_letter;
+  let const type_letter = known_status != nullptr
+                              ? os::file_type_letter(known_status->mode)
+                              : known_type_letter;
 
   usize filename_start = 0;
   for (usize index = path_text.length; index > 0; index--) {
@@ -204,19 +204,18 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
 
       unknown_batch.clear();
       for (usize index = 0; index < unknown_indices.count(); index++)
-        unknown_batch.add(os::batch_operation::lstat(
-            unknown_paths[index], unknown_statuses[index]));
+        unknown_batch.add(os::batch_operation::lstat(unknown_paths[index],
+                                                     unknown_statuses[index]));
 
-      unknown_batch.execute(unknown_results,
-                            os::batch_deduplication::Disabled);
+      unknown_batch.execute(unknown_results, os::batch_deduplication::Disabled);
       for (usize index = 0; index < unknown_indices.count(); index++) {
         let &kind = (*children)[unknown_indices[index]].kind;
         if (unknown_results[index].error_number != 0) {
           os::set_last_system_error(unknown_results[index].error_number);
           report_soft_koshkit_util_error(
               ec, cxt, "find",
-              "'" + unknown_paths[index].text() + "': " +
-                  os::last_system_error_message());
+              "'" + unknown_paths[index].text() +
+                  "': " + os::last_system_error_message());
           exit_status = 1;
           kind = Path::entry_kind::Other;
           continue;
@@ -311,11 +310,12 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
     let const predicate = args[index].view();
     let const predicate_kind = FIND_PREDICATES.find(predicate);
     if (!predicate_kind.has_value()) {
-      KOSHKIT_REPORT_ERROR_AT(
-          arg_locations[index],
-          "unknown predicate '" + String{cxt.scratch_allocator(), predicate} +
-              "'",
-          "Use `-name`, `-iname`, `-type`, `-maxdepth`, `-mindepth`, or `-print`");
+      KOSHKIT_REPORT_ERROR_AT(arg_locations[index],
+                              "unknown predicate '" +
+                                  String{cxt.scratch_allocator(), predicate} +
+                                  "'",
+                              "Use `-name`, `-iname`, `-type`, `-maxdepth`, "
+                              "`-mindepth`, or `-print`");
       return 1;
     }
 
@@ -333,8 +333,7 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
       if (index + 1 >= args.count()) {
         KOSHKIT_REPORT_ERROR_AT(
             arg_locations[index],
-            String{cxt.scratch_allocator(), predicate} +
-                " expects a pattern",
+            String{cxt.scratch_allocator(), predicate} + " expects a pattern",
             *predicate_kind == find_predicate_kind::Iname
                 ? StringView{"Pass a glob after `-iname`, e.g. `-iname '*.c'`"}
                 : StringView{"Pass a glob after `-name`, e.g. `-name '*.c'`"});
@@ -403,9 +402,10 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
     matcher_name_patterns.reserve(name_patterns.count());
     matcher_name_masks.reserve(name_patterns.count());
     for (usize pattern_index = 0; pattern_index < name_patterns.count();
-         pattern_index++) {
-      let decoded = utils::decode_shell_word(
-          name_patterns[pattern_index], cxt.scratch_allocator());
+         pattern_index++)
+    {
+      let decoded = utils::decode_shell_word(name_patterns[pattern_index],
+                                             cxt.scratch_allocator());
       if (name_pattern_ignore_case[pattern_index]) {
         String folded{cxt.scratch_allocator()};
         folded.reserve(decoded.text.length());
@@ -450,8 +450,8 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
     if (results[root_index].error_number != 0) {
       os::set_last_system_error(results[root_index].error_number);
       report_soft_koshkit_util_error(ec, cxt, args[0].view(),
-                                     "'" + String{allocator, root} +
-                                         "': " + os::last_system_error_message());
+                                     "'" + String{allocator, root} + "': " +
+                                         os::last_system_error_message());
       status = 1;
       continue;
     }

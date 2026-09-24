@@ -8,12 +8,12 @@
 
 #include "../CLI.hpp"
 #include "../CLIColors.hpp"
-#include "../base/Arena.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
 #include "../Utils.hpp"
+#include "../base/Arena.hpp"
 
 FLAG_LIST_DECL();
 
@@ -33,13 +33,11 @@ static pure fn is_evilnet_sample_duration(koshka::StringView value) wontthrow
   return !value.is_empty() &&
          ((value[0] >= '0' && value[0] <= '9') || value[0] == '.');
 }
-FLAG_OPTIONAL(EVILNET_LIVE, 'l', "live",
-              Live,
+FLAG_OPTIONAL(EVILNET_LIVE, 'l', "live", Live,
               "Sample and refresh live traffic every N seconds; the default "
               "is 0.5 seconds.",
               is_evilnet_sample_duration, "seconds");
-FLAG_OPTIONAL(EVILNET_CUMULATIVE, 'C', "cumulative",
-              Live,
+FLAG_OPTIONAL(EVILNET_CUMULATIVE, 'C', "cumulative", Live,
               "Measure traffic over an M-second rolling window; the default is "
               "one second.",
               is_evilnet_sample_duration, "seconds");
@@ -75,32 +73,32 @@ struct evilnet_sort_spec
 };
 
 static constexpr evilnet_sort_spec EVILNET_SORT_SPECS[] = {
-    {evilnet_sort_key::Name, "name", os::network_statistics_field::ReceiveBytes,
-     &os::network_interface_statistics_entry::receive_bytes},
-    {evilnet_sort_key::ReceiveBytes, "rx",
+    {evilnet_sort_key::Name,            "name",       os::network_statistics_field::ReceiveBytes,
+     &os::network_interface_statistics_entry::receive_bytes        },
+    {evilnet_sort_key::ReceiveBytes,    "rx",
      os::network_statistics_field::ReceiveBytes,
-     &os::network_interface_statistics_entry::receive_bytes},
-    {evilnet_sort_key::TransmitBytes, "tx",
+     &os::network_interface_statistics_entry::receive_bytes        },
+    {evilnet_sort_key::TransmitBytes,   "tx",
      os::network_statistics_field::TransmitBytes,
-     &os::network_interface_statistics_entry::transmit_bytes},
-    {evilnet_sort_key::ReceivePackets, "rx-packets",
+     &os::network_interface_statistics_entry::transmit_bytes       },
+    {evilnet_sort_key::ReceivePackets,  "rx-packets",
      os::network_statistics_field::ReceivePackets,
-     &os::network_interface_statistics_entry::receive_packet_count},
+     &os::network_interface_statistics_entry::receive_packet_count },
     {evilnet_sort_key::TransmitPackets, "tx-packets",
      os::network_statistics_field::TransmitPackets,
      &os::network_interface_statistics_entry::transmit_packet_count},
-    {evilnet_sort_key::ReceiveErrors, "rx-errors",
+    {evilnet_sort_key::ReceiveErrors,   "rx-errors",
      os::network_statistics_field::ReceiveErrors,
-     &os::network_interface_statistics_entry::receive_error_count},
-    {evilnet_sort_key::TransmitErrors, "tx-errors",
+     &os::network_interface_statistics_entry::receive_error_count  },
+    {evilnet_sort_key::TransmitErrors,  "tx-errors",
      os::network_statistics_field::TransmitErrors,
-     &os::network_interface_statistics_entry::transmit_error_count},
-    {evilnet_sort_key::ReceiveDrops, "rx-drops",
+     &os::network_interface_statistics_entry::transmit_error_count },
+    {evilnet_sort_key::ReceiveDrops,    "rx-drops",
      os::network_statistics_field::ReceiveDrops,
-     &os::network_interface_statistics_entry::receive_drop_count},
-    {evilnet_sort_key::TransmitDrops, "tx-drops",
+     &os::network_interface_statistics_entry::receive_drop_count   },
+    {evilnet_sort_key::TransmitDrops,   "tx-drops",
      os::network_statistics_field::TransmitDrops,
-     &os::network_interface_statistics_entry::transmit_drop_count},
+     &os::network_interface_statistics_entry::transmit_drop_count  },
 };
 
 struct evilnet_sort_resolution
@@ -137,9 +135,10 @@ fn sort_network_statistics(
 {
   let const selected = sort_key.value_or(evilnet_sort_key::Name);
   let spec_index = Maybe<usize>{None};
-  for (usize index = 0; index < sizeof(EVILNET_SORT_SPECS) /
-                                sizeof(EVILNET_SORT_SPECS[0]);
-       index++) {
+  for (usize index = 0;
+       index < sizeof(EVILNET_SORT_SPECS) / sizeof(EVILNET_SORT_SPECS[0]);
+       index++)
+  {
     if (EVILNET_SORT_SPECS[index].key == selected) {
       spec_index = index;
       break;
@@ -199,8 +198,7 @@ fn append_network_interface_report(String &output, bool should_color) throws
     cells.push({address.address.view(), colors::ansi::RESET});
     table.add_row(cells);
   }
-  append_titled_report_table(output, "Network interfaces", table,
-                             should_color);
+  append_titled_report_table(output, "Network interfaces", table, should_color);
 
   return addresses.count();
 }
@@ -232,12 +230,18 @@ fn append_network_traffic_statistics_report(
   receive_drops_header += duration_suffix;
   transmit_drops_header += duration_suffix;
   const StringView HEADERS[] = {
-      receive_header.view(),        transmit_header.view(),
-      receive_packets_header.view(), transmit_packets_header.view(),
-      receive_errors_header.view(),  transmit_errors_header.view(),
-      receive_drops_header.view(),   transmit_drops_header.view(),
-      "RX CAP",                     "TX CAP",
-      "TX QUEUE",                   "TX LIMIT",
+      receive_header.view(),
+      transmit_header.view(),
+      receive_packets_header.view(),
+      transmit_packets_header.view(),
+      receive_errors_header.view(),
+      transmit_errors_header.view(),
+      receive_drops_header.view(),
+      transmit_drops_header.view(),
+      "RX CAP",
+      "TX CAP",
+      "TX QUEUE",
+      "TX LIMIT",
   };
   for (let const heading : HEADERS)
     table.add_column(heading, report_table_alignment::Right,
@@ -246,9 +250,9 @@ fn append_network_traffic_statistics_report(
   let cells = ArrayList<report_table_cell_view>{allocator};
   cells.reserve(countof(HEADERS) + 1);
   for (let const &entry : statistics) {
-    let const is_default = default_interface.has_value() &&
-                           entry.interface_name.view() ==
-                               default_interface->view();
+    let const is_default =
+        default_interface.has_value() &&
+        entry.interface_name.view() == default_interface->view();
     let values = ArrayList<String>{allocator};
     values.reserve(countof(HEADERS));
     values.push(entry.has_field(os::network_statistics_field::ReceiveBytes)
@@ -585,8 +589,8 @@ pure fn network_counter_reset(
 fn sample_network_statistics(
     const ArrayList<os::network_interface_statistics_entry> &before,
     const ArrayList<os::network_interface_statistics_entry> &after,
-    Allocator allocator)
-    throws -> ArrayList<os::network_interface_statistics_entry>
+    Allocator allocator) throws
+    -> ArrayList<os::network_interface_statistics_entry>
 {
   let sampled = ArrayList<os::network_interface_statistics_entry>{allocator};
   sampled.reserve(after.count());
@@ -654,8 +658,8 @@ fn get_network_window_status(const live_network_row &row,
                              Allocator allocator) throws
     -> os::network_interface_statistics_entry
 {
-  let const oldest = rolling_window_baseline_index(
-      row.history_nanoseconds, window_start_nanoseconds);
+  let const oldest = rolling_window_baseline_index(row.history_nanoseconds,
+                                                   window_start_nanoseconds);
   let const &before = row.history[oldest];
 
   let sampled = row.history.back();
@@ -678,8 +682,7 @@ fn get_network_window_status(const live_network_row &row,
 
 fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
                             f64 window_seconds, f64 sample_interval_seconds,
-                            f64 refresh_interval_seconds,
-                            bool should_color,
+                            f64 refresh_interval_seconds, bool should_color,
                             Maybe<evilnet_sort_key> sort_key) throws -> i32
 {
   let retained = ArrayList<live_network_row>{allocator};
@@ -691,8 +694,7 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
       static_cast<u64>(sample_interval_seconds * 1000000000.0);
   u64 last_refresh_nanoseconds = os::monotonic_nanos();
   u64 last_sample_nanoseconds = last_refresh_nanoseconds;
-  let const is_terminal =
-      os::is_fd_a_tty(ec.out_fd.value_or(KOSH_STDOUT));
+  let const is_terminal = os::is_fd_a_tty(ec.out_fd.value_or(KOSH_STDOUT));
   let const is_alternate = is_terminal && enter_alternate_screen(ec);
   let const is_cursor_hidden = is_terminal && hide_cursor(ec);
   let const sample_label = format_live_duration(window_seconds, allocator);
@@ -724,16 +726,19 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
     let const frame_allocator = bump_allocator(frame_arena);
 
     let const before_wait_nanoseconds = os::monotonic_nanos();
-    let const sample_elapsed = before_wait_nanoseconds - last_sample_nanoseconds;
-    let const refresh_elapsed = before_wait_nanoseconds - last_refresh_nanoseconds;
+    let const sample_elapsed =
+        before_wait_nanoseconds - last_sample_nanoseconds;
+    let const refresh_elapsed =
+        before_wait_nanoseconds - last_refresh_nanoseconds;
     let const until_sample = sample_interval_nanoseconds > sample_elapsed
                                  ? sample_interval_nanoseconds - sample_elapsed
                                  : 0;
-    let const until_refresh = refresh_interval_nanoseconds > refresh_elapsed
-                                  ? refresh_interval_nanoseconds - refresh_elapsed
-                                  : 0;
-    let const wait_nanoseconds = until_sample < until_refresh ? until_sample
-                                                               : until_refresh;
+    let const until_refresh =
+        refresh_interval_nanoseconds > refresh_elapsed
+            ? refresh_interval_nanoseconds - refresh_elapsed
+            : 0;
+    let const wait_nanoseconds =
+        until_sample < until_refresh ? until_sample : until_refresh;
     os::sleep_for_seconds(static_cast<f64>(wait_nanoseconds) / 1000000000.0);
     if (os::INTERRUPT_REQUESTED != 0) {
       os::INTERRUPT_REQUESTED = 0;
@@ -799,10 +804,9 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
     let statistics =
         ArrayList<os::network_interface_statistics_entry>{frame_allocator};
     statistics.reserve(retained.count());
-    let const window_start =
-        last_sample_nanoseconds > falloff_nanoseconds
-            ? last_sample_nanoseconds - falloff_nanoseconds
-            : 0;
+    let const window_start = last_sample_nanoseconds > falloff_nanoseconds
+                                 ? last_sample_nanoseconds - falloff_nanoseconds
+                                 : 0;
     for (let const &row : retained) {
       statistics.push(
           get_network_window_status(row, window_start, frame_allocator));
@@ -813,10 +817,9 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_live_controls_bar(output, sample_label.view(), refresh_label.view(),
                              should_color);
-    append_network_traffic_statistics_report(output, warnings, frame_allocator,
-                                             statistics, should_color,
-                                             duration_suffix.view(),
-                                             default_interface);
+    append_network_traffic_statistics_report(
+        output, warnings, frame_allocator, statistics, should_color,
+        duration_suffix.view(), default_interface);
     if (!warnings.is_empty()) output += "\n";
     for (let const &warning : warnings) {
       output += Warning{warning.view()}.to_string().view();
@@ -858,8 +861,8 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_color = koshkit_should_color();
   Maybe<evilnet_sort_key> sort_key{};
   if (FLAG_EVILNET_SORT.is_set()) {
-    let const resolved = resolve_evilnet_sort_key(FLAG_EVILNET_SORT.value(),
-                                                  allocator);
+    let const resolved =
+        resolve_evilnet_sort_key(FLAG_EVILNET_SORT.value(), allocator);
     if (resolved.match_count == 0) {
       KOSHKIT_REPORT_ERROR_AT(FLAG_EVILNET_SORT.value_location(),
                               "invalid sort key",
@@ -908,14 +911,12 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
       return 1;
     }
   }
-  if (FLAG_EVILNET_LIVE.is_enabled() &&
-      !FLAG_EVILNET_CUMULATIVE.is_enabled())
+  if (FLAG_EVILNET_LIVE.is_enabled() && !FLAG_EVILNET_CUMULATIVE.is_enabled())
     window_seconds = live_interval_seconds;
   if (FLAG_EVILNET_LIVE.is_enabled()) {
-    return run_live_network_traffic(ec, heap_allocator(), window_seconds,
-                                    live_interval_seconds,
-                                    live_interval_seconds,
-                                    should_color, sort_key);
+    return run_live_network_traffic(
+        ec, heap_allocator(), window_seconds, live_interval_seconds,
+        live_interval_seconds, should_color, sort_key);
   }
   let const should_show_all = FLAG_EVILNET_ALL.is_enabled();
   let const should_show_traffic =

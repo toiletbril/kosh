@@ -11,9 +11,9 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../base/Path.hpp"
 #include "../Platform.hpp"
 #include "../Utils.hpp"
+#include "../base/Path.hpp"
 
 FLAG_LIST_DECL();
 
@@ -706,9 +706,8 @@ fn Stat::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let const allocator = cxt.scratch_allocator();
-  let const target = FLAG_STAT_FILESYSTEM.is_enabled()
-                         ? stat_target::Filesystem
-                         : stat_target::File;
+  let const target = FLAG_STAT_FILESYSTEM.is_enabled() ? stat_target::Filesystem
+                                                       : stat_target::File;
   let const should_follow =
       FLAG_STAT_DEREFERENCE.is_enabled() || target == stat_target::Filesystem;
 

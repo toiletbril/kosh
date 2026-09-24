@@ -11,9 +11,9 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../base/Path.hpp"
 #include "../Platform.hpp"
 #include "../Utils.hpp"
+#include "../base/Path.hpp"
 
 #include <ctime>
 
@@ -144,8 +144,8 @@ pure fn event_mask(watch_event event) wontthrow -> u8
 }
 
 fn format_watch_timestamp(i64 seconds, u32 nanoseconds, usize precision,
-                          timestamp_timezone timezone, Allocator allocator)
-    throws -> String
+                          timestamp_timezone timezone,
+                          Allocator allocator) throws -> String
 {
   let const when = static_cast<time_t>(seconds);
   let const *broken_down = timezone == timestamp_timezone::UTC
@@ -154,15 +154,17 @@ fn format_watch_timestamp(i64 seconds, u32 nanoseconds, usize precision,
   if (broken_down == nullptr) return String{allocator};
 
   char date_buffer[32];
-  let const date_length =
-      std::strftime(date_buffer, sizeof(date_buffer), "%Y-%m-%d %H:%M:%S",
-                    broken_down);
-  let text = String{allocator, StringView{date_buffer, date_length}};
+  let const date_length = std::strftime(date_buffer, sizeof(date_buffer),
+                                        "%Y-%m-%d %H:%M:%S", broken_down);
+  let text = String{
+      allocator, StringView{date_buffer, date_length}
+  };
   if (precision != 0) {
     text += ".";
     let const digits = String::from(nanoseconds, allocator);
     let fraction = String{allocator};
-    for (usize index = digits.length(); index < 9; index++) fraction += "0";
+    for (usize index = digits.length(); index < 9; index++)
+      fraction += "0";
     fraction += digits.view();
     text += fraction.substring_of_length(0, precision);
   }
@@ -180,15 +182,16 @@ fn report_event(String &output, StringView path, const os::file_status &status,
                 usize timestamp_precision, timestamp_timezone timezone,
                 bool should_color) throws -> void
 {
-  let const is_human = FLAG_GOODFSW_HUMAN.is_enabled() &&
-                       !FLAG_GOODFSW_MACHINE.is_enabled();
+  let const is_human =
+      FLAG_GOODFSW_HUMAN.is_enabled() && !FLAG_GOODFSW_MACHINE.is_enabled();
   if (is_human) {
-    output += format_watch_timestamp(scan_time, scan_nanoseconds,
-                                     timestamp_precision, timezone,
-                                     output.allocator());
+    output +=
+        format_watch_timestamp(scan_time, scan_nanoseconds, timestamp_precision,
+                               timezone, output.allocator());
     output += " ";
   } else if (FLAG_GOODFSW_MACHINE.is_enabled() ||
-             FLAG_GOODFSW_TIMESTAMP.is_enabled()) {
+             FLAG_GOODFSW_TIMESTAMP.is_enabled())
+  {
     output +=
         String::from(static_cast<u64>(scan_time), output.allocator()).view();
     output += " ";
@@ -219,8 +222,7 @@ fn is_excluded(StringView path) wontthrow -> bool
 }
 
 fn scan_path(StringView path, ArrayList<watched_entry> &entries, usize depth,
-             Allocator allocator,
-             u64 root_device_id,
+             Allocator allocator, u64 root_device_id,
              const os::file_status *known_status,
              goodfsw_traversal_mode traversal) throws -> void
 {
@@ -320,11 +322,10 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
   if (FLAG_GOODFSW_PRECISION.is_set()) {
     let const parsed = utils::parse_decimal_u64(FLAG_GOODFSW_PRECISION.value());
     if (parsed.is_error() || parsed.value() > 9) {
-      KOSHKIT_REPORT_ERROR_AT(
-          FLAG_GOODFSW_PRECISION.value_location(),
-          "Invalid timestamp precision '" + FLAG_GOODFSW_PRECISION.value() +
-              "'",
-          "use a number from 0 through 9");
+      KOSHKIT_REPORT_ERROR_AT(FLAG_GOODFSW_PRECISION.value_location(),
+                              "Invalid timestamp precision '" +
+                                  FLAG_GOODFSW_PRECISION.value() + "'",
+                              "use a number from 0 through 9");
       return 1;
     }
     timestamp_precision = static_cast<usize>(parsed.value());
@@ -463,8 +464,9 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
                      timestamp_precision, timezone, should_color);
       } else if (!is_same_attributes(previous_entry, current_entry)) {
         report_event(output, current_entry.path.view(), rendered,
-                     watch_event::AttributeModified, scan_time, scan_nanoseconds,
-                     timestamp_precision, timezone, should_color);
+                     watch_event::AttributeModified, scan_time,
+                     scan_nanoseconds, timestamp_precision, timezone,
+                     should_color);
       }
 
       previous_position++;

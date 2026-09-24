@@ -13,15 +13,15 @@
 
 #include "CLI.hpp"
 #include "CLIColors.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Lexer.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Debug.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 

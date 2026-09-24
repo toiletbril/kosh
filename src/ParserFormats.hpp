@@ -9,9 +9,9 @@
 
 #pragma once
 
+#include "MimicMood.hpp"
 #include "base/ArrayList.hpp"
 #include "base/Maybe.hpp"
-#include "MimicMood.hpp"
 #include "base/String.hpp"
 #include "base/StringView.hpp"
 

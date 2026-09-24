@@ -10,16 +10,16 @@
 
 #pragma once
 
+#include "Builtin.hpp"
+#include "Errors.hpp"
+#include "MimicMood.hpp"
+#include "Platform.hpp"
 #include "base/Arena.hpp"
 #include "base/Bitset.hpp"
-#include "Builtin.hpp"
 #include "base/Common.hpp"
 #include "base/Containers.hpp"
-#include "Errors.hpp"
 #include "base/Maybe.hpp"
-#include "MimicMood.hpp"
 #include "base/Path.hpp"
-#include "Platform.hpp"
 
 namespace koshka {
 

@@ -9,16 +9,16 @@
  * coordinator above the specialized expansion sources.
  */
 
-#include "base/Arena.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Debug.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -252,8 +252,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
           break;
         }
       }
-      let const segment_source_location =
-          segment.get_source_location(source_store().m_current_location.source_name_index);
+      let const segment_source_location = segment.get_source_location(
+          source_store().m_current_location.source_name_index);
       let const do_source_location_for =
           [&](StringView part,
               SourceLocation &storage) -> const SourceLocation * {
@@ -687,8 +687,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
             break;
           }
       }
-      let const source_location =
-          segment.get_source_location(source_store().m_current_location.source_name_index);
+      let const source_location = segment.get_source_location(
+          source_store().m_current_location.source_name_index);
       let const value = apply_parameter_expansion(
           segment.text.view(),
           source_location.has_value() ? &*source_location : nullptr);
@@ -772,8 +772,8 @@ hot fn EvalContext::expand_word_for_assignment(const Word &word) throws
     let const segment_text = segment.text.view();
     switch (segment.kind) {
     case WordSegment::Kind::VariableReference: {
-      let const source_location =
-          segment.get_source_location(source_store().m_current_location.source_name_index);
+      let const source_location = segment.get_source_location(
+          source_store().m_current_location.source_name_index);
       result += apply_parameter_expansion(
           segment_text,
           source_location.has_value() ? &*source_location : nullptr);
@@ -827,8 +827,8 @@ fn EvalContext::expand_case_pattern_masked(const Word &word,
       do_emit_run(segment_text, true);
       break;
     case WordSegment::Kind::VariableReference: {
-      let const source_location =
-          segment.get_source_location(source_store().m_current_location.source_name_index);
+      let const source_location = segment.get_source_location(
+          source_store().m_current_location.source_name_index);
       let const value = apply_parameter_expansion(
           segment_text,
           source_location.has_value() ? &*source_location : nullptr);

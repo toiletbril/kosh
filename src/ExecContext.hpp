@@ -11,18 +11,18 @@
 
 #pragma once
 
-#include "base/Arena.hpp"
-#include "base/Bitset.hpp"
 #include "Builtin.hpp"
-#include "base/Common.hpp"
-#include "base/Containers.hpp"
 #include "Errors.hpp"
 #include "EvalTypes.hpp"
-#include "base/Maybe.hpp"
 #include "MimicMood.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "ProgramResolver.hpp"
+#include "base/Arena.hpp"
+#include "base/Bitset.hpp"
+#include "base/Common.hpp"
+#include "base/Containers.hpp"
+#include "base/Maybe.hpp"
+#include "base/Path.hpp"
 
 namespace koshka {
 
@@ -48,8 +48,7 @@ public:
                       bool are_koshkit_utilities_reachable,
                       bool should_check_hash, ProgramResolver &program_resolver,
                       ArrayList<SourceLocation> &&arg_locations,
-                      mimic_mood mood) throws
-      -> ExecContext;
+                      mimic_mood mood) throws -> ExecContext;
 
   /* Build directly from an already resolved builtin kind or program path,
      skipping the PATH search. A simple command memoizes its resolution. */

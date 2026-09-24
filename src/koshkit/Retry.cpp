@@ -116,8 +116,8 @@ fn Retry::execute(const ExecContext &ec, EvalContext &cxt,
 
   i64 attempt_limit = DEFAULT_ATTEMPT_COUNT;
   if (FLAG_RETRY_ATTEMPTS.is_set()) {
-    let const parsed = utils::parse_integer_in_base(
-        FLAG_RETRY_ATTEMPTS.value(), nullptr, int_base::decimal);
+    let const parsed = utils::parse_integer_in_base(FLAG_RETRY_ATTEMPTS.value(),
+                                                    nullptr, int_base::decimal);
     if (parsed.is_error() || parsed.value() < 1 ||
         parsed.value() > MAXIMUM_ATTEMPT_COUNT)
     {

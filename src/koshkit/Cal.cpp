@@ -63,8 +63,8 @@ static pure fn cal_weekday(i64 year, usize month, usize day) wontthrow -> usize
 }
 
 static fn append_calendar_month(String &output, usize month, i64 year,
-                                const std::tm &current_date,
-                                bool should_color, Allocator allocator,
+                                const std::tm &current_date, bool should_color,
+                                Allocator allocator,
                                 week_start first_day) throws -> void
 {
   let title = String{allocator, CAL_MONTH_NAMES[month - 1]};
@@ -76,17 +76,15 @@ static fn append_calendar_month(String &output, usize month, i64 year,
   append_report_text(output, title.view(), colors::ansi::BOLD_BLUE,
                      should_color);
   output += '\n';
-  append_report_text(
-      output, first_day == week_start::Monday
-                  ? "Mo Tu We Th Fr Sa Su"
-                  : "Su Mo Tu We Th Fr Sa",
-      colors::ansi::BOLD_CYAN, should_color);
+  append_report_text(output,
+                     first_day == week_start::Monday ? "Mo Tu We Th Fr Sa Su"
+                                                     : "Su Mo Tu We Th Fr Sa",
+                     colors::ansi::BOLD_CYAN, should_color);
   output += '\n';
 
   let const first_weekday = cal_weekday(year, month, 1);
-  let const first_column = first_day == week_start::Monday
-                               ? (first_weekday + 6) % 7
-                               : first_weekday;
+  let const first_column =
+      first_day == week_start::Monday ? (first_weekday + 6) % 7 : first_weekday;
   let day_count = CAL_MONTH_LENGTHS[month - 1];
   if (month == 2 && is_cal_leap_year(year)) day_count++;
   for (usize position = 0; position < first_column; position++)
@@ -107,9 +105,8 @@ static fn append_calendar_month(String &output, usize month, i64 year,
                                        : StringView{};
     let const day_text = String::from(day, allocator);
     append_report_text(output, day_text.view(), style, should_color);
-    let const column = first_day == week_start::Monday
-                           ? (weekday + 6) % 7
-                           : weekday;
+    let const column =
+        first_day == week_start::Monday ? (weekday + 6) % 7 : weekday;
     if (column == 6 || day == day_count)
       output += '\n';
     else
@@ -185,8 +182,8 @@ fn Cal::execute(const ExecContext &ec, EvalContext &cxt,
 
   let output = String{cxt.scratch_allocator()};
   let const should_color = koshkit_should_color();
-  let const first_day = FLAG_CAL_TODAY.is_enabled() ? week_start::Monday
-                                                    : week_start::Sunday;
+  let const first_day =
+      FLAG_CAL_TODAY.is_enabled() ? week_start::Monday : week_start::Sunday;
   if (month != 0) {
     append_calendar_month(output, month, year, current_date, should_color,
                           cxt.scratch_allocator(), first_day);

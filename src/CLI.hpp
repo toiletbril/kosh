@@ -9,9 +9,9 @@
 
 #pragma once
 
+#include "Errors.hpp"
 #include "base/Common.hpp"
 #include "base/Containers.hpp"
-#include "Errors.hpp"
 
 #define FLAG_LIST T__FLAG_LIST
 
@@ -47,20 +47,20 @@
    description, followed by the value validator and displayed value name. */
 #define T__FLAG_OPTIONAL_SELECT(_1, _2, _3, _4, _5, _6, _7, name, ...) name
 #define FLAG_OPTIONAL(...)                                                     \
-  T__FLAG_OPTIONAL_SELECT(__VA_ARGS__, T__FLAG_OPTIONAL7, T__FLAG_OPTIONAL6, \
-                          T__FLAG_OPTIONAL5)                                  \
+  T__FLAG_OPTIONAL_SELECT(__VA_ARGS__, T__FLAG_OPTIONAL7, T__FLAG_OPTIONAL6,   \
+                          T__FLAG_OPTIONAL5)                                   \
   (__VA_ARGS__)
 #define T__FLAG_OPTIONAL5(var_name, short_name, long_name, description,        \
-                          acceptor)                                           \
+                          acceptor)                                            \
   T__FLAG_OPTIONAL6(var_name, short_name, long_name, description, acceptor,    \
                     "...")
 #define T__FLAG_OPTIONAL6(var_name, short_name, long_name, description,        \
-                          acceptor, value_name)                               \
+                          acceptor, value_name)                                \
   T__FLAG_OPTIONAL7(var_name, short_name, long_name, NoSection, description,   \
                     acceptor, value_name)
 #define T__FLAG_OPTIONAL7(var_name, short_name, long_name, section,            \
-                          description, acceptor, value_name)                  \
-  static koshka::FlagOptionalValue concat_literal(FLAG_, var_name)            \
+                          description, acceptor, value_name)                   \
+  static koshka::FlagOptionalValue concat_literal(FLAG_, var_name)             \
   {                                                                            \
     FLAG_LIST, short_name, long_name, koshka::flag_section::section,           \
         description, acceptor, value_name                                      \
@@ -464,8 +464,8 @@ fn leave_alternate_screen(const ExecContext &ec) wontthrow -> void;
 fn hide_cursor(const ExecContext &ec) wontthrow -> bool;
 fn show_cursor(const ExecContext &ec) wontthrow -> void;
 fn append_live_controls_bar(String &output, StringView sample_label,
-                            StringView refresh_label, bool should_color)
-    throws -> void;
+                            StringView refresh_label, bool should_color) throws
+    -> void;
 fn format_live_duration(f64 seconds, Allocator allocator) throws -> String;
 pure fn rolling_window_baseline_index(const ArrayList<u64> &timestamps,
                                       u64 window_start) wontthrow -> usize;

@@ -12,15 +12,15 @@
  */
 
 #include "CLI.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "EvalVariablesInternal.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 #include <fcntl.h>
 
@@ -467,8 +467,7 @@ fn TempFileSet::cleanup_from(usize mark) wontthrow -> void
   usize kept = mark;
   for (usize i = mark; i < m_paths.count(); i++) {
     try {
-      let const wide_path =
-          utf8_to_wide(m_paths[i].view(), heap_allocator());
+      let const wide_path = utf8_to_wide(m_paths[i].view(), heap_allocator());
       if (wide_path.has_value() && DeleteFileW(wide_path->begin()) != FALSE)
         continue;
     } catch (...) {}
@@ -1263,8 +1262,9 @@ fn collate_compare(const String &left, const String &right) wontthrow -> int
   return right < left ? 1 : 0;
 }
 
-static fn windows_system_configuration_value(
-    system_configuration_key key) wontthrow -> Maybe<i64>
+static fn
+windows_system_configuration_value(system_configuration_key key) wontthrow
+    -> Maybe<i64>
 {
   SYSTEM_INFO system_info{};
   GetSystemInfo(&system_info);
@@ -1392,13 +1392,12 @@ fn query_system_configuration(system_configuration_key key) wontthrow
     -> numeric_configuration_result
 {
   let const value = windows_system_configuration_value(key);
-  if (!value.has_value())
-    return {configuration_query_status::Undefined, 0};
+  if (!value.has_value()) return {configuration_query_status::Undefined, 0};
   return {configuration_query_status::Value, *value};
 }
 
-static fn windows_path_configuration_value(
-    StringView path, path_configuration_key key) wontthrow
+static fn windows_path_configuration_value(StringView path,
+                                           path_configuration_key key) wontthrow
     -> Maybe<i64>
 {
   let const path_text = utf8_to_wide(path, heap_allocator());
@@ -1455,8 +1454,7 @@ fn query_path_configuration(StringView path,
 {
   SetLastError(ERROR_SUCCESS);
   let const value = windows_path_configuration_value(path, key);
-  if (value.has_value())
-    return {configuration_query_status::Value, *value};
+  if (value.has_value()) return {configuration_query_status::Value, *value};
   if (GetLastError() != ERROR_SUCCESS)
     return {configuration_query_status::Error, 0};
   return {configuration_query_status::Undefined, 0};
@@ -1524,8 +1522,7 @@ fn terminal_size(u32 &columns, u32 &rows, descriptor output) wontthrow -> bool
 }
 
 fn terminal_settings(descriptor terminal, Allocator allocator,
-                     terminal_settings_output_mode mode) throws
-    -> Maybe<String>
+                     terminal_settings_output_mode mode) throws -> Maybe<String>
 {
   DWORD mode = 0;
   if (GetConsoleMode(terminal, &mode) == FALSE) return None;

@@ -7,16 +7,16 @@
  * productions are separate from simple-command and pipeline parsing.
  */
 
-#include "base/Arena.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Expressions.hpp"
 #include "Optimizer.hpp"
 #include "Parser.hpp"
 #include "ParserInternal.hpp"
 #include "Tokens.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -98,8 +98,7 @@ hot fn Parser::parse_while_or_until(loop_kind kind) throws -> Command *
   let const location = keyword->source_location();
 
   LOG(Debug, "parsing a %s loop at byte %u",
-      kind == loop_kind::Until ? "until" : "while",
-      location.position);
+      kind == loop_kind::Until ? "until" : "while", location.position);
 
   Expression *condition = parse_command_list(token_kind_mask(Token::Kind::Do));
   Token *do_token = m_lexer.next_shell_token();
@@ -477,8 +476,7 @@ static fn word_token_from_assignment(BumpArena &arena,
   word.has_locale_translation_quote =
       a->value_word().has_locale_translation_quote;
   let prefix = a->key().clone();
-  prefix += a->get_update_mode() == assignment_update_mode::Append ? "+="
-                                                                    : "=";
+  prefix += a->get_update_mode() == assignment_update_mode::Append ? "+=" : "=";
   word.segments.push(WordSegment{
       WordSegment::Kind::UnquotedText,
       SegmentText{bump_allocator(arena), prefix.view()},

@@ -23,8 +23,10 @@ HELP_DESCRIPTION_DECL(
 FLAG(GREP_IGNORE_CASE, Bool, 'i', "", "Match without regard to letter case.");
 FLAG(GREP_INVERT, Bool, 'v', "", "Print the lines that do not match.");
 FLAG(GREP_RECURSIVE, Bool, 'r', "recursive", "Search directories recursively.");
-FLAG(GREP_LINE_NUMBER, Bool, 'n', "line-number", "Prefix matching lines with numbers.");
-FLAG(GREP_NO_FILENAME, Bool, 'h', "no-filename", "Suppress file-name prefixes.");
+FLAG(GREP_LINE_NUMBER, Bool, 'n', "line-number",
+     "Prefix matching lines with numbers.");
+FLAG(GREP_NO_FILENAME, Bool, 'h', "no-filename",
+     "Suppress file-name prefixes.");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
 REGISTER_KOSHKIT_UTIL_FLAGS(Grep);
@@ -39,21 +41,21 @@ static pure fn is_literal_search_pattern(StringView pattern) wontthrow -> bool
 {
   for (usize index = 0; index < pattern.length; index++) {
     switch (pattern[index]) {
-      case '.':
-      case '^':
-      case '$':
-      case '*':
-      case '+':
-      case '?':
-      case '(':
-      case ')':
-      case '[':
-      case ']':
-      case '{':
-      case '}':
-      case '|':
-      case '\\': return false;
-      default: break;
+    case '.':
+    case '^':
+    case '$':
+    case '*':
+    case '+':
+    case '?':
+    case '(':
+    case ')':
+    case '[':
+    case ']':
+    case '{':
+    case '}':
+    case '|':
+    case '\\': return false;
+    default: break;
     }
   }
 
@@ -77,9 +79,9 @@ static fn collect_recursive_sources(const ExecContext &ec, EvalContext &cxt,
   if (path_kind == Path::entry_kind::Unknown) {
     os::file_status file_status{};
     if (!os::stat_path(path.view(), file_status)) {
-      report_soft_koshkit_util_error(
-          ec, cxt, "grep",
-          path.text() + ": " + os::last_system_error_message());
+      report_soft_koshkit_util_error(ec, cxt, "grep",
+                                     path.text() + ": " +
+                                         os::last_system_error_message());
       status = 2;
       return;
     }
@@ -100,8 +102,7 @@ static fn collect_recursive_sources(const ExecContext &ec, EvalContext &cxt,
   let children = Path::read_directory_typed(path, allocator);
   if (!children.has_value()) {
     report_soft_koshkit_util_error(
-        ec, cxt, "grep",
-        path.text() + ": " + os::last_system_error_message());
+        ec, cxt, "grep", path.text() + ": " + os::last_system_error_message());
     status = 2;
     return;
   }
@@ -140,8 +141,8 @@ static fn collect_recursive_sources(const ExecContext &ec, EvalContext &cxt,
 
       batch.clear();
       for (usize index = 0; index < unknown_indices.count(); index++)
-        batch.add(os::batch_operation::stat(
-            child_paths[unknown_indices[index]], unknown_statuses[index]));
+        batch.add(os::batch_operation::stat(child_paths[unknown_indices[index]],
+                                            unknown_statuses[index]));
 
       batch.execute(results, os::batch_deduplication::Disabled);
       for (usize index = 0; index < unknown_indices.count(); index++) {
@@ -218,11 +219,12 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
 
   os::compiled_regex compiled;
   if (!should_use_literal_search) {
-    if (os::compile_search_regex(
-            pattern, compiled,
-            should_ignore_case ? os::case_sensitivity::Insensitive
-                               : os::case_sensitivity::Sensitive) !=
-        os::regex_compile_result::Ok) {
+    if (os::compile_search_regex(pattern, compiled,
+                                 should_ignore_case
+                                     ? os::case_sensitivity::Insensitive
+                                     : os::case_sensitivity::Sensitive) !=
+        os::regex_compile_result::Ok)
+    {
       report_soft_koshkit_util_error(
           ec, cxt, operand_locations[0], args[0].view(),
           "the pattern '" + operands[0] + "' is not a valid regex");
@@ -230,7 +232,8 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
 
-  defer {
+  defer
+  {
     if (!should_use_literal_search) os::free_regex(compiled);
   };
 
@@ -246,12 +249,12 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
         continue;
       }
       let const source_path = Path{source, allocator};
-      collect_recursive_sources(ec, cxt, source_path,
-                                Path::entry_kind::Unknown, allocator,
-                                recursive_storage, status);
+      collect_recursive_sources(ec, cxt, source_path, Path::entry_kind::Unknown,
+                                allocator, recursive_storage, status);
     }
     sources.reserve(recursive_storage.count() + 1);
-    for (let const &source : recursive_storage) sources.push(source.view());
+    for (let const &source : recursive_storage)
+      sources.push(source.view());
     if (sources.is_empty() && operand_sources.count() == 1 &&
         operand_sources[0] == "-")
       sources.push("-");
@@ -262,8 +265,8 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_print_names = !should_suppress_names && sources.count() > 1;
   let output = String{allocator};
   let line = String{allocator};
-  let reader = SourceBatchReader{ec, sources, allocator, 64 * 1024, true,
-                                 should_recurse};
+  let reader = SourceBatchReader{ec,        sources, allocator,
+                                 64 * 1024, true,    should_recurse};
   let chunks = ArrayList<SourceBatchReader::Chunk>{allocator};
   ArrayList<usize> source_line_numbers{allocator};
   source_line_numbers.reserve(sources.count());
@@ -272,12 +275,12 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   bool has_any_match = false;
   let const do_process_line = [&](usize source_index, StringView source,
                                   StringView value) throws -> void {
-    let const is_match = should_use_literal_search
-                             ? (should_ignore_case
-                                    ? utils::contains_case_insensitive_ascii(
-                                          value, folded_pattern.view())
-                                    : value.find_substring(pattern).has_value())
-                             : os::regex_matches_null_terminated(compiled, value);
+    let const is_match =
+        should_use_literal_search
+            ? (should_ignore_case ? utils::contains_case_insensitive_ascii(
+                                        value, folded_pattern.view())
+                                  : value.find_substring(pattern).has_value())
+            : os::regex_matches_null_terminated(compiled, value);
     if (is_match != should_invert) {
       has_any_match = true;
       if (should_print_names) {
@@ -310,9 +313,9 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
       while (position < chunk.content.length) {
         let const remaining = chunk.content.substring(position);
         let const newline_offset = remaining.find_character('\n');
-        let const delimiter_position =
-            newline_offset.has_value() ? position + *newline_offset
-                                        : chunk.content.length;
+        let const delimiter_position = newline_offset.has_value()
+                                           ? position + *newline_offset
+                                           : chunk.content.length;
 
         let const segment = chunk.content.substring_of_length(
             position, delimiter_position - position);

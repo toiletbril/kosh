@@ -8,13 +8,13 @@
  */
 
 #include "CLI.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 #if defined __linux__
 #include <sys/sysmacros.h>
@@ -338,7 +338,10 @@ cold fn list_directory_typed(StringView dir, Allocator allocator) throws
     default: kind = Path::entry_kind::Other; break;
     }
 
-    entries.push(Path::directory_child{String{allocator, name}, kind});
+    entries.push(Path::directory_child{
+        String{allocator, name},
+        kind
+    });
   }
 
   ::closedir(handle);

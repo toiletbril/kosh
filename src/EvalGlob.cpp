@@ -8,16 +8,16 @@
  * filesystem traversal and pattern expansion outside general word expansion.
  */
 
-#include "base/Arena.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Debug.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -25,13 +25,11 @@ namespace {
 
 fn name_matches_glob(StringView glob, StringView filename,
                      const Bitset &glob_active, usize mask_offset,
-                     utils::extglob_mode mode,
-                     bool should_ignore_case, Allocator allocator) throws
-    -> bool
+                     utils::extglob_mode mode, bool should_ignore_case,
+                     Allocator allocator) throws -> bool
 {
   if (!should_ignore_case)
-    return utils::glob_matches(glob, filename, glob_active, mask_offset,
-                               mode);
+    return utils::glob_matches(glob, filename, glob_active, mask_offset, mode);
 
   /* The glob arrives already lowered from the caller, so only the per-entry
      filename is lowered here. Lowering preserves length, so the active mask
@@ -128,10 +126,8 @@ fn EvalContext::expand_path_once(const glob_field &field,
       return false;
     }
 
-    return name_matches_glob(
-        match_glob, filename, field.glob_active, stem_start,
-        extglob,
-        nocaseglob_is_on, scratch);
+    return name_matches_glob(match_glob, filename, field.glob_active,
+                             stem_start, extglob, nocaseglob_is_on, scratch);
   };
   let const do_append_entry = [&](StringView filename) throws -> void {
     add_expansion();
@@ -212,8 +208,7 @@ hot pure fn first_active_glob(StringView text, const Bitset &mask,
 
     let const ch = text.data[i];
     if (mode == extglob_mode::Enabled && i + 1 < text.length &&
-        lexer::is_extglob_operator(ch) &&
-        text.data[i + 1] == '(')
+        lexer::is_extglob_operator(ch) && text.data[i + 1] == '(')
     {
       return i;
     }
@@ -392,8 +387,7 @@ fn EvalContext::expand_path_recurse(ArrayList<glob_field> fields) throws
   let should_batch_literals = !fields.is_empty();
   for (let const &field : fields) {
     let const glob_index = first_active_glob(
-        field.text.view(), field.glob_active,
-        get_extglob_mode());
+        field.text.view(), field.glob_active, get_extglob_mode());
     if (glob_index.has_value()) should_batch_literals = false;
     glob_indices.push(glob_index);
   }
@@ -655,11 +649,9 @@ hot fn EvalContext::expand_path(glob_field field,
 
   /* Fast path. A field with no glob is its own single result. */
   let const has_glob =
-      !no_glob() &&
-      first_active_glob(
-          field.text.view(), field.glob_active,
-          get_extglob_mode())
-          .has_value();
+      !no_glob() && first_active_glob(field.text.view(), field.glob_active,
+                                      get_extglob_mode())
+                        .has_value();
 
   if (!has_glob) {
     let single_result = ArrayList<String>{scratch};

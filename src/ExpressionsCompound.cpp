@@ -9,11 +9,8 @@
  * branch and loop behavior.
  */
 
-#include "base/Arena.hpp"
 #include "Builtin.hpp"
 #include "CLI.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
@@ -24,8 +21,11 @@
 #include "Platform.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -434,11 +434,11 @@ hot fn CompoundListCondition::evaluate_root_status_impl(
     let const user_cpu = user_after - user_before;
     let const system_cpu = system_after - system_before;
 
-    let const layout =
-        m_cmd->get_time_format_mode() == time_format_mode::Posix
-            ? utils::time_report_layout::Posix
-        : cxt.is_bash_compatible() ? utils::time_report_layout::Bash
-                                    : utils::time_report_layout::Rich;
+    let const layout = m_cmd->get_time_format_mode() == time_format_mode::Posix
+                           ? utils::time_report_layout::Posix
+                       : cxt.is_bash_compatible()
+                           ? utils::time_report_layout::Bash
+                           : utils::time_report_layout::Rich;
 
     let const time_format = cxt.get_variable_value("TIMEFORMAT");
     let const report = utils::format_time_report(
@@ -857,10 +857,9 @@ hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
 
     let stage_arg_locations =
         ArrayList<SourceLocation>{cxt.scratch_allocator()};
-    let stage_args =
-        cxt.process_args(e->args(), &stage_arg_locations,
-                         argument_lifetime::Transient,
-                         argument_context::Command);
+    let stage_args = cxt.process_args(e->args(), &stage_arg_locations,
+                                      argument_lifetime::Transient,
+                                      argument_context::Command);
     expand_command_aliases(cxt, stage_args, stage_arg_locations);
 
     if (stage_args.is_empty()) {

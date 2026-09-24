@@ -11,8 +11,8 @@
 #include "../CLI.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
-#include "../base/Trace.hpp"
 #include "../Utils.hpp"
+#include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
 
@@ -63,9 +63,9 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const start_nanos = os::monotonic_nanos();
 
-  let const status = cxt.run_source(command, "time", ec.source_location(),
-                                    StringView{"time"}, nullptr, nullptr,
-                                    return_handling::Propagate);
+  let const status =
+      cxt.run_source(command, "time", ec.source_location(), StringView{"time"},
+                     nullptr, nullptr, return_handling::Propagate);
 
   let const elapsed_nanos = os::monotonic_nanos() - start_nanos;
 
@@ -83,11 +83,10 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                    : utils::time_report_layout::Rich;
 
   let const time_format = cxt.get_variable_value("TIMEFORMAT");
-  let const report =
-      utils::format_time_report(
-          time_format, real_seconds, user_cpu, system_cpu, rss_after, layout,
-          FLAG_TIME_RSS.is_enabled() ? utils::time_report_rss::Include
-                                      : utils::time_report_rss::Omit);
+  let const report = utils::format_time_report(
+      time_format, real_seconds, user_cpu, system_cpu, rss_after, layout,
+      FLAG_TIME_RSS.is_enabled() ? utils::time_report_rss::Include
+                                 : utils::time_report_rss::Omit);
 
   if (!report.is_empty()) {
     koshka::print_error(report);

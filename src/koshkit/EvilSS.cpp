@@ -58,8 +58,7 @@ struct socket_row
       : protocol(allocator), state(allocator), receive_queue(allocator),
         send_queue(allocator), local(allocator), peer(allocator),
         process_id(allocator), process_name(allocator), owner(allocator)
-  {
-  }
+  {}
 
   String protocol;
   String state;
@@ -181,10 +180,9 @@ fn append_network_socket_report(String &output,
     let const has_protocol_filter = options.should_show_tcp ||
                                     options.should_show_udp ||
                                     options.should_show_unix;
-    let const is_selected_protocol =
-        (is_tcp && options.should_show_tcp) ||
-        (is_udp && options.should_show_udp) ||
-        (is_unix && options.should_show_unix);
+    let const is_selected_protocol = (is_tcp && options.should_show_tcp) ||
+                                     (is_udp && options.should_show_udp) ||
+                                     (is_unix && options.should_show_unix);
     if (has_protocol_filter && !is_selected_protocol) continue;
 
     let const has_address_family_filter =
@@ -230,8 +228,8 @@ fn append_network_socket_report(String &output,
     row.send_queue = String::from(socket.send_queue_bytes, allocator);
     row.local = is_unix ? unix_endpoint(socket.local_address.view(),
                                         socket.identity, allocator)
-                        : endpoint(socket.local_address.view(), socket.local_port,
-                                   allocator, socket.family);
+                        : endpoint(socket.local_address.view(),
+                                   socket.local_port, allocator, socket.family);
     row.peer = is_unix ? unix_endpoint({}, socket.peer_identity, allocator)
                        : endpoint(socket.peer_address.view(), socket.peer_port,
                                   allocator, socket.family);

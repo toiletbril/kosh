@@ -12,17 +12,17 @@
 
 #pragma once
 
+#include "Builtin.hpp"
+#include "Completion.hpp"
+#include "Errors.hpp"
+#include "MimicMood.hpp"
+#include "Platform.hpp"
 #include "base/Arena.hpp"
 #include "base/Bitset.hpp"
-#include "Builtin.hpp"
 #include "base/Common.hpp"
-#include "Completion.hpp"
 #include "base/Containers.hpp"
-#include "Errors.hpp"
 #include "base/Maybe.hpp"
-#include "MimicMood.hpp"
 #include "base/Path.hpp"
-#include "Platform.hpp"
 
 namespace koshka {
 
@@ -415,7 +415,8 @@ public:
 
   fn set_field_separators(StringView value) throws -> void
   {
-    for (u64 &bits : m_field_separator_bits) bits = 0;
+    for (u64 &bits : m_field_separator_bits)
+      bits = 0;
     for (usize i = 0; i < value.length; i++) {
       let const byte = static_cast<u8>(value.data[i]);
       m_field_separator_bits[byte >> 6] |= u64{1} << (byte & 63);
@@ -435,8 +436,7 @@ public:
   {
     return m_shell_variables;
   }
-  pure fn shell_variables() const wontthrow
-      -> const StringMap<String> &
+  pure fn shell_variables() const wontthrow -> const StringMap<String> &
   {
     return m_shell_variables;
   }
@@ -454,8 +454,7 @@ public:
   hot pure fn is_field_separator(char c) const wontthrow -> bool
   {
     let const byte = static_cast<u8>(c);
-    return (m_field_separator_bits[byte >> 6] &
-            (u64{1} << (byte & 63))) != 0;
+    return (m_field_separator_bits[byte >> 6] & (u64{1} << (byte & 63))) != 0;
   }
 
   fn indexed_arrays() wontthrow -> StringMap<ArrayList<String>> &
@@ -488,7 +487,10 @@ public:
   {
     return m_sparse_array_values;
   }
-  fn sparse_array_names() wontthrow -> HashSet & { return m_sparse_array_names; }
+  fn sparse_array_names() wontthrow -> HashSet &
+  {
+    return m_sparse_array_names;
+  }
   pure fn sparse_array_names() const wontthrow -> const HashSet &
   {
     return m_sparse_array_names;
@@ -534,8 +536,7 @@ public:
   {
     return m_bash_argument_arrays;
   }
-  pure fn bash_argument_arrays() const wontthrow
-      -> BashArgumentArrayStorage *
+  pure fn bash_argument_arrays() const wontthrow -> BashArgumentArrayStorage *
   {
     return m_bash_argument_arrays;
   }
@@ -543,8 +544,7 @@ public:
   {
     return m_bash_argument_arrays;
   }
-  fn bash_argument_frame_context_ref() wontthrow
-      -> BashArgumentFrameContext *&
+  fn bash_argument_frame_context_ref() wontthrow -> BashArgumentFrameContext *&
   {
     return m_bash_argument_frame_context;
   }
@@ -641,8 +641,7 @@ public:
   {
     return m_definitions;
   }
-  pure fn definitions() const wontthrow
-      -> const StringMap<FunctionBodyHandle> &
+  pure fn definitions() const wontthrow -> const StringMap<FunctionBodyHandle> &
   {
     return m_definitions;
   }
@@ -668,8 +667,7 @@ public:
   {
     return m_call_locations;
   }
-  pure fn call_locations() const wontthrow
-      -> const ArrayList<SourceLocation> &
+  pure fn call_locations() const wontthrow -> const ArrayList<SourceLocation> &
   {
     return m_call_locations;
   }
@@ -677,8 +675,7 @@ public:
   {
     return m_call_sources;
   }
-  pure fn call_sources() const wontthrow
-      -> const ArrayList<const String *> &
+  pure fn call_sources() const wontthrow -> const ArrayList<const String *> &
   {
     return m_call_sources;
   }
@@ -833,7 +830,7 @@ class SourceStore
 {
 public:
   fn set_current_source(const String *source, String origin,
-                       u64 source_generation) wontthrow -> void
+                        u64 source_generation) wontthrow -> void
   {
     m_current_source = source;
     m_current_source_generation = source_generation;
@@ -890,10 +887,7 @@ public:
   {
     m_is_script_run = is_script_run;
   }
-  pure fn is_script_run() const wontthrow -> bool
-  {
-    return m_is_script_run;
-  }
+  pure fn is_script_run() const wontthrow -> bool { return m_is_script_run; }
   fn mimicry_depth() wontthrow -> usize & { return m_mimicry_depth; }
   pure fn mimicry_depth() const wontthrow -> usize { return m_mimicry_depth; }
   fn set_mimicry_depth(usize depth) wontthrow -> void
@@ -941,8 +935,7 @@ public:
      the token it expanded from. A token that splits into many fields
      contributes one location per field. */
   fn process_args(const ArrayList<const Token *> &args,
-                  ArrayList<SourceLocation> *expanded_locations =
-                      nullptr,
+                  ArrayList<SourceLocation> *expanded_locations = nullptr,
                   argument_lifetime lifetime = argument_lifetime::Persistent,
                   argument_context context = argument_context::Command) throws
       -> ArrayList<String>;
@@ -952,10 +945,7 @@ public:
     return expansion_store().scratch_allocator();
   }
   fn set_parse_arena(BumpArena *arena) wontthrow { m_parse_arena = arena; }
-  pure fn parse_arena() const wontthrow -> BumpArena *
-  {
-    return m_parse_arena;
-  }
+  pure fn parse_arena() const wontthrow -> BumpArena * { return m_parse_arena; }
   fn set_function_arena(BumpArena *arena) wontthrow
   {
     m_function_arena = arena;
@@ -996,8 +986,7 @@ public:
   {
     return m_variable_store.bash_argument_arrays();
   }
-  pure fn bash_argument_arrays() const wontthrow
-      -> BashArgumentArrayStorage *
+  pure fn bash_argument_arrays() const wontthrow -> BashArgumentArrayStorage *
   {
     return m_variable_store.bash_argument_arrays();
   }
@@ -1421,11 +1410,10 @@ public:
   fn for_each_function_name(Callback callback) const throws -> void
   {
     function_store().definitions().for_each(
-        [&](StringView name, const FunctionBodyHandle &storage)
-                             throws {
-                               unused(storage);
-                               callback(name);
-                             });
+        [&](StringView name, const FunctionBodyHandle &storage) throws {
+          unused(storage);
+          callback(name);
+        });
   }
 
   fn register_completion_spec(StringView command, completion_spec spec) throws
@@ -1493,17 +1481,23 @@ public:
   {
     return trap_store().m_status_before_return;
   }
-  pure fn has_debug_trap() const wontthrow -> bool { return trap_store().m_has_debug_trap; }
-  pure fn has_err_trap() const wontthrow -> bool { return trap_store().m_has_err_trap; }
+  pure fn has_debug_trap() const wontthrow -> bool
+  {
+    return trap_store().m_has_debug_trap;
+  }
+  pure fn has_err_trap() const wontthrow -> bool
+  {
+    return trap_store().m_has_err_trap;
+  }
   /* The two hot conditions carry a flag beside the map. Every write to the map
      refreshes the flag. The child wake is armed from the same place, because
      the CHLD action is the only reader of a reaped child. */
   fn refresh_trap_flags() wontthrow -> void
   {
-    trap_store().m_has_debug_trap = trap_store().actions().find(StringView{"DEBUG", 5}) !=
-                       nullptr;
-    trap_store().m_has_err_trap = trap_store().actions().find(StringView{"ERR", 3}) !=
-                     nullptr;
+    trap_store().m_has_debug_trap =
+        trap_store().actions().find(StringView{"DEBUG", 5}) != nullptr;
+    trap_store().m_has_err_trap =
+        trap_store().actions().find(StringView{"ERR", 3}) != nullptr;
 
     let const *child_action =
         trap_store().actions().find(StringView{"CHLD", 4});
@@ -1540,8 +1534,10 @@ public:
   fn lower_trap_depths_to_current() wontthrow -> void
   {
     let const depth = nesting_depth();
-    if (trap_store().m_debug_trap_active_depth > depth) trap_store().m_debug_trap_active_depth = depth;
-    if (trap_store().m_err_trap_active_depth > depth) trap_store().m_err_trap_active_depth = depth;
+    if (trap_store().m_debug_trap_active_depth > depth)
+      trap_store().m_debug_trap_active_depth = depth;
+    if (trap_store().m_err_trap_active_depth > depth)
+      trap_store().m_err_trap_active_depth = depth;
   }
   /* A function call the trace option does not follow runs its body without the
      trap the caller installed. The body sees no trap listed and can install one
@@ -1633,7 +1629,8 @@ public:
   pure fn trap_trigger_line_number() const wontthrow -> Maybe<usize>
   {
     if (trap_store().m_trap_action_depth == 0) return None;
-    if (source_store().m_source_frames.count() != trap_store().m_trap_action_source_frame_count)
+    if (source_store().m_source_frames.count() !=
+        trap_store().m_trap_action_source_frame_count)
       return None;
     if (function_store().call_depth() !=
         trap_store().m_trap_action_function_depth)

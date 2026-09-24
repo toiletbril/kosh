@@ -103,8 +103,7 @@ fn Chown::execute(const ExecContext &ec, EvalContext &cxt,
     if (!utils::change_path_ownership(
             ec, cxt, "chown",
             Path{operands[index].view(), cxt.scratch_allocator()}, owner_id,
-            group_id,
-            FLAG_CHOWN_RECURSIVE.is_enabled(),
+            group_id, FLAG_CHOWN_RECURSIVE.is_enabled(),
             FLAG_CHOWN_NO_DEREFERENCE.is_enabled(),
             FLAG_CHOWN_COMMAND_LINE_FOLLOW.position(),
             FLAG_CHOWN_FOLLOW.position(), FLAG_CHOWN_PHYSICAL.position()))

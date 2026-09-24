@@ -8,13 +8,13 @@
  */
 
 #include "../Builtin.hpp"
-#include "../base/ErrorOr.hpp"
 #include "../Eval.hpp"
-#include "../base/Path.hpp"
 #include "../Platform.hpp"
 #include "../Toiletline.hpp"
-#include "../base/Trace.hpp"
 #include "../Utils.hpp"
+#include "../base/ErrorOr.hpp"
+#include "../base/Path.hpp"
+#include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
 
@@ -166,8 +166,7 @@ static fn get_history_file_identity(const Path &path) throws
 
   let status = os::file_status{};
   identity.has_file_identity =
-      os::stat_path_following(path.view(), status) &&
-      status.has_file_identity;
+      os::stat_path_following(path.view(), status) && status.has_file_identity;
   if (identity.has_file_identity) {
     identity.device_id = status.device_id;
     identity.file_id = status.file_id;
@@ -306,8 +305,8 @@ static fn write_history_to_file(EvalContext &cxt, const Path &target,
     toiletline::encode_history_record(payload, event.command.view());
 
   if (!should_append) {
-    let const opened = os::open_file_descriptor(target.view(),
-                                                os::file_open_mode::Truncate);
+    let const opened =
+        os::open_file_descriptor(target.view(), os::file_open_mode::Truncate);
     if (!opened.has_value()) return Error{os::last_system_error_message()};
 
     let const fd = opened.value();
@@ -338,8 +337,8 @@ static fn write_history_to_file(EvalContext &cxt, const Path &target,
     }
   }
 
-    let const opened = os::open_file_descriptor(target.view(),
-                                              os::file_open_mode::Append);
+  let const opened =
+      os::open_file_descriptor(target.view(), os::file_open_mode::Append);
   if (!opened.has_value()) return Error{os::last_system_error_message()};
 
   let const fd = opened.value();
@@ -574,8 +573,8 @@ fn History::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
          index-- > selection->first_index;)
     {
       let const &event = events[index];
-      if (!toiletline::rewrite_history_event(event.number,
-                                             event.command.view(), ""))
+      if (!toiletline::rewrite_history_event(event.number, event.command.view(),
+                                             ""))
       {
         report_soft_builtin_error(ec, cxt, FLAG_HISTORY_DELETE.value_location(),
                                   "Unable to delete the history event");

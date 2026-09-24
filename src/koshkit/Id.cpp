@@ -40,8 +40,8 @@ enum class id_name_mode : u8
 
 }
 
-static fn id_user_text(u32 id, Allocator allocator, id_name_mode name_mode)
-    throws -> String
+static fn id_user_text(u32 id, Allocator allocator,
+                       id_name_mode name_mode) throws -> String
 {
   if (name_mode == id_name_mode::Name)
     if (let const name = os::uid_to_username(id); name.has_value())
@@ -49,8 +49,8 @@ static fn id_user_text(u32 id, Allocator allocator, id_name_mode name_mode)
   return String::from(id, allocator);
 }
 
-static fn id_group_text(u32 id, Allocator allocator, id_name_mode name_mode)
-    throws -> String
+static fn id_group_text(u32 id, Allocator allocator,
+                        id_name_mode name_mode) throws -> String
 {
   if (name_mode == id_name_mode::Name)
     if (let const name = os::gid_to_groupname(id); name.has_value())
@@ -87,8 +87,7 @@ fn Id::execute(const ExecContext &ec, EvalContext &cxt,
                                       ? os::get_real_group_id()
                                       : os::get_effective_group_id());
   if (!operands.is_empty()) {
-    let const resolved =
-        utils::resolve_user_id(operands[0].view());
+    let const resolved = utils::resolve_user_id(operands[0].view());
     if (!resolved.has_value()) {
       report_soft_koshkit_util_error(ec, cxt, operand_locations[0],
                                      args[0].view(),
@@ -99,18 +98,18 @@ fn Id::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (FLAG_ID_USER.is_enabled()) {
-    ec.print_to_stdout(id_user_text(
-                           user_id, cxt.scratch_allocator(),
-                           FLAG_ID_NAME.is_enabled() ? id_name_mode::Name
-                                                      : id_name_mode::Numeric) +
+    ec.print_to_stdout(id_user_text(user_id, cxt.scratch_allocator(),
+                                    FLAG_ID_NAME.is_enabled()
+                                        ? id_name_mode::Name
+                                        : id_name_mode::Numeric) +
                        "\n");
     return 0;
   }
   if (FLAG_ID_GROUP.is_enabled()) {
-    ec.print_to_stdout(id_group_text(
-                           group_id, cxt.scratch_allocator(),
-                           FLAG_ID_NAME.is_enabled() ? id_name_mode::Name
-                                                      : id_name_mode::Numeric) +
+    ec.print_to_stdout(id_group_text(group_id, cxt.scratch_allocator(),
+                                     FLAG_ID_NAME.is_enabled()
+                                         ? id_name_mode::Name
+                                         : id_name_mode::Numeric) +
                        "\n");
     return 0;
   }
@@ -120,10 +119,10 @@ fn Id::execute(const ExecContext &ec, EvalContext &cxt,
     let output = String{cxt.scratch_allocator()};
     for (usize index = 0; index < groups.count(); index++) {
       if (index != 0) output += ' ';
-      output += id_group_text(
-          groups[index], cxt.scratch_allocator(),
-          FLAG_ID_NAME.is_enabled() ? id_name_mode::Name
-                                     : id_name_mode::Numeric);
+      output +=
+          id_group_text(groups[index], cxt.scratch_allocator(),
+                        FLAG_ID_NAME.is_enabled() ? id_name_mode::Name
+                                                  : id_name_mode::Numeric);
     }
     output += '\n';
     ec.print_to_stdout(output);

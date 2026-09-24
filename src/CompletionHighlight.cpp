@@ -9,20 +9,20 @@
  * span caching and terminal rendering.
  */
 
-#include "base/Arena.hpp"
 #include "Builtin.hpp"
 #include "CLIColors.hpp"
 #include "Completion.hpp"
 #include "CompletionInternal.hpp"
-#include "base/Debug.hpp"
-#include "base/HashSet.hpp"
 #include "Koshkit.hpp"
 #include "Lexer.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "Tokens.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Debug.hpp"
+#include "base/HashSet.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 

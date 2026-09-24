@@ -9,17 +9,17 @@
  * EvalArrays.cpp.
  */
 
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
-#include "base/PackedStringKey.hpp"
 #include "Parser.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/PackedStringKey.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -86,20 +86,21 @@ fn EvalContext::register_function(StringView name,
   let info = function_definition_info{};
   info.body_start_position = body_start_position;
   info.header_length = name.length + StringView{" () \n"}.length;
-  if (source_store().m_current_source != nullptr && !definition_text.is_empty()) {
+  if (source_store().m_current_source != nullptr && !definition_text.is_empty())
+  {
     /* The body opens on the copy's second line, because the synthesized header
        occupies the first one. A body that opens on the defining file's first
        line therefore shifts back by one. */
-    let const body_line = static_cast<isize>(
-        utils::line_number_at(source_store().m_current_source->view(), body_start_position));
+    let const body_line = static_cast<isize>(utils::line_number_at(
+        source_store().m_current_source->view(), body_start_position));
     info.line_offset = body_line - 2;
   }
 
   if (source_store().m_current_source != nullptr &&
       definition_location.position < source_store().m_current_source->count())
   {
-    info.definition_line = utils::line_number_at(source_store().m_current_source->view(),
-                                                 definition_location.position);
+    info.definition_line = utils::line_number_at(
+        source_store().m_current_source->view(), definition_location.position);
   }
 
   info.source_name_index = definition_location.source_name_index;
@@ -123,13 +124,15 @@ pure fn EvalContext::resolve_render_source(
     const String *fallback_source) const wontthrow -> resolved_render_source
 {
   let resolved_source = resolved_render_source{};
-  resolved_source.text =
-      fallback_source != nullptr ? fallback_source : source_store().m_current_source;
+  resolved_source.text = fallback_source != nullptr
+                             ? fallback_source
+                             : source_store().m_current_source;
 
   if (function_store().call_names().is_empty()) return resolved_source;
 
   for (usize depth = function_store().call_storages().count(); depth > 0;
-       depth--) {
+       depth--)
+  {
     let const &storage = function_store().call_storages()[depth - 1];
     let const *info = storage.get_definition_info();
     if (info == nullptr) continue;
@@ -190,9 +193,10 @@ fn EvalContext::sorted_function_names() const throws -> ArrayList<String>
 {
   let out = ArrayList<String>{heap_allocator()};
   out.reserve(function_store().definitions().count());
-  function_store().definitions().for_each([&](StringView name, const FunctionBodyHandle &) {
-    out.push_managed(name);
-  });
+  function_store().definitions().for_each(
+      [&](StringView name, const FunctionBodyHandle &) {
+        out.push_managed(name);
+      });
   out.sort();
   return out;
 }
@@ -262,10 +266,11 @@ fn EvalContext::sorted_readonly_function_names() const throws
 fn EvalContext::function_names() const throws -> HashSet
 {
   let names = HashSet{heap_allocator()};
-  function_store().definitions().for_each([&](StringView name, const FunctionBodyHandle &storage) {
-    unused(storage);
-    names.add(name);
-  });
+  function_store().definitions().for_each(
+      [&](StringView name, const FunctionBodyHandle &storage) {
+        unused(storage);
+        names.add(name);
+      });
   return names;
 }
 
@@ -275,9 +280,9 @@ fn EvalContext::variable_names(Allocator result_allocator) const throws
   let names = HashSet{result_allocator};
   m_variable_store.shell_variables().for_each(
       [&](StringView name, const String &value) {
-    unused(value);
-    names.add(name);
-  });
+        unused(value);
+        names.add(name);
+      });
   /* An indexed or associative array is a set variable too, so its name joins
      the scalar names. */
   indexed_arrays().for_each(
@@ -303,7 +308,9 @@ fn EvalContext::variable_names(Allocator result_allocator) const throws
 fn EvalContext::cached_trap_body(StringView condition, StringView action) throws
     -> FunctionBodyHandle
 {
-  if (let const *cached = trap_store().cached_bodies().find(condition); cached != nullptr) {
+  if (let const *cached = trap_store().cached_bodies().find(condition);
+      cached != nullptr)
+  {
     let const *cached_source = cached->get_source();
     if (cached->get_body() != nullptr && cached_source != nullptr &&
         cached_source->view() == action)
@@ -350,7 +357,10 @@ fn EvalContext::run_named_trap(StringView condition,
   }
 
   trap_store().m_running_trap_conditions |= condition_bit;
-  defer { trap_store().m_running_trap_conditions &= static_cast<u8>(~condition_bit); };
+  defer
+  {
+    trap_store().m_running_trap_conditions &= static_cast<u8>(~condition_bit);
+  };
 
   trap_store().m_trap_action_depth += 1;
   defer { trap_store().m_trap_action_depth -= 1; };
@@ -364,17 +374,23 @@ fn EvalContext::run_named_trap(StringView condition,
      read against the current source afterwards. run_source pushes exactly one
      frame. */
   let const saved_trigger_line_number = trap_store().m_trap_trigger_line_number;
-  let const saved_action_source_frame_count = trap_store().m_trap_action_source_frame_count;
-  let const saved_action_function_depth = trap_store().m_trap_action_function_depth;
-  let const trigger_site =
-      trigger_location != nullptr ? *trigger_location : source_store().m_current_location;
-  trap_store().m_trap_trigger_line_number = line_number_at_location(trigger_site);
-  trap_store().m_trap_action_source_frame_count = source_store().m_source_frames.count() + 1;
+  let const saved_action_source_frame_count =
+      trap_store().m_trap_action_source_frame_count;
+  let const saved_action_function_depth =
+      trap_store().m_trap_action_function_depth;
+  let const trigger_site = trigger_location != nullptr
+                               ? *trigger_location
+                               : source_store().m_current_location;
+  trap_store().m_trap_trigger_line_number =
+      line_number_at_location(trigger_site);
+  trap_store().m_trap_action_source_frame_count =
+      source_store().m_source_frames.count() + 1;
   trap_store().m_trap_action_function_depth = function_store().call_depth();
   defer
   {
     trap_store().m_trap_trigger_line_number = saved_trigger_line_number;
-    trap_store().m_trap_action_source_frame_count = saved_action_source_frame_count;
+    trap_store().m_trap_action_source_frame_count =
+        saved_action_source_frame_count;
     trap_store().m_trap_action_function_depth = saved_action_function_depth;
   };
 
@@ -499,11 +515,12 @@ fn EvalContext::discard_inherited_signal_traps() throws -> void
   trap_store().m_did_reset_inherited_signal_traps = false;
 
   ArrayList<String> discarded{heap_allocator()};
-  trap_store().actions().for_each([&](StringView condition, const String &action) {
-    unused(action);
-    if (!os::signal_number_from_name(condition).has_value()) return;
-    discarded.push(String{heap_allocator(), condition});
-  });
+  trap_store().actions().for_each(
+      [&](StringView condition, const String &action) {
+        unused(action);
+        if (!os::signal_number_from_name(condition).has_value()) return;
+        discarded.push(String{heap_allocator(), condition});
+      });
 
   LOG(Info, "the subshell discarded %zu inherited signal actions",
       discarded.count());
@@ -542,8 +559,10 @@ fn EvalContext::set_trap(StringView condition, StringView action) throws -> void
   /* A trap installed inside a function, a subshell, or a substitution traces
      that frame without functrace or errtrace. An inherited trap needs the
      option to reach the frame. */
-  if (condition == "DEBUG") trap_store().m_debug_trap_active_depth = nesting_depth();
-  if (condition == "ERR") trap_store().m_err_trap_active_depth = nesting_depth();
+  if (condition == "DEBUG")
+    trap_store().m_debug_trap_active_depth = nesting_depth();
+  if (condition == "ERR")
+    trap_store().m_err_trap_active_depth = nesting_depth();
   /* EXIT runs at the shell's end and needs no OS handler. An empty action
      installs the ignore disposition the way trap "" SIG asks. */
   if (condition == "EXIT") return;
@@ -620,16 +639,18 @@ fn EvalContext::restore_untraced_trap(StringView condition,
 
 fn EvalContext::install_trap_dispositions() throws -> void
 {
-  LOG(Info, "reinstalling the dispositions of %zu traps", trap_store().actions().count());
-  trap_store().actions().for_each([&](StringView condition, const String &action) {
-    if (condition == "EXIT") return;
-    if (let const number = os::signal_number_from_name(condition)) {
-      if (action.is_empty())
-        os::set_trap_ignore(*number);
-      else
-        os::set_trap_handler(*number);
-    }
-  });
+  LOG(Info, "reinstalling the dispositions of %zu traps",
+      trap_store().actions().count());
+  trap_store().actions().for_each(
+      [&](StringView condition, const String &action) {
+        if (condition == "EXIT") return;
+        if (let const number = os::signal_number_from_name(condition)) {
+          if (action.is_empty())
+            os::set_trap_ignore(*number);
+          else
+            os::set_trap_handler(*number);
+        }
+      });
 }
 
 /* A signal an action sends to the shell is drained at the next boundary inside
@@ -691,7 +712,8 @@ fn EvalContext::run_pending_traps() throws -> void
     if (name->view() == "CHLD") continue;
     if (trap_store().m_did_reset_inherited_signal_traps) continue;
 
-    if (let const *action = trap_store().actions().find(name->view()); action != nullptr)
+    if (let const *action = trap_store().actions().find(name->view());
+        action != nullptr)
       if (action->count() > 0) {
         LOG(Info, "running the trap action for signal '%s'", name->c_str());
         /* A return in the action belongs to the function the signal
@@ -711,7 +733,8 @@ fn EvalContext::run_pending_traps() throws -> void
   }
 
   let const child_bit = running_trap_bit(child_condition);
-  if (trap_store().m_pending_child_trap_count > 0 && !trap_store().m_did_reset_inherited_signal_traps &&
+  if (trap_store().m_pending_child_trap_count > 0 &&
+      !trap_store().m_did_reset_inherited_signal_traps &&
       (trap_store().m_running_trap_conditions & child_bit) == 0 &&
       os::has_reaped_child_arrival())
   {
@@ -722,7 +745,10 @@ fn EvalContext::run_pending_traps() throws -> void
       let const fire_count = trap_store().m_pending_child_trap_count;
 
       trap_store().m_running_trap_conditions |= child_bit;
-      defer { trap_store().m_running_trap_conditions &= static_cast<u8>(~child_bit); };
+      defer
+      {
+        trap_store().m_running_trap_conditions &= static_cast<u8>(~child_bit);
+      };
 
       let const child_body = cached_trap_body(child_condition, action.view());
       let const *cached_child_body =
@@ -743,8 +769,9 @@ fn EvalContext::run_pending_traps() throws -> void
         if (has_pending_control_flow()) break;
 
         LOG(Info, "running the trap action for signal 'CHLD'");
-        run_source(action.view(), "the CHLD trap", source_store().m_current_location,
-                   None, nullptr, cached_child_body, return_handling::Reject);
+        run_source(action.view(), "the CHLD trap",
+                   source_store().m_current_location, None, nullptr,
+                   cached_child_body, return_handling::Reject);
       }
     }
   }

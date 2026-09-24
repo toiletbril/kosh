@@ -11,8 +11,6 @@
 
 #include "Builtin.hpp"
 #include "CLI.hpp"
-#include "base/Containers.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "EvalVariablesInternal.hpp"
@@ -20,8 +18,10 @@
 #include "Lexer.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Containers.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -201,15 +201,14 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
 
   let const source = cxt.current_source();
   unused(cxt.materialize_kosh_identity());
-  os::process p =
-      os::execute_program(ec,
-                          source != nullptr ? source->view() : StringView{}, 0,
-                          is_async ? os::script_fallback_policy::Reject
-                                   : os::script_fallback_policy::Allow,
-                          os::terminal_handoff::Keep,
-                          is_async ? os::process_group_mode::NewBackground
-                          : is_foreground_job ? os::process_group_mode::New
-                                              : os::process_group_mode::Inherit);
+  os::process p = os::execute_program(
+      ec, source != nullptr ? source->view() : StringView{}, 0,
+      is_async ? os::script_fallback_policy::Reject
+               : os::script_fallback_policy::Allow,
+      os::terminal_handoff::Keep,
+      is_async            ? os::process_group_mode::NewBackground
+      : is_foreground_job ? os::process_group_mode::New
+                          : os::process_group_mode::Inherit);
   if (p == KOSH_INVALID_PROCESS) {
     LOG(Debug, "running the file as a shell script in this process");
     const mimic_mood mode = cxt.mood();
@@ -553,10 +552,10 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
                 stage_source.view(), ec.in_fd, stage_out, stage_err,
                 ec.source_location(),
                 source != nullptr ? source->view() : StringView{},
-                process_group_id,
-                has_bootstrap ? &bootstrap : nullptr, cxt.shell_name(),
-                cxt.last_exit_status(), os::get_shell_process_id(),
-                cxt.get_subshell_depth() + 1, cxt.mood(), process_group);
+                process_group_id, has_bootstrap ? &bootstrap : nullptr,
+                cxt.shell_name(), cxt.last_exit_status(),
+                os::get_shell_process_id(), cxt.get_subshell_depth() + 1,
+                cxt.mood(), process_group);
             forked_child = launch.child;
           } catch (...) {
             ec.close_fds();

@@ -11,16 +11,16 @@
 
 #include "Builtin.hpp"
 #include "CLI.hpp"
-#include "base/Containers.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Containers.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -657,8 +657,8 @@ fn ProgramResolver::rebuild_path_command_index(CompletionRefresh refresh) throws
       symlink_statuses.push({});
     }
     for (usize position = 0; position < symlink_count; position++)
-      symlink_batch.add(os::batch_operation::stat(
-          symlink_paths[position], symlink_statuses[position]));
+      symlink_batch.add(os::batch_operation::stat(symlink_paths[position],
+                                                  symlink_statuses[position]));
     let symlink_results = ArrayList<os::batch_result>{heap_allocator()};
     if (symlink_count != 0) symlink_batch.execute(symlink_results);
 
@@ -824,8 +824,8 @@ fn ProgramResolver::revalidate_command_prefix(StringView prefix) throws -> void
     }
     symlink_batch.reserve(symlink_paths.count());
     for (usize position = 0; position < symlink_paths.count(); position++)
-      symlink_batch.add(os::batch_operation::stat(
-          symlink_paths[position], symlink_statuses[position]));
+      symlink_batch.add(os::batch_operation::stat(symlink_paths[position],
+                                                  symlink_statuses[position]));
     let symlink_results = ArrayList<os::batch_result>{heap_allocator()};
     if (!symlink_paths.is_empty()) symlink_batch.execute(symlink_results);
 
@@ -1133,36 +1133,32 @@ fn ProgramResolver::resolve_along_path(StringView program_name,
           os::file_type_letter(candidate_statuses[index].mode) != '-')
         continue;
 
-      let const should_check_executable =
-          requirement != Requirement::Regular ||
-          cache_policy != CachePolicy::Bypass;
+      let const should_check_executable = requirement != Requirement::Regular ||
+                                          cache_policy != CachePolicy::Bypass;
       let const is_runnable =
           should_check_executable && candidate_paths[index].is_executable();
       let const is_match = requirement == Requirement::Regular || is_runnable;
       if (is_match) {
-        let const extension =
-            name_info.extension == os::program_extension::None
-                ? os::PROGRAM_SUFFIXES[index].extension
-                : name_info.extension;
+        let const extension = name_info.extension == os::program_extension::None
+                                  ? os::PROGRAM_SUFFIXES[index].extension
+                                  : name_info.extension;
         result.push(steal(candidate_paths[index]));
         if ((cache_policy == CachePolicy::Remember ||
              cache_policy == CachePolicy::RememberUnchecked) &&
             is_runnable)
         {
-          cache_resolved_path(
-              key, result.back(), extension,
-              name_info.extension == os::program_extension::None
-                  ? program_path_kind::Bare
-                  : program_path_kind::Full);
+          cache_resolved_path(key, result.back(), extension,
+                              name_info.extension == os::program_extension::None
+                                  ? program_path_kind::Bare
+                                  : program_path_kind::Full);
         }
         return result;
       }
 
       if (requirement == Requirement::Execution && !blocked.has_value()) {
-        let const extension =
-            name_info.extension == os::program_extension::None
-                ? os::PROGRAM_SUFFIXES[index].extension
-                : name_info.extension;
+        let const extension = name_info.extension == os::program_extension::None
+                                  ? os::PROGRAM_SUFFIXES[index].extension
+                                  : name_info.extension;
         blocked = CachedPath{candidate_paths[index].clone(), extension};
       }
     }

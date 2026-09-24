@@ -8,8 +8,8 @@
 
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
-#include "../base/Trace.hpp"
 #include "../Utils.hpp"
+#include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
 
@@ -108,8 +108,8 @@ fn parse_printf_number(const String &arg) throws -> printf_number
       arg.view().substring_of_length(number_start, number_end - number_start);
   let is_out_of_range = false;
   let const parsed =
-      is_hexadecimal ? utils::parse_integer_in_base(number_text, &is_out_of_range,
-                                                    int_base::hex)
+      is_hexadecimal ? utils::parse_integer_in_base(
+                           number_text, &is_out_of_range, int_base::hex)
       : is_octal ? utils::parse_integer_in_base(number_text, &is_out_of_range,
                                                 int_base::octal)
                  : utils::parse_decimal_i64(number_text, &is_out_of_range);

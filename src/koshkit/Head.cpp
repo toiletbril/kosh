@@ -10,8 +10,8 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../base/Path.hpp"
 #include "../Utils.hpp"
+#include "../base/Path.hpp"
 
 FLAG_LIST_DECL();
 
@@ -102,7 +102,8 @@ static fn read_regular_all_but_last(os::descriptor fd, u64 file_size,
   batch.reserve(1);
   results.reserve(1);
 
-  let const do_read_block = [&](u64 offset, usize byte_count) -> os::batch_result {
+  let const do_read_block = [&](u64 offset,
+                                usize byte_count) -> os::batch_result {
     batch.clear();
     batch.add(os::batch_operation::read(fd, block, byte_count, offset));
     batch.execute(results);
@@ -120,8 +121,8 @@ static fn read_regular_all_but_last(os::descriptor fd, u64 file_size,
       if (os::INTERRUPT_REQUESTED) return String{allocator};
 
       let const byte_count = next_end > block_byte_count
-                                  ? block_byte_count
-                                  : static_cast<usize>(next_end);
+                                 ? block_byte_count
+                                 : static_cast<usize>(next_end);
       let const offset = next_end - byte_count;
       let const read_result = do_read_block(offset, byte_count);
       if (read_result.error_number != 0) {
@@ -152,8 +153,8 @@ static fn read_regular_all_but_last(os::descriptor fd, u64 file_size,
 
     let const remaining = prefix_end - next_offset;
     let const byte_count = remaining > block_byte_count
-                                ? block_byte_count
-                                : static_cast<usize>(remaining);
+                               ? block_byte_count
+                               : static_cast<usize>(remaining);
     let const read_result = do_read_block(next_offset, byte_count);
     if (read_result.error_number != 0) {
       os::set_last_system_error(read_result.error_number);
@@ -262,15 +263,13 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
         was_opened = true;
       }
 
-      let const file_size = was_opened
-                                ? os::regular_descriptor_file_size(fd)
-                                : Maybe<u64>{};
-      let const text = file_size.has_value()
-                           ? read_regular_all_but_last(
-                                 fd, *file_size, count,
-                                 cxt.scratch_allocator(), unit)
-                           : read_all_but_last(fd, count,
-                                               cxt.scratch_allocator(), unit);
+      let const file_size =
+          was_opened ? os::regular_descriptor_file_size(fd) : Maybe<u64>{};
+      let const text =
+          file_size.has_value()
+              ? read_regular_all_but_last(fd, *file_size, count,
+                                          cxt.scratch_allocator(), unit)
+              : read_all_but_last(fd, count, cxt.scratch_allocator(), unit);
       let const read_error = os::get_last_system_error_number();
       if (was_opened) os::close_fd(fd);
       if (os::INTERRUPT_REQUESTED) return 130;

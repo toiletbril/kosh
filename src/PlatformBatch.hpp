@@ -9,8 +9,8 @@
 
 #pragma once
 
-#include "base/Common.hpp"
 #include "Platform.hpp"
+#include "base/Common.hpp"
 
 namespace koshka::os {
 
@@ -198,13 +198,11 @@ public:
   fn reserve(usize operation_count) throws -> void;
   fn add(batch_operation operation) throws -> void;
   fn clear() wontthrow -> void;
-  fn execute(
-      ArrayList<batch_result> &results,
-      batch_deduplication deduplication = batch_deduplication::Enabled) throws
-      -> void;
-  fn execute(batch_deduplication deduplication =
-                 batch_deduplication::Enabled) throws
-      -> ArrayList<batch_result>;
+  fn execute(ArrayList<batch_result> &results,
+             batch_deduplication deduplication =
+                 batch_deduplication::Enabled) throws -> void;
+  fn execute(batch_deduplication deduplication = batch_deduplication::Enabled)
+      throws -> ArrayList<batch_result>;
 
   pure fn count() const wontthrow -> usize;
 

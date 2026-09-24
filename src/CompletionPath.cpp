@@ -7,21 +7,21 @@
  * Filesystem completion and highlighting share these transformation rules.
  */
 
-#include "base/Arena.hpp"
 #include "Builtin.hpp"
 #include "CLIColors.hpp"
 #include "Completion.hpp"
 #include "CompletionInternal.hpp"
 #include "CompletionPolicy.hpp"
-#include "base/Debug.hpp"
-#include "base/HashSet.hpp"
 #include "Koshkit.hpp"
 #include "Lexer.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "Tokens.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Debug.hpp"
+#include "base/HashSet.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -151,13 +151,12 @@ static fn append_candidate_suffix(String &candidate, StringView suffix) throws
 {
   usize component_start = 0;
   for (usize position = 0; position <= suffix.length; position++) {
-    let const is_separator =
-        position < suffix.length &&
-        os::is_directory_separator(suffix[position]);
+    let const is_separator = position < suffix.length &&
+                             os::is_directory_separator(suffix[position]);
     if (position < suffix.length && !is_separator) continue;
 
-    let const component = suffix.substring_of_length(
-        component_start, position - component_start);
+    let const component =
+        suffix.substring_of_length(component_start, position - component_start);
     if (path_candidate_needs_quoting(component))
       candidate += quote_path_candidate(component);
     else
@@ -209,9 +208,9 @@ fn internal::rebuild_shell_syntax_candidate(
     {
       candidate.append(raw_token.substring_of_length(
           0, decoded_word.leading_variable_expansion_end));
-      append_candidate_suffix(
-          candidate, decoded_candidate.substring(
-                         decoded_word.leading_variable_expansion_end));
+      append_candidate_suffix(candidate,
+                              decoded_candidate.substring(
+                                  decoded_word.leading_variable_expansion_end));
       return candidate;
     }
 

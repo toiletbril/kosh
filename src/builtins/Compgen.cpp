@@ -14,12 +14,12 @@
 #include "../Completion.hpp"
 #include "../Eval.hpp"
 #include "../Lexer.hpp"
-#include "../base/Path.hpp"
 #include "../Platform.hpp"
 #include "../StaticStringMap.hpp"
 #include "../Tokens.hpp"
-#include "../base/Trace.hpp"
 #include "../Utils.hpp"
+#include "../base/Path.hpp"
+#include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
 
@@ -180,9 +180,8 @@ static fn compile_filter(StringView raw_filter, StringView word,
 static fn candidate_is_excluded(StringView candidate,
                                 const compgen_filter &filter) throws -> bool
 {
-  let const matches =
-      utils::glob_matches(filter.pattern.view(), candidate, filter.active, 0,
-                          filter.extglob);
+  let const matches = utils::glob_matches(filter.pattern.view(), candidate,
+                                          filter.active, 0, filter.extglob);
   return filter.is_negated ? !matches : matches;
 }
 

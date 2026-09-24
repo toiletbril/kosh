@@ -12,14 +12,14 @@
  */
 
 #include "CLI.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 #include <syslog.h>
 #include <utmpx.h>
@@ -344,7 +344,8 @@ static fn linux_unix_sockets(const ArrayList<linux_socket_owner> *owners,
     };
     bool has_process_owner = false;
     if (process_mode == network_socket_process_mode::WithProcesses &&
-        owners != nullptr) {
+        owners != nullptr)
+    {
       for (let const &owner : *owners) {
         if (owner.inode == inode.value()) {
           do_push_socket(owner.pid, owner.start_token, owner.has_start_token);
@@ -506,7 +507,8 @@ static fn linux_network_sockets_from_file(
 
     bool has_process_owner = false;
     if (process_mode == network_socket_process_mode::WithProcesses &&
-        owners != nullptr) {
+        owners != nullptr)
+    {
       for (let const &owner : *owners) {
         if (owner.inode == inode.value()) {
           do_push_socket(owner.pid, owner.start_token, owner.has_start_token);
@@ -1046,8 +1048,8 @@ fn default_network_interface(Allocator allocator) throws -> Maybe<String>
     let const line_start = position;
     while (position < contents->length() && contents->view()[position] != '\n')
       position++;
-    let const line = contents->view().substring_of_length(
-        line_start, position - line_start);
+    let const line =
+        contents->view().substring_of_length(line_start, position - line_start);
     if (position < contents->length()) position++;
     if (line.starts_with("Iface")) continue;
 
@@ -1063,8 +1065,8 @@ fn default_network_interface(Allocator allocator) throws -> Maybe<String>
              line[word_position] != '\t')
         word_position++;
       if (word_position > word_start)
-        words[word_count++] = line.substring_of_length(
-            word_start, word_position - word_start);
+        words[word_count++] =
+            line.substring_of_length(word_start, word_position - word_start);
     }
     let const has_up_flag =
         word_count >= 4 && words[3].length >= 4 &&
@@ -1234,14 +1236,14 @@ fn network_sockets(network_socket_process_mode process_mode) throws
     let entries = linux_network_sockets_from_file(
         path.view(), source.protocol,
         process_mode == network_socket_process_mode::WithProcesses ? &owners
-                                                                    : nullptr,
+                                                                   : nullptr,
         allocator, source.family, process_mode);
     for (let &entry : entries)
       result.push(steal(entry));
   }
   let unix_entries = linux_unix_sockets(
       process_mode == network_socket_process_mode::WithProcesses ? &owners
-                                                                  : nullptr,
+                                                                 : nullptr,
       allocator, process_mode);
   for (let &entry : unix_entries)
     result.push(steal(entry));
@@ -1793,8 +1795,7 @@ static fn append_terminal_character(String &output, cc_t value) throws -> void
 }
 
 fn terminal_settings(descriptor terminal, Allocator allocator,
-                     terminal_settings_output_mode mode) throws
-    -> Maybe<String>
+                     terminal_settings_output_mode mode) throws -> Maybe<String>
 {
   termios state{};
   if (tcgetattr(terminal, &state) != 0) return None;
@@ -2664,8 +2665,7 @@ fn query_system_configuration(system_configuration_key key) wontthrow
   if (key == system_configuration_key::Count)
     return {configuration_query_status::Undefined, 0};
   let const native_key = SYSTEM_CONFIGURATION_KEYS[static_cast<usize>(key)];
-  if (native_key < 0)
-    return {configuration_query_status::Undefined, 0};
+  if (native_key < 0) return {configuration_query_status::Undefined, 0};
 
   errno = 0;
   let const value = sysconf(native_key);
@@ -2762,8 +2762,9 @@ fn query_string_configuration(string_configuration_key key,
     }
 
     result.status = configuration_query_status::Value;
-    result.value = String{allocator,
-                          StringView{buffer.begin(), actual_size - 1}};
+    result.value = String{
+        allocator, StringView{buffer.begin(), actual_size - 1}
+    };
     return result;
   }
   errno = EAGAIN;
@@ -2818,8 +2819,7 @@ fn query_path_configuration(StringView path,
   if (key == path_configuration_key::Count)
     return {configuration_query_status::Undefined, 0};
   let const native_key = PATH_CONFIGURATION_KEYS[static_cast<usize>(key)];
-  if (native_key < 0)
-    return {configuration_query_status::Undefined, 0};
+  if (native_key < 0) return {configuration_query_status::Undefined, 0};
 
   let const path_text = String{heap_allocator(), path};
   errno = 0;

@@ -9,16 +9,16 @@
 
 #include "Builtin.hpp"
 #include "CLI.hpp"
-#include "base/Containers.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Koshkit.hpp"
 #include "Lexer.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Containers.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 

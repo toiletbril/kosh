@@ -9,18 +9,18 @@
  * coordinator.
  */
 
-#include "base/Arena.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
-#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Path.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -95,16 +95,14 @@ fn trim_matching(Allocator result_allocator, StringView value,
     if (extent == pattern_match_extent::Longest) {
       for (usize length = value.length;; length--) {
         if (utils::glob_matches(pattern, value.substring_of_length(0, length),
-                                active, 0,
-                                mode))
+                                active, 0, mode))
           return String{result_allocator, value.substring(length)};
         if (length == 0) break;
       }
     } else {
       for (usize length = 0; length <= value.length; length++) {
         if (utils::glob_matches(pattern, value.substring_of_length(0, length),
-                                active, 0,
-                                mode))
+                                active, 0, mode))
           return String{result_allocator, value.substring(length)};
       }
     }
@@ -128,12 +126,11 @@ fn trim_matching(Allocator result_allocator, StringView value,
   return String{result_allocator, value};
 }
 
-static fn
-trim_value_with_modifier(EvalContext &cxt, StringView value, StringView word,
-                         trim_end end,
-                         const SourceLocation *source_location = nullptr,
-                         pattern_match_extent extent =
-                             pattern_match_extent::Shortest) throws -> String
+static fn trim_value_with_modifier(
+    EvalContext &cxt, StringView value, StringView word, trim_end end,
+    const SourceLocation *source_location = nullptr,
+    pattern_match_extent extent = pattern_match_extent::Shortest) throws
+    -> String
 {
   LOG(All, "trimming a value of %zu bytes with the pattern word '%.*s'",
       value.length, static_cast<int>(word.length), word.data);
@@ -251,7 +248,8 @@ fn EvalContext::expand_modifier_word_worker(
       const SourceLocation *call_site_pointer = nullptr;
       let const call_site_length = j - i + (j < word.length);
       if (source_location != nullptr && i <= source_location->length &&
-          call_site_length <= source_location->length - i) {
+          call_site_length <= source_location->length - i)
+      {
         call_site = source_location->subspan(i, call_site_length);
         call_site_pointer = &call_site;
       }
@@ -394,7 +392,8 @@ fn EvalContext::expand_modifier_word_worker(
       let inner_location = SourceLocation{};
       const SourceLocation *inner_location_pointer = nullptr;
       if (source_location != nullptr && i + 2 <= source_location->length &&
-          inner.count() <= source_location->length - (i + 2)) {
+          inner.count() <= source_location->length - (i + 2))
+      {
         inner_location = source_location->subspan(i + 2, inner.count());
         inner_location_pointer = &inner_location;
       }
@@ -499,7 +498,8 @@ fn EvalContext::expand_modifier_word_worker(
       const SourceLocation *call_site_pointer = nullptr;
       let const call_site_length = j - i + (j < word.length);
       if (source_location != nullptr && i <= source_location->length &&
-          call_site_length <= source_location->length - i) {
+          call_site_length <= source_location->length - i)
+      {
         call_site = source_location->subspan(i, call_site_length);
         call_site_pointer = &call_site;
       }
@@ -695,7 +695,7 @@ hot fn EvalContext::apply_parameter_expansion(
             if (!treat_as_unset) return value;
             let assigned = do_expand_modifier_word(word);
             assign_array_element(name, subscript, assigned.view(),
-                                assignment_update_mode::Replace);
+                                 assignment_update_mode::Replace);
             return assigned;
           }
           case '?':
@@ -808,22 +808,22 @@ hot fn EvalContext::apply_parameter_expansion(
     let word_location = SourceLocation{};
     let const current_view =
         current.has_value() ? current->view() : StringView{};
-    return trim_value_with_modifier(
-        *this, current_view, word, trim_end::Prefix,
-        do_source_location_for(word, word_location),
-        is_doubled ? pattern_match_extent::Longest
-                   : pattern_match_extent::Shortest);
+    return trim_value_with_modifier(*this, current_view, word, trim_end::Prefix,
+                                    do_source_location_for(word, word_location),
+                                    is_doubled
+                                        ? pattern_match_extent::Longest
+                                        : pattern_match_extent::Shortest);
   }
 
   case '%': {
     let word_location = SourceLocation{};
     let const current_view =
         current.has_value() ? current->view() : StringView{};
-    return trim_value_with_modifier(
-        *this, current_view, word, trim_end::Suffix,
-        do_source_location_for(word, word_location),
-        is_doubled ? pattern_match_extent::Longest
-                   : pattern_match_extent::Shortest);
+    return trim_value_with_modifier(*this, current_view, word, trim_end::Suffix,
+                                    do_source_location_for(word, word_location),
+                                    is_doubled
+                                        ? pattern_match_extent::Longest
+                                        : pattern_match_extent::Shortest);
   }
 
   default: return expand_variable(name);
@@ -949,10 +949,9 @@ static fn longest_pattern_match_at(StringView pattern,
                                    extglob_mode mode) throws -> Maybe<usize>
 {
   for (usize end = value.length; end >= start; end--) {
-    if (utils::glob_matches(
-            pattern, value.substring_of_length(start, end - start),
-            pattern_active, 0,
-                                   mode))
+    if (utils::glob_matches(pattern,
+                            value.substring_of_length(start, end - start),
+                            pattern_active, 0, mode))
       return end - start;
     if (end == start) break;
   }
@@ -1049,9 +1048,8 @@ fn EvalContext::pattern_replace_value(
 
   if (is_anchored_at_end) {
     for (usize start = 0; start <= value.length; start++) {
-      if (utils::glob_matches(
-              pattern.view(), value.substring(start), pattern_active, 0,
-              extglob))
+      if (utils::glob_matches(pattern.view(), value.substring(start),
+                              pattern_active, 0, extglob))
       {
         out.append(value.substring_of_length(0, start));
         append_pattern_replacement(out, replacement.view(),
@@ -1223,9 +1221,8 @@ fn EvalContext::apply_case_modification_to_value(
     let const is_affected = should_modify_all || i == 0;
     if (is_affected &&
         (pattern_matches_any ||
-         utils::glob_matches(
-             pattern.view(), value.substring_of_length(i, 1), pattern_active, 0,
-             extglob)))
+         utils::glob_matches(pattern.view(), value.substring_of_length(i, 1),
+                             pattern_active, 0, extglob)))
     {
       const unsigned char byte = static_cast<unsigned char>(character);
       if (op == '^') {

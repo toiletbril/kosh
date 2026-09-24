@@ -55,7 +55,7 @@ fn Stty::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_report =
       settings.is_empty() || should_report_all || should_encode;
   let const output_mode =
-      should_encode ? os::terminal_settings_output_mode::Encoded
+      should_encode       ? os::terminal_settings_output_mode::Encoded
       : should_report_all ? os::terminal_settings_output_mode::All
                           : os::terminal_settings_output_mode::Normal;
   let const terminal = ec.in_fd.value_or(KOSH_STDIN);

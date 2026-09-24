@@ -9,8 +9,8 @@
 
 #pragma once
 
-#include "Common.hpp"
 #include "../Platform.hpp"
+#include "Common.hpp"
 #include "String.hpp"
 #include "StringView.hpp"
 

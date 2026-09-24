@@ -9,11 +9,8 @@
  * ExpressionsCompound.cpp and ExpressionsControlFlow.cpp.
  */
 
-#include "base/Arena.hpp"
 #include "Builtin.hpp"
 #include "CLI.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
@@ -24,8 +21,11 @@
 #include "Platform.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -1464,11 +1464,10 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
   let &function_definition =
       actx.function_definitions[function_definition_index];
   if (function_definition.recursive_call_count > 0) {
-    let const diagnostic =
-        function_definition.recursive_call_count >= 2 &&
-                function_definition.has_async_recursive_call
-            ? diagnostic_id::fork_bomb
-            : diagnostic_id::sc2264;
+    let const diagnostic = function_definition.recursive_call_count >= 2 &&
+                                   function_definition.has_async_recursive_call
+                               ? diagnostic_id::fork_bomb
+                               : diagnostic_id::sc2264;
     actx.report_diagnostic(diagnostic,
                            function_definition.first_recursive_call_location,
                            {m_name.view()}, source_location());

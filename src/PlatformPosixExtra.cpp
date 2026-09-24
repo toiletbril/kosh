@@ -1332,21 +1332,20 @@ fn read_system_activity_status(system_activity_status &status) wontthrow -> bool
         };
         static constexpr stat_scalar_field STAT_SCALAR_FIELDS[] = {
             {"intr ",      &system_activity_status::interrupt_count,
-             system_activity_field::Interrupts                              },
+             system_activity_field::Interrupts      },
             {"ctxt ",      &system_activity_status::context_switch_count,
-             system_activity_field::ContextSwitches                         },
+             system_activity_field::ContextSwitches },
             {"processes ", &system_activity_status::process_creation_count,
-             system_activity_field::ProcessCreations                        },
+             system_activity_field::ProcessCreations},
             {"softirq ",   &system_activity_status::soft_interrupt_count,
-             system_activity_field::SoftInterrupts                          },
+             system_activity_field::SoftInterrupts  },
         };
         for (let const &field : STAT_SCALAR_FIELDS) {
           if (!line.starts_with(field.name)) continue;
           let const value = leading_digits(line, field.name.length).to<u64>();
           if (!value.is_error()) {
             status.*(field.value) = value.value();
-            status.available_fields |=
-                static_cast<u32>(field.availability);
+            status.available_fields |= static_cast<u32>(field.availability);
           }
           break;
         }
@@ -1506,9 +1505,8 @@ fn read_system_activity_status(system_activity_status &status) wontthrow -> bool
     usize cgroup_length = 0;
     bool has_complete_read = false;
     while (cgroup_length < sizeof(cgroup_buffer)) {
-      let const read_length =
-          ::read(cgroup_fd, cgroup_buffer + cgroup_length,
-                 sizeof(cgroup_buffer) - cgroup_length);
+      let const read_length = ::read(cgroup_fd, cgroup_buffer + cgroup_length,
+                                     sizeof(cgroup_buffer) - cgroup_length);
       if (read_length > 0) {
         cgroup_length += static_cast<usize>(read_length);
         continue;
@@ -1766,9 +1764,8 @@ fn read_tcp_statistics(tcp_statistics &statistics) wontthrow -> bool
   }
 
   char netstat_buffer[65536];
-  let const netstat_length =
-      read_small_file("/proc/net/netstat", netstat_buffer,
-                      sizeof(netstat_buffer));
+  let const netstat_length = read_small_file(
+      "/proc/net/netstat", netstat_buffer, sizeof(netstat_buffer));
   if (netstat_length == 0) return has_statistics;
 
   let const netstat_text = StringView{netstat_buffer, netstat_length};
@@ -1800,26 +1797,26 @@ fn read_tcp_statistics(tcp_statistics &statistics) wontthrow -> bool
       };
       static constexpr tcp_extended_field FIELDS[] = {
           {"ListenOverflows", &tcp_statistics::listen_overflow_count,
-           tcp_statistics_field::ListenOverflows                },
+           tcp_statistics_field::ListenOverflows           },
           {"ListenDrops",     &tcp_statistics::listen_drop_count,
-           tcp_statistics_field::ListenDrops                    },
+           tcp_statistics_field::ListenDrops               },
           {"TCPTimeouts",     &tcp_statistics::retransmit_timeout_count,
-           tcp_statistics_field::RetransmitTimeouts             },
+           tcp_statistics_field::RetransmitTimeouts        },
           {"TCPSynRetrans",   &tcp_statistics::syn_retransmit_count,
-           tcp_statistics_field::SynRetransmits                 },
+           tcp_statistics_field::SynRetransmits            },
           {"TCPFastRetrans",  &tcp_statistics::fast_retransmit_count,
-           tcp_statistics_field::FastRetransmits                },
+           tcp_statistics_field::FastRetransmits           },
           {"TCPSpuriousRTOs",
            &tcp_statistics::spurious_retransmit_timeout_count,
-           tcp_statistics_field::SpuriousRetransmitTimeouts     },
+           tcp_statistics_field::SpuriousRetransmitTimeouts},
           {"TCPRcvQDrop",     &tcp_statistics::receive_queue_drop_count,
-           tcp_statistics_field::ReceiveQueueDrops              },
+           tcp_statistics_field::ReceiveQueueDrops         },
           {"TCPBacklogDrop",  &tcp_statistics::backlog_drop_count,
-           tcp_statistics_field::BacklogDrops                   },
+           tcp_statistics_field::BacklogDrops              },
           {"TCPReqQFullDrop", &tcp_statistics::request_queue_full_drop_count,
-           tcp_statistics_field::RequestQueueFullDrops          },
+           tcp_statistics_field::RequestQueueFullDrops     },
           {"TCPRetransFail",  &tcp_statistics::retransmit_failure_count,
-           tcp_statistics_field::RetransmitFailures             },
+           tcp_statistics_field::RetransmitFailures        },
       };
       for (let const &known : FIELDS) {
         if (name != known.name) continue;
@@ -2067,9 +2064,8 @@ fn read_memory_status(memory_status &status) wontthrow -> bool
                             static_cast<u64>(vm_stats.inactive_count) +
                             static_cast<u64>(vm_stats.purgeable_count)) *
                            page_kib;
-    status.available_fields |=
-        static_cast<u32>(memory_status_field::Free) |
-        static_cast<u32>(memory_status_field::Available);
+    status.available_fields |= static_cast<u32>(memory_status_field::Free) |
+                               static_cast<u32>(memory_status_field::Available);
   }
 
   struct xsw_usage swap{};
@@ -2092,31 +2088,30 @@ fn read_memory_status(memory_status &status) wontthrow -> bool
   };
 
   static constexpr meminfo_field MEMINFO_FIELDS[] = {
-      {"MemTotal", &memory_status::total_kib, memory_status_field::Total},
-      {"MemFree", &memory_status::free_kib, memory_status_field::Free},
-      {"MemAvailable", &memory_status::available_kib,
-       memory_status_field::Available},
-      {"SwapTotal", &memory_status::swap_total_kib,
-       memory_status_field::SwapTotal},
-      {"SwapFree", &memory_status::swap_free_kib,
-       memory_status_field::SwapFree},
-      {"Buffers", &memory_status::buffer_kib, memory_status_field::Buffers},
-      {"Cached", &memory_status::cached_kib, memory_status_field::Cached},
-      {"SReclaimable", &memory_status::reclaimable_slab_kib,
-       memory_status_field::ReclaimableSlab},
-      {"Shmem", &memory_status::shared_kib, memory_status_field::Shared},
-      {"Slab", &memory_status::slab_kib, memory_status_field::Slab},
-      {"Active", &memory_status::active_kib, memory_status_field::Active},
-      {"Inactive", &memory_status::inactive_kib,
-       memory_status_field::Inactive},
-      {"CommitLimit", &memory_status::commit_limit_kib,
-       memory_status_field::CommitLimit},
-      {"Committed_AS", &memory_status::committed_kib,
-       memory_status_field::Committed},
+      {"MemTotal",        &memory_status::total_kib,             memory_status_field::Total   },
+      {"MemFree",         &memory_status::free_kib,              memory_status_field::Free    },
+      {"MemAvailable",    &memory_status::available_kib,
+       memory_status_field::Available                                                         },
+      {"SwapTotal",       &memory_status::swap_total_kib,
+       memory_status_field::SwapTotal                                                         },
+      {"SwapFree",        &memory_status::swap_free_kib,
+       memory_status_field::SwapFree                                                          },
+      {"Buffers",         &memory_status::buffer_kib,            memory_status_field::Buffers },
+      {"Cached",          &memory_status::cached_kib,            memory_status_field::Cached  },
+      {"SReclaimable",    &memory_status::reclaimable_slab_kib,
+       memory_status_field::ReclaimableSlab                                                   },
+      {"Shmem",           &memory_status::shared_kib,            memory_status_field::Shared  },
+      {"Slab",            &memory_status::slab_kib,              memory_status_field::Slab    },
+      {"Active",          &memory_status::active_kib,            memory_status_field::Active  },
+      {"Inactive",        &memory_status::inactive_kib,          memory_status_field::Inactive},
+      {"CommitLimit",     &memory_status::commit_limit_kib,
+       memory_status_field::CommitLimit                                                       },
+      {"Committed_AS",    &memory_status::committed_kib,
+       memory_status_field::Committed                                                         },
       {"HugePages_Total", &memory_status::huge_page_total_count,
-       memory_status_field::HugePagesTotal},
-      {"HugePages_Free", &memory_status::huge_page_free_count,
-       memory_status_field::HugePagesFree},
+       memory_status_field::HugePagesTotal                                                    },
+      {"HugePages_Free",  &memory_status::huge_page_free_count,
+       memory_status_field::HugePagesFree                                                     },
   };
 
   char buffer[8192];
@@ -2136,7 +2131,8 @@ fn read_memory_status(memory_status &status) wontthrow -> bool
 
       if (let const parsed =
               leading_digits(line, *colon_position + 1).to<u64>();
-          !parsed.is_error()) {
+          !parsed.is_error())
+      {
         status.*known.field = parsed.value();
         status.available_fields |= static_cast<u32>(known.availability);
       }
@@ -2480,8 +2476,8 @@ fn linux_socket_endpoint(StringView process_path, u64 inode,
       while (token_position < line.length && line[token_position] != ' ' &&
              line[token_position] != '\t')
         token_position++;
-      let const token = line.substring_of_length(token_start,
-                                                 token_position - token_start);
+      let const token =
+          line.substring_of_length(token_start, token_position - token_start);
       if (token_index == 6) inode_token = token;
       if (token_index == 7) endpoint = token;
     }
@@ -2511,26 +2507,25 @@ fn list_process_open_files(i64 pid, Allocator allocator,
     -> ArrayList<process_open_file>
 {
   ArrayList<process_open_file> files{allocator};
-  let const do_push = [&files, allocator](StringView path,
-                                          i64 descriptor_number, u64 size,
-                                          u64 file_id, u64 offset, u32 mode,
-                                          process_file_use use, char access,
-                                          bool is_deleted,
-                                          StringView socket_endpoint) throws
-      -> void {
+  let const do_push =
+      [&files, allocator](StringView path, i64 descriptor_number, u64 size,
+                          u64 file_id, u64 offset, u32 mode,
+                          process_file_use use, char access, bool is_deleted,
+                          StringView socket_endpoint) throws -> void {
     if (path.is_empty()) return;
 
     files.push(process_open_file{
-        String{allocator, path},
-        descriptor_number, size, file_id, offset, mode, use, access,
-        is_deleted, false, String{allocator, socket_endpoint}
+        String{allocator, path           },
+        descriptor_number, size, file_id, offset, mode,
+        use, access, is_deleted, false, String{allocator, socket_endpoint}
     });
   };
 
 #if defined __APPLE__
   if (should_include_mappings) {
     files.push(process_open_file{
-        String{allocator, "[inaccessible]"}, -1, 0, 0, 0, 0,
+        String{allocator, "[inaccessible]"},
+        -1, 0, 0, 0, 0,
         process_file_use::Mapped, 'u', false, true, String{allocator}
     });
   }
@@ -2541,8 +2536,8 @@ fn list_process_open_files(i64 pid, Allocator allocator,
   {
     do_push(StringView{vnode_paths.pvi_cdir.vip_path}, -1, 0,
             static_cast<u64>(vnode_paths.pvi_cdir.vip_vi.vi_stat.vst_ino), 0,
-            vnode_paths.pvi_cdir.vip_vi.vi_stat.vst_mode,
-            process_file_use::Cwd, 'r', false, {});
+            vnode_paths.pvi_cdir.vip_vi.vi_stat.vst_mode, process_file_use::Cwd,
+            'r', false, {});
     do_push(StringView{vnode_paths.pvi_rdir.vip_path}, -1, 0,
             static_cast<u64>(vnode_paths.pvi_rdir.vip_vi.vi_stat.vst_ino), 0,
             vnode_paths.pvi_rdir.vip_vi.vi_stat.vst_mode,
@@ -2584,25 +2579,24 @@ fn list_process_open_files(i64 pid, Allocator allocator,
       do_push(StringView{vnode.pvip.vip_path}, descriptor_number,
               static_cast<u64>(vnode.pvip.vip_vi.vi_stat.vst_size),
               static_cast<u64>(vnode.pvip.vip_vi.vi_stat.vst_ino), 0,
-              vnode.pvip.vip_vi.vi_stat.vst_mode,
-              process_file_use::File,
+              vnode.pvip.vip_vi.vi_stat.vst_mode, process_file_use::File,
               open_flags_access(vnode.pfi.fi_openflags), false, {});
       break;
     }
 
     case PROX_FDTYPE_SOCKET:
-      do_push("[socket]", descriptor_number, 0, 0, 0, 0,
-              process_file_use::File, 'u', false, {});
+      do_push("[socket]", descriptor_number, 0, 0, 0, 0, process_file_use::File,
+              'u', false, {});
       break;
 
     case PROX_FDTYPE_PIPE:
-      do_push("[pipe]", descriptor_number, 0, 0, 0, 0,
-              process_file_use::File, 'u', false, {});
+      do_push("[pipe]", descriptor_number, 0, 0, 0, 0, process_file_use::File,
+              'u', false, {});
       break;
 
     default:
-      do_push("[other]", descriptor_number, 0, 0, 0, 0,
-              process_file_use::File, 'u', false, {});
+      do_push("[other]", descriptor_number, 0, 0, 0, 0, process_file_use::File,
+              'u', false, {});
       break;
     }
   }
@@ -2637,10 +2631,9 @@ fn list_process_open_files(i64 pid, Allocator allocator,
 
     constexpr StringView DELETED_SUFFIX = " (deleted)";
     let path = target->view();
-    let const is_deleted = path.length >= DELETED_SUFFIX.length &&
-                            path.substring(path.length -
-                                           DELETED_SUFFIX.length) ==
-                                DELETED_SUFFIX;
+    let const is_deleted =
+        path.length >= DELETED_SUFFIX.length &&
+        path.substring(path.length - DELETED_SUFFIX.length) == DELETED_SUFFIX;
     if (is_deleted)
       path = path.substring_of_length(0, path.length - DELETED_SUFFIX.length);
     do_push(path, -1, 0, 0, 0, 0, reference.use, 'r', is_deleted, {});
@@ -2666,9 +2659,9 @@ fn list_process_open_files(i64 pid, Allocator allocator,
           u64 file_id = 0;
           bool is_valid = true;
           for (usize field_index = 0; field_index < 5; field_index++) {
-            while (field_position < line.length &&
-                   (line[field_position] == ' ' ||
-                    line[field_position] == '\t'))
+            while (
+                field_position < line.length &&
+                (line[field_position] == ' ' || line[field_position] == '\t'))
               field_position++;
             let const field_start = field_position;
             while (field_position < line.length &&
@@ -2700,13 +2693,13 @@ fn list_process_open_files(i64 pid, Allocator allocator,
           if (path[0] == '[') continue;
 
           constexpr StringView DELETED_SUFFIX = " (deleted)";
-          let const is_deleted = path.length >= DELETED_SUFFIX.length &&
-                                  path.substring(path.length -
-                                                 DELETED_SUFFIX.length) ==
-                                      DELETED_SUFFIX;
+          let const is_deleted =
+              path.length >= DELETED_SUFFIX.length &&
+              path.substring(path.length - DELETED_SUFFIX.length) ==
+                  DELETED_SUFFIX;
           if (is_deleted)
-            path = path.substring_of_length(
-                0, path.length - DELETED_SUFFIX.length);
+            path = path.substring_of_length(0, path.length -
+                                                   DELETED_SUFFIX.length);
 
           bool is_duplicate = false;
           for (let const &file : files) {
@@ -2726,7 +2719,8 @@ fn list_process_open_files(i64 pid, Allocator allocator,
     }
     if (!did_read_mappings) {
       files.push(process_open_file{
-          String{allocator, "[inaccessible]"}, -1, 0, 0, 0, 0,
+          String{allocator, "[inaccessible]"},
+          -1, 0, 0, 0, 0,
           process_file_use::Mapped, 'u', false, true, String{allocator}
       });
     }
@@ -2736,9 +2730,11 @@ fn list_process_open_files(i64 pid, Allocator allocator,
   DIR *descriptor_directory = ::opendir(descriptor_root.c_str());
   if (descriptor_directory == nullptr) {
     if (errno == EACCES || errno == EPERM) {
-      files.push(process_open_file{String{allocator, "[inaccessible]"}, -1,
-                                   0, 0, 0, 0, process_file_use::File, 'u',
-                                   false, true, String{allocator}});
+      files.push(process_open_file{
+          String{allocator, "[inaccessible]"},
+          -1, 0, 0, 0, 0,
+          process_file_use::File, 'u', false, true, String{allocator}
+      });
     }
     return files;
   }
@@ -2780,13 +2776,15 @@ fn list_process_open_files(i64 pid, Allocator allocator,
       while (info_position < info_text.length) {
         let const line = each_line(info_text, info_position);
         if (line.length >= 4 &&
-            line.substring_of_length(0, 4) == StringView{"pos:"}) {
+            line.substring_of_length(0, 4) == StringView{"pos:"})
+        {
           let const parsed = line.substring(4).to<u64>();
           if (!parsed.is_error()) offset = parsed.value();
           continue;
         }
         if (line.length < 6 ||
-            line.substring_of_length(0, 6) != StringView{"flags:"}) continue;
+            line.substring_of_length(0, 6) != StringView{"flags:"})
+          continue;
 
         let const flags = std::strtol(line.data + 6, nullptr, 8);
         switch (flags & O_ACCMODE) {
@@ -2800,10 +2798,10 @@ fn list_process_open_files(i64 pid, Allocator allocator,
     }
 
     let const deleted_suffix = StringView{" (deleted)"};
-    let const is_deleted = target->view().length >= deleted_suffix.length &&
-                           target->view().substring(
-                               target->view().length - deleted_suffix.length) ==
-                               deleted_suffix;
+    let const is_deleted =
+        target->view().length >= deleted_suffix.length &&
+        target->view().substring(target->view().length -
+                                 deleted_suffix.length) == deleted_suffix;
     let const mode = descriptor_status.st_mode;
     let socket_endpoint = String{allocator};
     if (target->view().starts_with("socket:[")) {
@@ -2815,13 +2813,12 @@ fn list_process_open_files(i64 pid, Allocator allocator,
                                      .substring_of_length(0, *close - *open - 1)
                                      .to<u64>();
         if (!socket_inode.is_error())
-          socket_endpoint = linux_socket_endpoint(process_path, socket_inode.value(),
-                                                  allocator);
+          socket_endpoint = linux_socket_endpoint(
+              process_path, socket_inode.value(), allocator);
       }
     }
     do_push(target->view(), parsed_number.value(), size, file_id, offset, mode,
-            process_file_use::File, access, is_deleted,
-            socket_endpoint.view());
+            process_file_use::File, access, is_deleted, socket_endpoint.view());
   }
 
   return files;

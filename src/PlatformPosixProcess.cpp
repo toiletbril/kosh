@@ -10,13 +10,13 @@
  */
 
 #include "CLI.hpp"
-#include "base/Common.hpp"
-#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"
-#include "base/Trace.hpp"
 #include "Utils.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 
@@ -516,7 +516,8 @@ static fn fork_job_process() throws -> process
 fn try_fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
                            Maybe<descriptor> err_fd, SourceLocation location,
                            StringView source, i64 process_group_id,
-                           process_group_mode process_group) throws -> Maybe<process>
+                           process_group_mode process_group) throws
+    -> Maybe<process>
 {
   return fork_compound_stage(steal(in_fd), steal(out_fd), steal(err_fd),
                              steal(location), source, process_group_id,
@@ -530,11 +531,12 @@ fn try_fork_job_process() throws -> Maybe<process>
 
 fn can_fork_evaluator() wontthrow -> bool { return true; }
 
-fn launch_process_substitution(
-    StringView source, bool source_traces_enabled,
-    const subshell_bootstrap *bootstrap, StringView shell_name,
-    i32 previous_exit_status, i64 shell_process_id, usize subshell_depth,
-    process_substitution_direction direction, mimic_mood mood) throws
+fn launch_process_substitution(StringView source, bool source_traces_enabled,
+                               const subshell_bootstrap *bootstrap,
+                               StringView shell_name, i32 previous_exit_status,
+                               i64 shell_process_id, usize subshell_depth,
+                               process_substitution_direction direction,
+                               mimic_mood mood) throws
     -> process_substitution_launch
 {
   unused(source);
@@ -602,8 +604,8 @@ fn launch_compound_stage(StringView source, Maybe<descriptor> in_fd,
                          const subshell_bootstrap *bootstrap,
                          StringView shell_name, i32 previous_exit_status,
                          i64 shell_process_id, usize subshell_depth,
-                         mimic_mood mood, process_group_mode process_group)
-    throws
+                         mimic_mood mood,
+                         process_group_mode process_group) throws
     -> compound_stage_launch
 {
   unused(source);
