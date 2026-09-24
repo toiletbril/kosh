@@ -2019,11 +2019,18 @@ fn launch_process_substitution(const process_substitution_options &options)
     -> process_substitution_launch;
 fn release_unused_process_substitution(opaque *cleanup) wontthrow -> void;
 
-fn try_fork_compound_stage(
-    Maybe<descriptor> in_fd, Maybe<descriptor> out_fd, Maybe<descriptor> err_fd,
-    SourceLocation location = {}, StringView source = {},
-    i64 process_group_id = 0,
-    process_group_mode process_group = process_group_mode::Inherit) throws
+struct fork_compound_stage_options
+{
+  Maybe<descriptor> in_fd{None};
+  Maybe<descriptor> out_fd{None};
+  Maybe<descriptor> err_fd{None};
+  SourceLocation location{};
+  StringView diagnostic_source{};
+  i64 process_group_id{0};
+  process_group_mode process_group{process_group_mode::Inherit};
+};
+
+fn try_fork_compound_stage(const fork_compound_stage_options &options) throws
     -> Maybe<process>;
 
 fn try_fork_job_process() throws -> Maybe<process>;

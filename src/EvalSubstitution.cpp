@@ -501,8 +501,12 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
 
     koshka::flush();
     let const forked_child = os::try_fork_compound_stage(
-        None, pipe->out, None, previous_location,
-        previous_source != nullptr ? previous_source->view() : StringView{});
+        os::fork_compound_stage_options{
+            .out_fd = pipe->out,
+            .location = previous_location,
+            .diagnostic_source = previous_source != nullptr
+                                     ? previous_source->view()
+                                     : StringView{}});
 
     if (!forked_child.has_value()) {
       os::close_fd(pipe->in);

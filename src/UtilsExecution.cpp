@@ -468,9 +468,15 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
           !is_async ? os::process_group_mode::Inherit
                     : os::background_process_group_mode(process_group_id);
       let forked_child = os::try_fork_compound_stage(
-          ec.in_fd, ec.out_fd, ec.err_fd, ec.source_location(),
-          source != nullptr ? source->view() : StringView{}, process_group_id,
-          process_group);
+          os::fork_compound_stage_options{
+              .in_fd = ec.in_fd,
+              .out_fd = ec.out_fd,
+              .err_fd = ec.err_fd,
+              .location = ec.source_location(),
+              .diagnostic_source =
+                  source != nullptr ? source->view() : StringView{},
+              .process_group_id = process_group_id,
+              .process_group = process_group});
       let preflight_status = Maybe<i32>{};
       let preflight_location = SourceLocation{};
       let preflight_message = String{cxt.scratch_allocator()};

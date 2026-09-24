@@ -1149,7 +1149,8 @@ fn Subshell::evaluate_impl(EvalContext &cxt) const throws -> i64
   koshka::flush();
   let const forked_child = should_elide_fork
                                ? Maybe<os::process>{None}
-                               : os::try_fork_compound_stage(None, None, None);
+                               : os::try_fork_compound_stage(
+                                     os::fork_compound_stage_options{});
   if (!forked_child.has_value()) {
     i32 status = 1;
     try {

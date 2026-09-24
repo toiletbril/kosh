@@ -1373,18 +1373,10 @@ static fn spawn_subshell_stage(
   return process_info.hProcess;
 }
 
-fn try_fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
-                           Maybe<descriptor> err_fd, SourceLocation location,
-                           StringView source, i64 process_group_id,
-                           process_group_mode process_group) -> Maybe<process>
+fn try_fork_compound_stage(const fork_compound_stage_options &options)
+    -> Maybe<process>
 {
-  unused(in_fd);
-  unused(out_fd);
-  unused(err_fd);
-  unused(location);
-  unused(source);
-  unused(process_group);
-  unused(process_group_id);
+  unused(options);
   return koshka::None;
 }
 

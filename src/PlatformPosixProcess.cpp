@@ -513,15 +513,12 @@ static fn fork_job_process() throws -> process
   return child_pid;
 }
 
-fn try_fork_compound_stage(Maybe<descriptor> in_fd, Maybe<descriptor> out_fd,
-                           Maybe<descriptor> err_fd, SourceLocation location,
-                           StringView source, i64 process_group_id,
-                           process_group_mode process_group) throws
+fn try_fork_compound_stage(const fork_compound_stage_options &options) throws
     -> Maybe<process>
 {
-  return fork_compound_stage(steal(in_fd), steal(out_fd), steal(err_fd),
-                             steal(location), source, process_group_id,
-                             process_group);
+  return fork_compound_stage(options.in_fd, options.out_fd, options.err_fd,
+                             options.location, options.diagnostic_source,
+                             options.process_group_id, options.process_group);
 }
 
 fn try_fork_job_process() throws -> Maybe<process>
