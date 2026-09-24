@@ -504,10 +504,9 @@ static fn run_script_contents(
 
     /* A function body parsed into the function arena would outlive the unit
        that defined it, and that arena is never reset. */
-    BumpArena *const previous_function_arena = FUNCTION_ARENA;
-    if (should_stream_units || should_stream_execution)
-      FUNCTION_ARENA = nullptr;
-    defer { FUNCTION_ARENA = previous_function_arena; };
+    let function_arena_scope = FunctionArenaScope{
+        (should_stream_units || should_stream_execution) ? nullptr
+                                                         : FUNCTION_ARENA};
 
     /* A file with any parse error must not run, so every error is collected
        and reported at once. */
@@ -688,7 +687,7 @@ static fn run_script_contents(
             Lexer{script_contents.view(), ast_arena, false, filename,
                   context.mood()}
         };
-        FUNCTION_ARENA = previous_function_arena;
+        function_arena_scope.restore();
         let const was_terminal_exec_allowed = context.terminal_exec_allowed();
         defer { context.set_terminal_exec_allowed(was_terminal_exec_allowed); };
 

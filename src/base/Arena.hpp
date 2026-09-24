@@ -191,13 +191,21 @@ public:
     FUNCTION_ARENA = arena;
   }
 
-  ~FunctionArenaScope() { FUNCTION_ARENA = m_previous; }
+  ~FunctionArenaScope() { restore(); }
+
+  fn restore() wontthrow -> void
+  {
+    if (!m_is_active) return;
+    FUNCTION_ARENA = m_previous;
+    m_is_active = false;
+  }
 
   FunctionArenaScope(const FunctionArenaScope &) = delete;
   FunctionArenaScope &operator=(const FunctionArenaScope &) = delete;
 
 private:
   BumpArena *m_previous;
+  bool m_is_active{true};
 };
 
 fn is_arena_pointer(const opaque *pointer) wontthrow -> bool;
