@@ -111,28 +111,18 @@ fn RuntimeState::restore(EvalContext &context) const wontthrow -> void
 
 fn EvalContext::add_evaluated_expression() wontthrow -> void
 {
-  if (!stats_enabled()) return;
-  m_expressions_executed_last++;
+  evaluation_metrics_store().add_evaluated_expression(stats_enabled());
 }
 
 fn EvalContext::add_expansion() wontthrow -> void
 {
-  if (!stats_enabled()) return;
-  m_expansions_last++;
+  evaluation_metrics_store().add_expansion(stats_enabled());
 }
 
 fn EvalContext::end_command() wontthrow -> void
 {
-  m_expansions_total += m_expansions_last;
-  m_expressions_executed_total += m_expressions_executed_last;
-  m_commands_evaluated++;
-
-  if (parse_arena() != nullptr) {
-    let const used = parse_arena()->bytes_used();
-    if (used > m_peak_ast_arena_bytes) m_peak_ast_arena_bytes = used;
-  }
-
-  m_expansions_last = m_expressions_executed_last = 0;
+  let const used = parse_arena() != nullptr ? parse_arena()->bytes_used() : 0;
+  evaluation_metrics_store().end_command(used);
 }
 
 fn EvalContext::record_history_event(StringView command) throws -> bool
@@ -165,7 +155,7 @@ pure fn EvalContext::has_history_transaction() const wontthrow -> bool
 
 fn EvalContext::begin_command_evaluation() wontthrow -> void
 {
-  m_command_evaluation_index++;
+  evaluation_metrics_store().begin_command_evaluation();
 }
 
 hot fn EvalContext::assign_variable(StringView name, StringView value) throws

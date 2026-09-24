@@ -472,29 +472,39 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
             heap_allocator());
       }
       case dynamic_var::KOSH_GIT_BRANCH: {
-        if (m_git_branch_command_index != m_command_evaluation_index) {
-          m_git_branch = utils::current_git_branch();
-          m_git_branch_command_index = m_command_evaluation_index;
+        if (evaluation_metrics_store().git_branch_command_index() !=
+            evaluation_metrics_store().command_evaluation_index()) {
+          evaluation_metrics_store().git_branch() = utils::current_git_branch();
+          evaluation_metrics_store().git_branch_command_index() =
+              evaluation_metrics_store().command_evaluation_index();
         }
-        return String{heap_allocator(), m_git_branch.view()};
+        return String{heap_allocator(),
+                      evaluation_metrics_store().git_branch().view()};
       }
       case dynamic_var::KOSH_GIT_AHEAD:
       case dynamic_var::KOSH_GIT_BEHIND: {
-        if (m_git_counts_command_index != m_command_evaluation_index) {
-          utils::git_status(m_git_branch, m_git_ahead_count,
-                            m_git_behind_count);
-          m_git_branch_command_index = m_command_evaluation_index;
-          m_git_counts_command_index = m_command_evaluation_index;
+        if (evaluation_metrics_store().git_counts_command_index() !=
+            evaluation_metrics_store().command_evaluation_index()) {
+          utils::git_status(evaluation_metrics_store().git_branch(),
+                            evaluation_metrics_store().git_ahead_count(),
+                            evaluation_metrics_store().git_behind_count());
+          evaluation_metrics_store().git_branch_command_index() =
+              evaluation_metrics_store().command_evaluation_index();
+          evaluation_metrics_store().git_counts_command_index() =
+              evaluation_metrics_store().command_evaluation_index();
         }
 
         switch (info->kind) {
         case dynamic_var::KOSH_GIT_AHEAD:
-          return m_git_ahead_count > 0
-                     ? String::from(m_git_ahead_count, heap_allocator())
+          return evaluation_metrics_store().git_ahead_count() > 0
+                     ? String::from(evaluation_metrics_store().git_ahead_count(),
+                                    heap_allocator())
                      : String{heap_allocator()};
         case dynamic_var::KOSH_GIT_BEHIND:
-          return m_git_behind_count > 0
-                     ? String::from(m_git_behind_count, heap_allocator())
+          return evaluation_metrics_store().git_behind_count() > 0
+                     ? String::from(
+                           evaluation_metrics_store().git_behind_count(),
+                           heap_allocator())
                      : String{heap_allocator()};
         default:
           unreachable("the git count variable must be KOSH_GIT_AHEAD or "

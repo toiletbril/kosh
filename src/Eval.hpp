@@ -574,6 +574,104 @@ private:
   bool m_shell_is_interactive{false};
 };
 
+class EvaluationMetricsStore
+{
+public:
+  fn add_evaluated_expression(bool enabled) wontthrow -> void
+  {
+    if (enabled) m_expressions_executed_last++;
+  }
+
+  fn add_expansion(bool enabled) wontthrow -> void
+  {
+    if (enabled) m_expansions_last++;
+  }
+
+  fn end_command(usize live_ast_arena_bytes) wontthrow -> void
+  {
+    m_expansions_total += m_expansions_last;
+    m_expressions_executed_total += m_expressions_executed_last;
+    m_commands_evaluated++;
+    if (live_ast_arena_bytes > m_peak_ast_arena_bytes)
+      m_peak_ast_arena_bytes = live_ast_arena_bytes;
+    m_expansions_last = 0;
+    m_expressions_executed_last = 0;
+  }
+
+  fn begin_command_evaluation() wontthrow -> void
+  {
+    m_command_evaluation_index++;
+  }
+
+  pure fn last_expressions_executed() const wontthrow -> usize
+  {
+    return m_expressions_executed_last;
+  }
+  pure fn total_expressions_executed() const wontthrow -> usize
+  {
+    return m_expressions_executed_total + m_expressions_executed_last;
+  }
+  pure fn last_expansion_count() const wontthrow -> usize
+  {
+    return m_expansions_last;
+  }
+  pure fn total_expansion_count() const wontthrow -> usize
+  {
+    return m_expansions_total + m_expansions_last;
+  }
+  pure fn commands_evaluated() const wontthrow -> usize
+  {
+    return m_commands_evaluated;
+  }
+  pure fn peak_ast_arena_bytes() const wontthrow -> usize
+  {
+    return m_peak_ast_arena_bytes;
+  }
+  pure fn command_evaluation_index() const wontthrow -> usize
+  {
+    return m_command_evaluation_index;
+  }
+  fn git_branch_command_index() wontthrow -> usize &
+  {
+    return m_git_branch_command_index;
+  }
+  fn git_branch_command_index() const wontthrow -> usize &
+  {
+    return m_git_branch_command_index;
+  }
+  fn git_counts_command_index() wontthrow -> usize &
+  {
+    return m_git_counts_command_index;
+  }
+  fn git_counts_command_index() const wontthrow -> usize &
+  {
+    return m_git_counts_command_index;
+  }
+  fn git_branch() wontthrow -> String & { return m_git_branch; }
+  fn git_branch() const wontthrow -> String & { return m_git_branch; }
+  fn git_ahead_count() wontthrow -> i32 & { return m_git_ahead_count; }
+  fn git_ahead_count() const wontthrow -> i32 & { return m_git_ahead_count; }
+  fn git_behind_count() wontthrow -> i32 & { return m_git_behind_count; }
+  fn git_behind_count() const wontthrow -> i32 &
+  {
+    return m_git_behind_count;
+  }
+
+private:
+  usize m_expressions_executed_last{0};
+  usize m_expressions_executed_total{0};
+  usize m_expansions_last{0};
+  usize m_expansions_total{0};
+  usize m_commands_evaluated{0};
+  usize m_command_evaluation_index{0};
+  mutable usize m_git_branch_command_index{static_cast<usize>(-1)};
+  mutable usize m_git_counts_command_index{static_cast<usize>(-1)};
+  mutable String m_git_branch{heap_allocator()};
+  mutable i32 m_git_ahead_count{0};
+  mutable i32 m_git_behind_count{0};
+  usize m_peak_ast_arena_bytes{0};
+};
+
 class NameValueArg
 {
 public:
@@ -1247,6 +1345,15 @@ public:
   pure fn execution_store() const wontthrow -> const ExecutionStore &
   {
     return m_execution_store;
+  }
+  fn evaluation_metrics_store() wontthrow -> EvaluationMetricsStore &
+  {
+    return m_evaluation_metrics_store;
+  }
+  pure fn evaluation_metrics_store() const wontthrow
+      -> const EvaluationMetricsStore &
+  {
+    return m_evaluation_metrics_store;
   }
   pure fn expansion_store() const wontthrow -> const ExpansionStore &
   {
@@ -2998,19 +3105,7 @@ protected:
   bool m_is_login_shell{false};
   bool m_has_custom_rcfile{false};
   bool m_is_restricted_shell{false};
-  usize m_expressions_executed_last{0};
-  usize m_expressions_executed_total{0};
-  usize m_expansions_last{0};
-  usize m_expansions_total{0};
-  usize m_commands_evaluated{0};
-  usize m_command_evaluation_index{0};
-  mutable usize m_git_branch_command_index{static_cast<usize>(-1)};
-  mutable usize m_git_counts_command_index{static_cast<usize>(-1)};
-  mutable String m_git_branch{heap_allocator()};
-  mutable i32 m_git_ahead_count{0};
-  mutable i32 m_git_behind_count{0};
-  /* The largest live AST arena footprint seen at the end of any command. */
-  usize m_peak_ast_arena_bytes{0};
+  EvaluationMetricsStore m_evaluation_metrics_store{};
 
   BumpArena *m_parse_arena{nullptr};
   BumpArena *m_function_arena{nullptr};

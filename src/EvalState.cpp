@@ -1799,7 +1799,7 @@ cold fn EvalContext::make_stats_string() const throws -> String
      sampled here. */
   const usize live_ast_arena_bytes =
       parse_arena() != nullptr ? parse_arena()->bytes_used() : 0;
-  usize peak_ast_arena_bytes = m_peak_ast_arena_bytes;
+  usize peak_ast_arena_bytes = evaluation_metrics_store().peak_ast_arena_bytes();
   if (live_ast_arena_bytes > peak_ast_arena_bytes)
     peak_ast_arena_bytes = live_ast_arena_bytes;
 
@@ -1807,7 +1807,9 @@ cold fn EvalContext::make_stats_string() const throws -> String
 
   stats_text += EXPRESSION_DOUBLE_AST_INDENT;
   stats_text += "Commands evaluated: " +
-                String::from(m_commands_evaluated + 1, heap_allocator());
+                String::from(evaluation_metrics_store().commands_evaluated() +
+                                 1,
+                             heap_allocator());
   stats_text += '\n';
   stats_text += EXPRESSION_DOUBLE_AST_INDENT;
   stats_text +=
@@ -1947,32 +1949,32 @@ pure fn EvalContext::has_custom_rcfile() const wontthrow -> bool
 
 pure fn EvalContext::last_expressions_executed() const wontthrow -> usize
 {
-  return m_expressions_executed_last;
+  return evaluation_metrics_store().last_expressions_executed();
 }
 
 pure fn EvalContext::total_expressions_executed() const wontthrow -> usize
 {
-  return m_expressions_executed_total + m_expressions_executed_last;
+  return evaluation_metrics_store().total_expressions_executed();
 }
 
 pure fn EvalContext::last_expansion_count() const wontthrow -> usize
 {
-  return m_expansions_last;
+  return evaluation_metrics_store().last_expansion_count();
 }
 
 pure fn EvalContext::total_expansion_count() const wontthrow -> usize
 {
-  return m_expansions_total + m_expansions_last;
+  return evaluation_metrics_store().total_expansion_count();
 }
 
 pure fn EvalContext::commands_evaluated() const wontthrow -> usize
 {
-  return m_commands_evaluated;
+  return evaluation_metrics_store().commands_evaluated();
 }
 
 pure fn EvalContext::peak_ast_arena_bytes() const wontthrow -> usize
 {
-  return m_peak_ast_arena_bytes;
+  return evaluation_metrics_store().peak_ast_arena_bytes();
 }
 
 /* The arithmetic engine, the ArithmeticParser, the cached-token fast path, and
