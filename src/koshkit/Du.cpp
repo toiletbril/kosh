@@ -37,7 +37,6 @@ namespace koshkit {
 struct du_output_row
 {
   u64 size_bytes;
-  String size;
   String path;
 };
 
@@ -67,21 +66,14 @@ struct du_stat_work
 };
 
 fn append_output_row(ArrayList<du_output_row> &rows, u64 size, StringView path,
-                     usize &size_width, Allocator allocator) throws -> void
+                     Allocator allocator) throws -> void
 {
-  let rendered_size = FLAG_DU_HUMAN.is_enabled()
-                          ? format_human_size(size, allocator)
-                          : String::from(size, allocator);
-  if (rendered_size.length() > size_width) size_width = rendered_size.length();
-  rows.push({
-      size, steal(rendered_size), String{allocator, path}
-  });
+  rows.push({size, String{allocator, path}});
 }
 
 static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
                      bool &has_failure, ArrayList<du_output_row> *output_rows,
-                     usize &size_width, HashSet &seen_links,
-                     Allocator allocator,
+                     HashSet &seen_links, Allocator allocator,
                      const os::file_status *known_status = nullptr) throws
     -> Maybe<du_size_result>
 {
@@ -120,7 +112,7 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
   if (type_letter != 'd') {
     if (output_rows != nullptr)
       append_output_row(*output_rows, allocated_size_bytes, path.view(),
-                        size_width, allocator);
+                        allocator);
 
     return du_size_result{allocated_size_bytes, true};
   }
@@ -161,7 +153,7 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
       } else {
         if (output_rows != nullptr)
           append_output_row(*output_rows, frame.total_bytes, frame.path.view(),
-                            size_width, allocator);
+                            allocator);
         if (frame.parent_index == SIZE_MAX) {
           is_root_complete = true;
           root_result = du_size_result{frame.total_bytes, true};
@@ -262,7 +254,7 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
           frames[parent_index].total_bytes += allocated_size_bytes;
           if (output_rows != nullptr)
             append_output_row(*output_rows, allocated_size_bytes,
-                              work.path.view(), size_width, allocator);
+                              work.path.view(), allocator);
         }
       }
       frames[parent_index].pending_stat_count--;
@@ -321,10 +313,11 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
   return root_result;
 }
 
-fn append_size_line(String &output, const du_output_row &row, usize size_width,
+fn append_size_line(String &output, const du_output_row &row,
+                    StringView rendered_size, usize size_width,
                     bool should_color) throws -> void
 {
-  append_report_column(output, row.size.view(), size_width, true,
+  append_report_column(output, rendered_size, size_width, true,
                        colors::ansi::BOLD_GREEN, should_color);
   output += "  ";
   append_report_text(output, row.path.view(), colors::ansi::BOLD_CYAN,
@@ -375,7 +368,6 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
   let output_rows = ArrayList<du_output_row>{allocator};
   output_rows.reserve(targets.count());
   let seen_links = HashSet{allocator};
-  usize size_width = 0;
   i32 status = 0;
   bool has_failure = false;
   bool was_interrupted = false;
@@ -393,7 +385,7 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
     let const total =
         total_size(ec, cxt, target, has_failure,
                    FLAG_DU_SUMMARY.is_enabled() ? nullptr : &output_rows,
-                   size_width, seen_links, allocator, &target_statuses[index]);
+                   seen_links, allocator, &target_statuses[index]);
     if (os::INTERRUPT_REQUESTED) {
       was_interrupted = true;
       break;
@@ -404,7 +396,7 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
     }
     if (FLAG_DU_SUMMARY.is_enabled() && total->should_emit)
       append_output_row(output_rows, total->size_bytes, target.view(),
-                        size_width, allocator);
+                        allocator);
   }
 
   output_rows.sort([](const du_output_row &left, const du_output_row &right) {
@@ -413,10 +405,23 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
     return left.path.view() < right.path.view();
   });
 
+  let rendered_sizes = ArrayList<String>{allocator};
+  rendered_sizes.reserve(output_rows.count());
+  usize size_width = 0;
+  for (let const &row : output_rows) {
+    let rendered_size = FLAG_DU_HUMAN.is_enabled()
+                            ? format_human_size(row.size_bytes, allocator)
+                            : String::from(row.size_bytes, allocator);
+    if (rendered_size.length() > size_width)
+      size_width = rendered_size.length();
+    rendered_sizes.push(steal(rendered_size));
+  }
+
   let output = String{allocator};
   let const should_color = koshkit_should_color();
-  for (let const &row : output_rows)
-    append_size_line(output, row, size_width, should_color);
+  for (usize index = 0; index < output_rows.count(); index++)
+    append_size_line(output, output_rows[index], rendered_sizes[index].view(),
+                     size_width, should_color);
 
   ec.print_to_stdout(output);
   if (was_interrupted) return 130;
