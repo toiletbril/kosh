@@ -36,6 +36,7 @@ struct find_options
   const ArrayList<StringView> *name_patterns{nullptr};
   const ArrayList<bool> *name_pattern_ignore_case{nullptr};
   const ArrayList<Bitset> *name_pattern_masks{nullptr};
+  bool has_case_insensitive_name_pattern{false};
   char type_filter{0};
   i64 max_depth{-1};
   i64 min_depth{0};
@@ -88,16 +89,11 @@ static fn find_entry_matches(char type_letter, StringView filename, usize depth,
   default: break;
   }
 
-  bool should_fold_filename = false;
-  if (options.name_pattern_ignore_case != nullptr)
-    for (let const ignore_case : *options.name_pattern_ignore_case)
-      should_fold_filename = should_fold_filename || ignore_case;
-
   let const original_filename = filename;
   String folded_filename{allocator};
   /* Keep -iname locale-independent: ASCII letters fold, while UTF-8 bytes
      remain exact so traversal does not depend on the process locale. */
-  if (should_fold_filename) {
+  if (options.has_case_insensitive_name_pattern) {
     folded_filename.reserve(filename.length);
     for (usize index = 0; index < filename.length; index++)
       folded_filename.push(utils::ascii_to_lower(filename[index]));
@@ -333,7 +329,7 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
          and needs no action. */
       break;
     case find_predicate_kind::Name:
-    case find_predicate_kind::Iname:
+    case find_predicate_kind::Iname: {
       if (index + 1 >= args.count()) {
         KOSHKIT_REPORT_ERROR_AT(
             arg_locations[index],
@@ -345,10 +341,14 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
         return 1;
       }
       name_patterns.push(args[index + 1].view());
-      name_pattern_ignore_case.push(*predicate_kind ==
-                                    find_predicate_kind::Iname);
+      let const is_case_insensitive =
+          *predicate_kind == find_predicate_kind::Iname;
+      name_pattern_ignore_case.push(is_case_insensitive);
+      options.has_case_insensitive_name_pattern =
+          options.has_case_insensitive_name_pattern || is_case_insensitive;
       index++;
       break;
+    }
     case find_predicate_kind::Type: {
       if (index + 1 >= args.count()) {
         KOSHKIT_REPORT_ERROR_AT(arg_locations[index],
