@@ -17,7 +17,8 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-aCtlf] [--sort key]");
+HELP_SYNOPSIS_DECL("[-aCtlf] [--live [seconds]] [--cumulative [seconds]] "
+                   "[--sort key]");
 
 HELP_DESCRIPTION_DECL(
     "The evilnet utility reports the addresses assigned to each interface.");
