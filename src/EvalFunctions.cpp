@@ -905,10 +905,10 @@ fn EvalContext::is_readonly(StringView name) const wontthrow -> bool
 fn EvalContext::readonly_names() const throws -> ArrayList<String>
 {
   let out = ArrayList<String>{heap_allocator()};
-  out.reserve(m_variable_attributes.count() +
+  out.reserve(variable_attributes().count() +
               countof(RESTRICTED_READONLY_KEYS) +
               countof(BASH_IMPLICIT_READONLY_KEYS));
-  m_variable_attributes.for_each([&](StringView name, u8 attributes) {
+  variable_attributes().for_each([&](StringView name, u8 attributes) {
     if ((attributes & static_cast<u8>(variable_attribute::Readonly)) != 0)
       out.push_managed(name);
   });
@@ -945,7 +945,7 @@ fn EvalContext::is_declared(StringView name) const wontthrow -> bool
 
 fn EvalContext::append_attributed_names(HashSet &out) const throws -> void
 {
-  m_variable_attributes.for_each([&](StringView name, u8) { out.add(name); });
+  variable_attributes().for_each([&](StringView name, u8) { out.add(name); });
 }
 
 fn EvalContext::mark_integer(StringView name) throws -> void
@@ -1006,7 +1006,7 @@ fn EvalContext::is_uppercase_variable(StringView name) const wontthrow -> bool
 
 pure fn EvalContext::variable_attributes(StringView name) const wontthrow -> u8
 {
-  let const *attributes = m_variable_attributes.find(name);
+  let const *attributes = variable_attributes().find(name);
   return attributes != nullptr ? *attributes : 0;
 }
 
@@ -1017,15 +1017,15 @@ fn EvalContext::set_variable_attribute(StringView name,
   let const mask = static_cast<u8>(attribute);
 
   if (is_enabled) {
-    m_variable_attributes.get_or_create(name, u8{0}) |= mask;
+    variable_attributes().get_or_create(name, u8{0}) |= mask;
     return;
   }
 
-  let *attributes = m_variable_attributes.find(name);
+  let *attributes = variable_attributes().find(name);
   if (attributes == nullptr) return;
 
   *attributes &= static_cast<u8>(~mask);
-  if (*attributes == 0) m_variable_attributes.erase(name);
+  if (*attributes == 0) variable_attributes().erase(name);
 }
 
 fn EvalContext::apply_variable_case(StringView name,

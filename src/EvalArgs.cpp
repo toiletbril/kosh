@@ -661,7 +661,7 @@ hot fn EvalContext::process_args(
           if (only.kind == WordSegment::Kind::VariableReference &&
               only.is_in_double_quotes && only.text.view() == "@")
           {
-            for (let const &param : m_positional_params) {
+            for (let const &param : positional_params()) {
               expanded_args.push(
                   String{expanded_args.allocator(), param.view()});
               do_record_location(location);

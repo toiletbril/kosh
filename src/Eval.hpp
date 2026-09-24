@@ -377,6 +377,11 @@ pure fn shopt_option_index(shopt_option_id option) wontthrow -> u8;
 class VariableStore
 {
 public:
+  VariableStore() = default;
+  explicit VariableStore(ArrayList<String> positional_params)
+      : m_positional_params(steal(positional_params))
+  {}
+
   fn set_field_separators(StringView value) throws -> void
   {
     for (u64 &bits : m_field_separator_bits) bits = 0;
@@ -437,6 +442,39 @@ public:
   {
     return m_sparse_array_names;
   }
+  fn exported_names() wontthrow -> StringMap<exported_name_value> &
+  {
+    return m_exported_names;
+  }
+  pure fn exported_names() const wontthrow
+      -> const StringMap<exported_name_value> &
+  {
+    return m_exported_names;
+  }
+  fn variable_attributes() wontthrow -> StringMap<u8> &
+  {
+    return m_variable_attributes;
+  }
+  pure fn variable_attributes() const wontthrow -> const StringMap<u8> &
+  {
+    return m_variable_attributes;
+  }
+  fn positional_params() wontthrow -> ArrayList<String> &
+  {
+    return m_positional_params;
+  }
+  pure fn positional_params() const wontthrow -> const ArrayList<String> &
+  {
+    return m_positional_params;
+  }
+  fn directory_stack() wontthrow -> ArrayList<String> &
+  {
+    return m_directory_stack;
+  }
+  pure fn directory_stack() const wontthrow -> const ArrayList<String> &
+  {
+    return m_directory_stack;
+  }
 
 private:
   String m_field_separators{" \t\n"};
@@ -446,6 +484,10 @@ private:
   StringMap<String> m_associative_values{heap_allocator()};
   StringMap<String> m_sparse_array_values{heap_allocator()};
   HashSet m_sparse_array_names{heap_allocator()};
+  StringMap<exported_name_value> m_exported_names{heap_allocator()};
+  StringMap<u8> m_variable_attributes{heap_allocator()};
+  ArrayList<String> m_positional_params{heap_allocator()};
+  ArrayList<String> m_directory_stack{heap_allocator()};
 };
 
 class CompletionStore
@@ -513,6 +555,11 @@ public:
   pure fn function_arena() const wontthrow -> BumpArena *
   {
     return m_function_arena;
+  }
+  fn variable_store() wontthrow -> VariableStore & { return m_variable_store; }
+  pure fn variable_store() const wontthrow -> const VariableStore &
+  {
+    return m_variable_store;
   }
   mustuse fn scratch_mark() const wontthrow -> BumpArena::Mark
   {
@@ -615,6 +662,23 @@ public:
   pure fn sparse_array_names() const wontthrow -> const HashSet &
   {
     return m_variable_store.sparse_array_names();
+  }
+  fn exported_names() wontthrow -> StringMap<exported_name_value> &
+  {
+    return m_variable_store.exported_names();
+  }
+  pure fn exported_names() const wontthrow
+      -> const StringMap<exported_name_value> &
+  {
+    return m_variable_store.exported_names();
+  }
+  fn variable_attributes() wontthrow -> StringMap<u8> &
+  {
+    return m_variable_store.variable_attributes();
+  }
+  pure fn variable_attributes() const wontthrow -> const StringMap<u8> &
+  {
+    return m_variable_store.variable_attributes();
   }
   pure fn lookup_indexed_array(StringView name) const wontthrow
       -> const ArrayList<String> *
@@ -761,17 +825,27 @@ public:
            variable_requires_dynamic_lookup(name);
   }
 
-  pure fn positional_params() const wontthrow -> const ArrayList<String> &;
+  fn positional_params() wontthrow -> ArrayList<String> &
+  {
+    return m_variable_store.positional_params();
+  }
+  pure fn positional_params() const wontthrow -> const ArrayList<String> &
+  {
+    return m_variable_store.positional_params();
+  }
   fn set_positional_params(ArrayList<String> params) wontthrow -> void;
   pure fn shell_name() const wontthrow -> StringView
   {
     return m_shell_name.view();
   }
 
-  fn directory_stack() wontthrow -> ArrayList<String> &;
+  fn directory_stack() wontthrow -> ArrayList<String> &
+  {
+    return m_variable_store.directory_stack();
+  }
   pure fn directory_stack() const wontthrow -> const ArrayList<String> &
   {
-    return m_directory_stack;
+    return m_variable_store.directory_stack();
   }
 
   /* Move the positional parameters out, so a function call saves the caller's
@@ -2283,7 +2357,6 @@ protected:
   /* The names currently in the process environment, kept in step with every
      environment write. An assignment tests membership in O(1). A key is the
      ASCII lowercase form of the name where the environment ignores case. */
-  StringMap<exported_name_value> m_exported_names{heap_allocator()};
 #if !defined NDEBUG
   mutable usize m_debug_variable_name_enumeration_count{0};
 #endif
@@ -2421,7 +2494,6 @@ protected:
 
   fn install_trap_dispositions() throws -> void;
 
-  StringMap<u8> m_variable_attributes{heap_allocator()};
   StringMap<String> m_aliases{heap_allocator()};
   /* One entry per active function call, holding the bindings a local shadowed.
    */

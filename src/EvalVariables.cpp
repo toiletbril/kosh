@@ -380,7 +380,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
                  : String{heap_allocator()};
     case '-': return option_flags_string();
     case '#':
-      return String::from(m_positional_params.count(), heap_allocator());
+      return String::from(positional_params().count(), heap_allocator());
     case '0': return String{heap_allocator(), m_shell_name};
     case '_': return String{heap_allocator(), m_last_argument.view()};
 
@@ -395,17 +395,17 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       }
       let joined = String{heap_allocator()};
       usize joined_length = 0;
-      for (usize i = 0; i < m_positional_params.count(); i++)
-        joined_length += m_positional_params[i].count();
-      if (has_separator && m_positional_params.count() > 1) {
-        joined_length += m_positional_params.count() - 1;
+      for (usize i = 0; i < positional_params().count(); i++)
+        joined_length += positional_params()[i].count();
+      if (has_separator && positional_params().count() > 1) {
+        joined_length += positional_params().count() - 1;
       }
       joined.reserve(joined_length);
-      for (usize i = 0; i < m_positional_params.count(); i++) {
+      for (usize i = 0; i < positional_params().count(); i++) {
         if (i > 0 && has_separator) {
           joined.push(separator);
         }
-        joined.append(m_positional_params[i].view());
+        joined.append(positional_params()[i].view());
       }
       return joined;
     }
@@ -422,9 +422,9 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       let const parsed_index = name.to<i64>();
       if (parsed_index.is_error()) return None;
       let const index = static_cast<usize>(parsed_index.value());
-      if (index >= 1 && index <= m_positional_params.count()) {
-        ASSERT(index - 1 < m_positional_params.count());
-        return m_positional_params[index - 1];
+      if (index >= 1 && index <= positional_params().count()) {
+        ASSERT(index - 1 < positional_params().count());
+        return positional_params()[index - 1];
       }
       return None;
     }

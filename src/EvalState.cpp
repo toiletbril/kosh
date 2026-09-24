@@ -689,7 +689,7 @@ fn EvalContext::suggest_similar_variable_name(StringView name) const throws
           throws -> void { suggestion.consider(candidate); });
   /* A case-sensitive environment types the value as Nothing. The generic
      parameter keeps the folded branch uninstantiated there. */
-  m_exported_names.for_each(
+  exported_names().for_each(
       [&suggestion](StringView key, const auto &display_name) throws -> void {
         if constexpr (os::ENVIRONMENT_IS_CASE_SENSITIVE) {
           unused(display_name);
@@ -744,7 +744,7 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       m_shopt_option_values,
       m_functions,
       m_aliases,
-      m_positional_params,
+      positional_params(),
       m_bash_argument_arrays != nullptr
           ? static_cast<u32>(m_bash_argument_arrays->values.count())
           : u32{0},
@@ -756,15 +756,15 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
           ? m_bash_argument_frame_context->flags
           : u8{0},
       m_last_argument,
-      m_directory_stack,
+      directory_stack(),
       steal(working_directory),
       os::get_file_creation_mask(),
       m_traps,
       m_debug_trap_active_depth,
       m_err_trap_active_depth,
       m_did_reset_inherited_signal_traps,
-      m_variable_attributes,
-      m_exported_names,
+      variable_attributes(),
+      exported_names(),
       m_environment_undo_log.count(),
       RuntimeState::capture(*this),
       m_program_resolver,
@@ -809,7 +809,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_shopt_option_values = snapshot.shopt_option_values;
   m_functions = steal(snapshot.functions);
   m_aliases = steal(snapshot.aliases);
-  m_positional_params = steal(snapshot.positional_params);
+  positional_params() = steal(snapshot.positional_params);
   if (!snapshot.had_bash_argument_arrays) {
     reset_bash_argument_arrays();
   } else {
@@ -829,7 +829,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
     m_bash_argument_frame_context->flags =
         snapshot.bash_argument_frame_context_flags;
   m_last_argument = steal(snapshot.last_argument);
-  m_directory_stack = steal(snapshot.directory_stack);
+  directory_stack() = steal(snapshot.directory_stack);
 
   snapshot.runtime.restore(*this);
   m_program_resolver = steal(snapshot.program_resolver);
@@ -856,8 +856,8 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_coprocess_read_fd = snapshot.coprocess_read_fd;
   m_coprocess_write_fd = snapshot.coprocess_write_fd;
 
-  m_variable_attributes = steal(snapshot.variable_attributes);
-  m_exported_names = steal(snapshot.exported_names);
+  variable_attributes() = steal(snapshot.variable_attributes);
+  exported_names() = steal(snapshot.exported_names);
 
   /* A signal the subshell trapped that the parent does not is returned to
      default before the parent's dispositions are reinstalled. */

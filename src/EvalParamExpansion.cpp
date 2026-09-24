@@ -575,7 +575,7 @@ hot fn EvalContext::apply_parameter_expansion(
   if (spec.length > 1 && spec[0] == '#') {
     let const name = spec.substring(1);
     if (name == "@" || name == "*") {
-      return String::from(m_positional_params.count(), scratch_allocator());
+      return String::from(positional_params().count(), scratch_allocator());
     }
 
     /* ${#a[@]} is the element count, ${#a[i]} the length of one element. */

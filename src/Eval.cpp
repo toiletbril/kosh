@@ -42,8 +42,8 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
                          bool should_echo_expanded, bool shell_is_interactive,
                          bool should_error_exit, String shell_name,
                          ArrayList<String> positional_params)
-    : m_shell_name(steal(shell_name)),
-      m_positional_params(steal(positional_params)),
+    : m_variable_store(steal(positional_params)),
+      m_shell_name(steal(shell_name)),
       m_shell_is_interactive(shell_is_interactive)
 {
   set_no_glob(should_disable_path_expansion);
@@ -435,13 +435,13 @@ fn EvalContext::unset_shell_variable(StringView name) throws -> void
     disable_bash_special_array(bash_special_array_id::Aliases);
   if (should_disable_bash_directory_stack)
     disable_bash_special_array(bash_special_array_id::DirectoryStack);
-  m_variable_attributes.erase(name);
+  variable_attributes().erase(name);
 }
 
 fn EvalContext::disable_ignoreeof() throws -> void
 {
   force_unset_shell_variable("IGNOREEOF");
-  m_variable_attributes.erase("IGNOREEOF");
+  variable_attributes().erase("IGNOREEOF");
 }
 
 fn EvalContext::peel_caller_local_binding(StringView name) throws -> bool
@@ -489,15 +489,15 @@ fn EvalContext::restore_local_binding(local_binding &binding) throws -> void
     indexed_arrays().erase(binding.name.view());
   let const was_restricted = restricted_enforcement_active();
   m_runtime.set_option(shell_option_id::Restricted, false);
-  m_variable_attributes.erase(binding.name.view());
+  variable_attributes().erase(binding.name.view());
   defer
   {
     m_runtime.set_option(shell_option_id::Restricted, was_restricted);
     if (binding.previous_attributes != 0)
-      m_variable_attributes.set(binding.name.view(),
+      variable_attributes().set(binding.name.view(),
                                 binding.previous_attributes);
     else
-      m_variable_attributes.erase(binding.name.view());
+      variable_attributes().erase(binding.name.view());
   };
   clear_sparse_array(binding.name.view());
   for (usize i = 0; i < binding.previous_sparse_indices.count(); i++)
@@ -905,26 +905,26 @@ fn EvalContext::mark_exported(StringView name) throws -> void
   LOG(All, "marking '%.*s' as exported", static_cast<int>(name.length),
       name.data);
   if constexpr (os::ENVIRONMENT_IS_CASE_SENSITIVE) {
-    store_exported_name(m_exported_names, name, name);
+    store_exported_name(exported_names(), name, name);
     return;
   }
 
   char folded[EXPORTED_NAME_FOLD_BYTES];
   let spill = String{heap_allocator()};
-  store_exported_name(m_exported_names, fold_exported_name(name, folded, spill),
+  store_exported_name(exported_names(), fold_exported_name(name, folded, spill),
                       name);
 }
 
 fn EvalContext::unmark_exported(StringView name) throws -> void
 {
   if constexpr (os::ENVIRONMENT_IS_CASE_SENSITIVE) {
-    m_exported_names.erase(name);
+    exported_names().erase(name);
     return;
   }
 
   char folded[EXPORTED_NAME_FOLD_BYTES];
   let spill = String{heap_allocator()};
-  m_exported_names.erase(fold_exported_name(name, folded, spill));
+  exported_names().erase(fold_exported_name(name, folded, spill));
 }
 
 fn EvalContext::unexport_shell_variable(StringView name) throws -> void
@@ -946,11 +946,11 @@ fn EvalContext::unexport_shell_variable(StringView name) throws -> void
 fn EvalContext::is_exported(StringView name) const throws -> bool
 {
   if constexpr (os::ENVIRONMENT_IS_CASE_SENSITIVE)
-    return m_exported_names.find(name) != nullptr;
+    return exported_names().find(name) != nullptr;
 
   char folded[EXPORTED_NAME_FOLD_BYTES];
   let spill = String{heap_allocator()};
-  return m_exported_names.find(fold_exported_name(name, folded, spill)) !=
+  return exported_names().find(fold_exported_name(name, folded, spill)) !=
          nullptr;
 }
 
@@ -963,26 +963,15 @@ fn EvalContext::sync_exported_after_restore(StringView name,
     unmark_exported(name);
 }
 
-pure fn EvalContext::positional_params() const wontthrow
-    -> const ArrayList<String> &
-{
-  return m_positional_params;
-}
-
 fn EvalContext::set_positional_params(ArrayList<String> params) wontthrow
     -> void
 {
-  m_positional_params = steal(params);
-}
-
-fn EvalContext::directory_stack() wontthrow -> ArrayList<String> &
-{
-  return m_directory_stack;
+  variable_store().positional_params() = steal(params);
 }
 
 fn EvalContext::take_positional_params() wontthrow -> ArrayList<String>
 {
-  return steal(m_positional_params);
+  return steal(variable_store().positional_params());
 }
 
 pure fn EvalContext::is_bash_argument_array(StringView name) const wontthrow
@@ -1009,13 +998,13 @@ fn EvalContext::initialize_bash_argument_arrays(
                                BashArgumentFrameFlag::HasSourceArguments);
     let const uses_source_path = is_source_frame && !has_source_arguments;
     let const argument_count =
-        uses_source_path ? usize{1} : m_positional_params.count();
+        uses_source_path ? usize{1} : positional_params().count();
     values.reserve(argument_count);
     frame_counts.reserve(1);
     if (uses_source_path) {
       values.push_managed(m_bash_argument_frame_context->source_path);
     } else {
-      for (let const &argument : m_positional_params)
+      for (let const &argument : positional_params())
         values.push_managed(argument.view());
     }
     frame_counts.push(static_cast<u32>(argument_count));
@@ -1089,7 +1078,7 @@ fn EvalContext::append_current_bash_argument_frame() const throws -> void
   if (is_source_frame && !has_source_arguments) {
     append_bash_argument_frame(m_bash_argument_frame_context->source_path);
   } else {
-    append_bash_argument_frame(m_positional_params);
+    append_bash_argument_frame(positional_params());
   }
 }
 

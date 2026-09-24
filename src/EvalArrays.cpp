@@ -290,7 +290,7 @@ fn EvalContext::get_bash_directory_stack_element(
   }
 
   return String{allocator,
-                m_directory_stack[m_directory_stack.count() - index].view()};
+                directory_stack()[directory_stack().count() - index].view()};
 }
 
 fn EvalContext::set_bash_directory_stack_element(usize index,
@@ -299,7 +299,7 @@ fn EvalContext::set_bash_directory_stack_element(usize index,
 {
   if (index == 0 || index >= bash_directory_stack_element_count()) return;
 
-  m_directory_stack[m_directory_stack.count() - index] =
+  directory_stack()[directory_stack().count() - index] =
       String{heap_allocator(), value};
 }
 
@@ -638,7 +638,7 @@ fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
   let const previous_attributes = variable_attributes(name);
   let const previous_special_definition_location =
       special_variable_definition_location(name);
-  if (!should_inherit_value) m_variable_attributes.erase(name);
+  if (!should_inherit_value) variable_attributes().erase(name);
   unmark_readonly(name);
 
   /* The export mark is left in place, so a plain local keeps any inherited
@@ -827,7 +827,7 @@ fn EvalContext::apply_array_subscript(
           out.append(current_directory.text());
         else
           out.append(
-              m_directory_stack[m_directory_stack.count() - index].view());
+              directory_stack()[directory_stack().count() - index].view());
       }
       return out;
     }
