@@ -176,7 +176,7 @@ fn EvalContext::request_return(i64 status, SourceLocation location) throws
     -> void
 {
   LOG(Debug, "return requested, status %lld", (long long) status);
-  m_status_before_return = m_last_exit_status;
+  trap_store().m_status_before_return = m_last_exit_status;
   m_control_flow = control_flow{control_flow::Kind::Return, status, location,
                                 m_current_source, String{m_current_origin}};
 }
@@ -759,10 +759,10 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       directory_stack(),
       steal(working_directory),
       os::get_file_creation_mask(),
-      m_traps,
-      m_debug_trap_active_depth,
-      m_err_trap_active_depth,
-      m_did_reset_inherited_signal_traps,
+      trap_store().actions(),
+      trap_store().m_debug_trap_active_depth,
+      trap_store().m_err_trap_active_depth,
+      trap_store().m_did_reset_inherited_signal_traps,
       variable_attributes(),
       exported_names(),
       m_environment_undo_log.count(),
@@ -861,23 +861,23 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 
   /* A signal the subshell trapped that the parent does not is returned to
      default before the parent's dispositions are reinstalled. */
-  if (m_traps.count() != 0 || snapshot.traps.count() != 0) {
-    m_traps.for_each([&](StringView condition, const String &action) {
+  if (trap_store().actions().count() != 0 || snapshot.traps.count() != 0) {
+    trap_store().actions().for_each([&](StringView condition, const String &action) {
       unused(action);
       if (condition == "EXIT") return;
       if (snapshot.traps.find(condition) != nullptr) return;
       if (let const number = os::signal_number_from_name(condition))
         os::clear_trap_handler(*number);
     });
-    m_traps = steal(snapshot.traps);
+    trap_store().actions() = steal(snapshot.traps);
     install_trap_dispositions();
   } else {
-    m_traps = steal(snapshot.traps);
+    trap_store().actions() = steal(snapshot.traps);
   }
   refresh_trap_flags();
-  m_debug_trap_active_depth = snapshot.debug_trap_active_depth;
-  m_err_trap_active_depth = snapshot.err_trap_active_depth;
-  m_did_reset_inherited_signal_traps =
+  trap_store().m_debug_trap_active_depth = snapshot.debug_trap_active_depth;
+  trap_store().m_err_trap_active_depth = snapshot.err_trap_active_depth;
+  trap_store().m_did_reset_inherited_signal_traps =
       snapshot.did_reset_inherited_signal_traps;
 
   if (!os::restore_current_directory(snapshot.working_directory))
@@ -1335,7 +1335,7 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
   for (let const process : m_job_table.m_detached_job_processes)
     append_subshell_bootstrap_u32(body, do_reference_process(process));
 
-  append_subshell_bootstrap_u64(body, m_startup_ignored_signals);
+  append_subshell_bootstrap_u64(body, trap_store().m_startup_ignored_signals);
 
   if (body.count() > UINT32_MAX) throw std::bad_alloc{};
   append_subshell_bootstrap_u32(source, SUBSHELL_BOOTSTRAP_MAGIC);
@@ -1636,8 +1636,8 @@ fn EvalContext::apply_subshell_bootstrap(
   m_disabled_bash_special_arrays = disabled_bash_special_arrays;
   m_unset_dynamic_readers = unset_dynamic_readers;
   {
-    m_is_replaying_inherited_state = true;
-    defer { m_is_replaying_inherited_state = false; };
+    trap_store().m_is_replaying_inherited_state = true;
+    defer { trap_store().m_is_replaying_inherited_state = false; };
     run_source(bootstrap.payload.view().substring_of_length(
                    0, static_cast<usize>(bootstrap.source_length)),
                "inherited shell state");
@@ -1652,7 +1652,7 @@ fn EvalContext::apply_subshell_bootstrap(
   m_random_state = random_state;
   m_shell_start_time = shell_start_time;
   m_seconds_base = seconds_base;
-  m_startup_ignored_signals = startup_ignored_signals;
+  trap_store().m_startup_ignored_signals = startup_ignored_signals;
   m_getopts_char_index = getopts_char_index;
   m_getopts_last_optind = getopts_last_optind;
   m_shopt_option_overrides = shopt_option_overrides;

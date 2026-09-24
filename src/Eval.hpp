@@ -594,6 +594,47 @@ private:
   HashSet m_readonly{heap_allocator()};
 };
 
+class TrapStore
+{
+public:
+  fn actions() wontthrow -> StringMap<String> & { return m_actions; }
+  pure fn actions() const wontthrow -> const StringMap<String> &
+  {
+    return m_actions;
+  }
+  fn cached_bodies() wontthrow -> StringMap<FunctionBodyHandle> &
+  {
+    return m_cached_bodies;
+  }
+  pure fn cached_bodies() const wontthrow
+      -> const StringMap<FunctionBodyHandle> &
+  {
+    return m_cached_bodies;
+  }
+
+  bool m_has_debug_trap{false};
+  bool m_has_err_trap{false};
+  usize m_debug_trap_active_depth{0};
+  usize m_err_trap_active_depth{0};
+  bool m_is_replaying_inherited_state{false};
+  bool m_exit_trap_ran{false};
+  u8 m_running_trap_conditions{0};
+  bool m_did_reset_inherited_signal_traps{false};
+  u64 m_startup_ignored_signals{0};
+  u32 m_pending_child_trap_count{0};
+  u32 m_trap_action_depth{0};
+  usize m_trap_trigger_line_number{0};
+  usize m_trap_action_source_frame_count{0};
+  usize m_trap_action_function_depth{0};
+  Maybe<i32> m_trap_saved_exit_status{None};
+  i32 m_last_trap_action_status{0};
+  i32 m_status_before_return{0};
+
+private:
+  StringMap<String> m_actions{heap_allocator()};
+  StringMap<FunctionBodyHandle> m_cached_bodies{heap_allocator()};
+};
+
 class EvalContext
 {
 public:
@@ -637,6 +678,11 @@ public:
   pure fn function_arena() const wontthrow -> BumpArena *
   {
     return m_function_arena;
+  }
+  fn trap_store() wontthrow -> TrapStore & { return m_trap_store; }
+  pure fn trap_store() const wontthrow -> const TrapStore &
+  {
+    return m_trap_store;
   }
   fn function_store() wontthrow -> FunctionStore & { return m_function_store; }
   pure fn function_store() const wontthrow -> const FunctionStore &
@@ -1140,19 +1186,22 @@ public:
       -> void;
   pure fn status_before_return() const wontthrow -> i32
   {
-    return m_status_before_return;
+    return trap_store().m_status_before_return;
   }
-  pure fn has_debug_trap() const wontthrow -> bool { return m_has_debug_trap; }
-  pure fn has_err_trap() const wontthrow -> bool { return m_has_err_trap; }
+  pure fn has_debug_trap() const wontthrow -> bool { return trap_store().m_has_debug_trap; }
+  pure fn has_err_trap() const wontthrow -> bool { return trap_store().m_has_err_trap; }
   /* The two hot conditions carry a flag beside the map. Every write to the map
      refreshes the flag. The child wake is armed from the same place, because
      the CHLD action is the only reader of a reaped child. */
   fn refresh_trap_flags() wontthrow -> void
   {
-    m_has_debug_trap = m_traps.find(StringView{"DEBUG", 5}) != nullptr;
-    m_has_err_trap = m_traps.find(StringView{"ERR", 3}) != nullptr;
+    trap_store().m_has_debug_trap = trap_store().actions().find(StringView{"DEBUG", 5}) !=
+                       nullptr;
+    trap_store().m_has_err_trap = trap_store().actions().find(StringView{"ERR", 3}) !=
+                     nullptr;
 
-    let const *child_action = m_traps.find(StringView{"CHLD", 4});
+    let const *child_action =
+        trap_store().actions().find(StringView{"CHLD", 4});
     os::set_child_trap_armed(child_action != nullptr &&
                              child_action->count() > 0);
   }
@@ -1162,9 +1211,9 @@ public:
      step belongs to the shell. */
   pure fn should_run_err_trap() const wontthrow -> bool
   {
-    return !m_is_replaying_inherited_state &&
+    return !trap_store().m_is_replaying_inherited_state &&
            (m_runtime.option_is_enabled(shell_option_id::Errtrace) ||
-            nesting_depth() <= m_err_trap_active_depth);
+            nesting_depth() <= trap_store().m_err_trap_active_depth);
   }
   /* How deep the current frame sits inside function calls, subshells, and
      command substitutions together. Each of the three moves it by one. One
@@ -1175,18 +1224,18 @@ public:
   }
   pure fn should_run_debug_trap() const wontthrow -> bool
   {
-    return m_has_debug_trap && !is_posix_mode() &&
-           !m_is_replaying_inherited_state &&
+    return trap_store().m_has_debug_trap && !is_posix_mode() &&
+           !trap_store().m_is_replaying_inherited_state &&
            (m_runtime.option_is_enabled(shell_option_id::Functrace) ||
-            nesting_depth() <= m_debug_trap_active_depth);
+            nesting_depth() <= trap_store().m_debug_trap_active_depth);
   }
   /* The trap installed inside a frame keeps running once that frame is left.
      Leaving a frame lowers the depth each action is allowed to reach. */
   fn lower_trap_depths_to_current() wontthrow -> void
   {
     let const depth = nesting_depth();
-    if (m_debug_trap_active_depth > depth) m_debug_trap_active_depth = depth;
-    if (m_err_trap_active_depth > depth) m_err_trap_active_depth = depth;
+    if (trap_store().m_debug_trap_active_depth > depth) trap_store().m_debug_trap_active_depth = depth;
+    if (trap_store().m_err_trap_active_depth > depth) trap_store().m_err_trap_active_depth = depth;
   }
   /* A function call the trace option does not follow runs its body without the
      trap the caller installed. The body sees no trap listed and can install one
@@ -1195,22 +1244,22 @@ public:
   {
     return save_untraced_trap(StringView{"DEBUG", 5},
                               shell_option_id::Functrace,
-                              &m_debug_trap_active_depth);
+                              &trap_store().m_debug_trap_active_depth);
   }
   fn restore_untraced_debug_trap(saved_frame_trap &&saved) wontthrow -> void
   {
     restore_untraced_trap(StringView{"DEBUG", 5}, steal(saved),
-                          &m_debug_trap_active_depth);
+                          &trap_store().m_debug_trap_active_depth);
   }
   mustuse fn save_untraced_err_trap() throws -> saved_frame_trap
   {
     return save_untraced_trap(StringView{"ERR", 3}, shell_option_id::Errtrace,
-                              &m_err_trap_active_depth);
+                              &trap_store().m_err_trap_active_depth);
   }
   fn restore_untraced_err_trap(saved_frame_trap &&saved) wontthrow -> void
   {
     restore_untraced_trap(StringView{"ERR", 3}, steal(saved),
-                          &m_err_trap_active_depth);
+                          &trap_store().m_err_trap_active_depth);
   }
   mustuse fn save_untraced_return_trap() throws -> saved_frame_trap
   {
@@ -1234,55 +1283,55 @@ public:
   }
   pure fn is_running_trap_action() const wontthrow -> bool
   {
-    return m_trap_action_depth > 0;
+    return trap_store().m_trap_action_depth > 0;
   }
   /* A subshell is a fresh shell for the trap engine. No action is running
      inside it, and the condition that forked it fires again there. */
   pure fn get_running_trap_conditions() const wontthrow -> u8
   {
-    return m_running_trap_conditions;
+    return trap_store().m_running_trap_conditions;
   }
   fn set_running_trap_conditions(u8 conditions) wontthrow -> void
   {
-    m_running_trap_conditions = conditions;
+    trap_store().m_running_trap_conditions = conditions;
   }
   pure fn get_trap_action_depth() const wontthrow -> u32
   {
-    return m_trap_action_depth;
+    return trap_store().m_trap_action_depth;
   }
   fn set_trap_action_depth(u32 depth) wontthrow -> void
   {
-    m_trap_action_depth = depth;
+    trap_store().m_trap_action_depth = depth;
   }
   /* The status an exit with no operand reports inside a trap action. It is the
      status the shell had reached when the action began. The commands of the
      action itself replace that status in the ordinary exit status. */
   pure fn get_trap_saved_exit_status() const wontthrow -> Maybe<i32>
   {
-    return m_trap_saved_exit_status;
+    return trap_store().m_trap_saved_exit_status;
   }
   fn set_trap_saved_exit_status(Maybe<i32> status) wontthrow -> void
   {
-    m_trap_saved_exit_status = status;
+    trap_store().m_trap_saved_exit_status = status;
   }
   /* The status of the last trap action. It is recorded before the restoration
      returns the triggering command's own status. A condition that ran no action
      records zero. */
   pure fn get_last_trap_action_status() const wontthrow -> i32
   {
-    return m_last_trap_action_status;
+    return trap_store().m_last_trap_action_status;
   }
   /* The line $LINENO reports inside a trap action. It is the line of the
      command that fired the trap. A function or a sourced file the action enters
      carries its own lines. The answer is empty there. */
   pure fn trap_trigger_line_number() const wontthrow -> Maybe<usize>
   {
-    if (m_trap_action_depth == 0) return None;
-    if (m_source_frames.count() != m_trap_action_source_frame_count)
+    if (trap_store().m_trap_action_depth == 0) return None;
+    if (m_source_frames.count() != trap_store().m_trap_action_source_frame_count)
       return None;
-    if (m_function_call_depth != m_trap_action_function_depth) return None;
+    if (m_function_call_depth != trap_store().m_trap_action_function_depth) return None;
 
-    return m_trap_trigger_line_number;
+    return trap_store().m_trap_trigger_line_number;
   }
 
   /* Run the action of every signal whose flag the handler set, at the command
@@ -1301,11 +1350,11 @@ public:
 
   pure fn get_startup_ignored_signals() const wontthrow -> u64
   {
-    return is_bash_compatible() ? m_startup_ignored_signals : 0;
+    return is_bash_compatible() ? trap_store().m_startup_ignored_signals : 0;
   }
   fn set_startup_ignored_signals(u64 signals) wontthrow -> void
   {
-    m_startup_ignored_signals = signals;
+    trap_store().m_startup_ignored_signals = signals;
   }
   pure fn is_signal_ignored_at_startup(StringView condition) const wontthrow
       -> bool;
@@ -2388,7 +2437,6 @@ protected:
   /* The status the shell held when the return builtin last ran. The RETURN trap
      action reads this status, and the frame it leaves takes the status the
      return supplied only after the action has finished. */
-  i32 m_status_before_return{0};
 
   u64 m_last_command_duration_nanos{0};
 
@@ -2516,42 +2564,25 @@ protected:
   bool m_glob_exempt_for_test{false};
   usize m_getopts_char_index{1};
   i64 m_getopts_last_optind{0};
-  StringMap<String> m_traps{heap_allocator()};
-  StringMap<FunctionBodyHandle> m_trap_bodies{heap_allocator()};
-  bool m_has_debug_trap{false};
-  bool m_has_err_trap{false};
+  TrapStore m_trap_store{};
   /* The deepest frame the DEBUG action still reaches without functrace. An
      install records the frame it ran in, and a command deeper than that frame
      is not traced. */
-  usize m_debug_trap_active_depth{0};
   /* The same ceiling for the ERR action. Errtrace lifts it. */
-  usize m_err_trap_active_depth{0};
-  bool m_is_replaying_inherited_state{false};
-  bool m_exit_trap_ran{false};
   /* One bit for each named condition whose action is running. Only the
      condition that is running is blocked. A signal action still fires the DEBUG
      trap and a pending signal still drains inside a DEBUG action. */
-  u8 m_running_trap_conditions{0};
-  bool m_did_reset_inherited_signal_traps{false};
-  u64 m_startup_ignored_signals{0};
-  u32 m_pending_child_trap_count{0};
   /* Nonzero while a trap action evaluates. BASH_COMMAND keeps the command that
      triggered the trap. */
-  u32 m_trap_action_depth{0};
   /* The line of the command that fired the running trap, together with the
      source and function nesting the action itself runs at. The action is parsed
      as its own source, whose first line would otherwise be the only line
      $LINENO can report. The frame count is not the source depth, because a
      command substitution pushes a frame without entering a source. */
-  usize m_trap_trigger_line_number{0};
-  usize m_trap_action_source_frame_count{0};
-  usize m_trap_action_function_depth{0};
   /* The status the shell had reached when the innermost running action began.
      An exit with no operand inside that action reports it. */
-  Maybe<i32> m_trap_saved_exit_status{None};
   /* The status of the last trap action. The extdebug skip reads it once the
      DEBUG action has returned. */
-  i32 m_last_trap_action_status{0};
   /* The end of the source span a redirected wrapper holds for the subshell it
      evaluates next. Zero when no wrapper is waiting. */
   u32 m_pending_subshell_end_position{0};
