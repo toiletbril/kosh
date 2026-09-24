@@ -442,7 +442,7 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
   }
   let const results = batch.execute();
 
-  let output = String{heap_allocator()};
+  let output = String{allocator};
   i32 status = 0;
   for (usize root_index = 0; root_index < roots.count(); root_index++) {
     let const root = roots[root_index];
