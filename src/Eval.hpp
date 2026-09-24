@@ -2045,7 +2045,7 @@ public:
   }
   fn get_foreground_program_title_buffer() wontthrow -> String &
   {
-    return m_foreground_program_title_buffer;
+    return m_job_table.foreground_program_title_buffer();
   }
 
   /* Whether a builtin is running as a stage of a multi-stage pipeline. exec
@@ -2053,11 +2053,11 @@ public:
      the whole shell. */
   fn set_in_pipeline_stage(bool in_stage) wontthrow -> void
   {
-    m_is_in_pipeline_stage = in_stage;
+    m_job_table.set_in_pipeline_stage(in_stage);
   }
   pure fn is_in_pipeline_stage() const wontthrow -> bool
   {
-    return m_is_in_pipeline_stage;
+    return m_job_table.is_in_pipeline_stage();
   }
 
   /* Whether this process already built the command text of the stage it is
@@ -2066,11 +2066,11 @@ public:
      build it again. A fresh evaluator starts without it and builds its own. */
   fn set_stage_boundary_published(bool was_published) wontthrow -> void
   {
-    m_was_stage_boundary_published = was_published;
+    m_job_table.set_stage_boundary_published(was_published);
   }
   pure fn was_stage_boundary_published() const wontthrow -> bool
   {
-    return m_was_stage_boundary_published;
+    return m_job_table.was_stage_boundary_published();
   }
 
   /* The end of the source span a redirected wrapper holds for the subshell it
@@ -2559,12 +2559,9 @@ protected:
   bool m_terminal_exec_allowed{false};
   bool m_is_completion_function_running{false};
   bool m_is_prompt_command_running{false};
-  bool m_is_in_pipeline_stage{false};
-  bool m_was_stage_boundary_published{false};
   BumpArena m_prompt_command_arena{};
   String m_prompt_command_cached_text{heap_allocator()};
   Expression *m_prompt_command_cached_ast{nullptr};
-  String m_foreground_program_title_buffer{heap_allocator()};
 
   fn install_trap_dispositions() throws -> void;
 

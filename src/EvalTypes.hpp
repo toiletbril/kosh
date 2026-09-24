@@ -291,11 +291,35 @@ public:
   fn take_snapshot() throws -> job_table_snapshot;
   fn restore_snapshot(job_table_snapshot snapshot) throws -> void;
 
+  fn foreground_program_title_buffer() wontthrow -> String &
+  {
+    return m_foreground_program_title_buffer;
+  }
+  fn set_in_pipeline_stage(bool in_stage) wontthrow -> void
+  {
+    m_is_in_pipeline_stage = in_stage;
+  }
+  pure fn is_in_pipeline_stage() const wontthrow -> bool
+  {
+    return m_is_in_pipeline_stage;
+  }
+  fn set_stage_boundary_published(bool published) wontthrow -> void
+  {
+    m_was_stage_boundary_published = published;
+  }
+  pure fn was_stage_boundary_published() const wontthrow -> bool
+  {
+    return m_was_stage_boundary_published;
+  }
+
 private:
   Maybe<i64> m_last_background_pid{};
   ArrayList<job> m_jobs;
   ArrayList<os::process> m_detached_job_processes;
   i32 m_next_job_id{1};
+  String m_foreground_program_title_buffer{heap_allocator()};
+  bool m_is_in_pipeline_stage{false};
+  bool m_was_stage_boundary_published{false};
 };
 
 struct environment_undo_entry
