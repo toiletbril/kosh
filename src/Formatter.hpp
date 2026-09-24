@@ -37,7 +37,9 @@ struct source_fix
 
 fn format_shell_source(StringView source, mimic_mood mood, BumpArena &arena,
                        ArrayList<String> &errors,
-                       String *ast_output = nullptr) throws -> Maybe<String>;
+                       String *ast_output = nullptr,
+                       BumpArena *function_arena = nullptr) throws
+    -> Maybe<String>;
 
 fn format_bash_function_source(StringView source) throws -> String;
 

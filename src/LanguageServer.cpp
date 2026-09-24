@@ -805,12 +805,14 @@ fn Server::format_document(const JsonValue *id, const JsonValue *params) throws
   let formatted = Maybe<String>{};
   if (!document->format.is_host_format) {
     formatted = format_shell_source(document->normalized_source.view(),
-                                    document->mood, m_ast_arena, errors);
+                                    document->mood, m_ast_arena, errors, nullptr,
+                                    m_context.function_arena());
   } else {
     let replacements = ArrayList<parser_format_replacement>{heap_allocator()};
     for (let const &fragment : document->format.fragments) {
       let const formatted_fragment = format_shell_source(
-          fragment.shell_source.view(), fragment.mood, m_ast_arena, errors);
+          fragment.shell_source.view(), fragment.mood, m_ast_arena, errors,
+          nullptr, m_context.function_arena());
       if (!formatted_fragment.has_value()) break;
       let encoded = parser_format_encode(fragment, formatted_fragment->view());
       if (!encoded.has_value()) break;

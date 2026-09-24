@@ -1706,16 +1706,17 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
 
 fn validate_formatted_source(StringView source, mimic_mood mood,
                              BumpArena &arena, ArrayList<String> &errors,
-                             String *ast_output = nullptr) throws -> bool
+                             String *ast_output,
+                             BumpArena *function_arena) throws -> bool
 {
   let const mark = arena.mark();
-  let const function_mark = FUNCTION_ARENA != nullptr
-                                ? Maybe<BumpArena::Mark>{FUNCTION_ARENA->mark()}
+  let const function_mark = function_arena != nullptr
+                                ? Maybe<BumpArena::Mark>{function_arena->mark()}
                                 : None;
   defer
   {
     arena.release(mark);
-    if (function_mark.has_value()) FUNCTION_ARENA->release(*function_mark);
+    if (function_mark.has_value()) function_arena->release(*function_mark);
   };
   let parser = Parser{
       Lexer{source, arena, false, None, mood}
@@ -1731,8 +1732,8 @@ fn validate_formatted_source(StringView source, mimic_mood mood,
 } /* namespace */
 
 fn format_shell_source(StringView source, mimic_mood mood, BumpArena &arena,
-                       ArrayList<String> &errors, String *ast_output) throws
-    -> Maybe<String>
+                       ArrayList<String> &errors, String *ast_output,
+                       BumpArena *function_arena) throws -> Maybe<String>
 {
   let normalized = String{heap_allocator()};
   let source_view = source;
@@ -1742,14 +1743,15 @@ fn format_shell_source(StringView source, mimic_mood mood, BumpArena &arena,
     source_view = normalized.view();
   }
 
-  if (!validate_formatted_source(source_view, mood, arena, errors, ast_output))
+  if (!validate_formatted_source(source_view, mood, arena, errors, ast_output,
+                                 function_arena))
     return None;
   let const pieces = scan_format_pieces(source_view);
   append_long_string_warnings(source_view, pieces, None, errors);
   let formatted = render_format_pieces(pieces);
   let formatted_errors = ArrayList<String>{heap_allocator()};
   if (!validate_formatted_source(formatted.view(), mood, arena,
-                                 formatted_errors))
+                                 formatted_errors, nullptr, function_arena))
   {
     errors = steal(formatted_errors);
     return None;

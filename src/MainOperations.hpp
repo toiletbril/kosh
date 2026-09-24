@@ -824,7 +824,8 @@ static fn run_lint_document_contents(
 static fn format_document_source(StringView source, Maybe<StringView> filename,
                                  mimic_mood mood, BumpArena &ast_arena,
                                  ArrayList<String> &errors,
-                                 String *ast_output = nullptr) throws
+                                 String *ast_output = nullptr,
+                                 BumpArena *function_arena = nullptr) throws
     -> Maybe<String>
 {
   let const document =
@@ -835,14 +836,15 @@ static fn format_document_source(StringView source, Maybe<StringView> filename,
     return None;
   }
   if (!document.is_host_format)
-    return format_shell_source(source, mood, ast_arena, errors, ast_output);
+    return format_shell_source(source, mood, ast_arena, errors, ast_output,
+                               function_arena);
 
   let replacements = ArrayList<parser_format_replacement>{heap_allocator()};
   for (let const &fragment : document.fragments) {
     let fragment_ast = String{heap_allocator()};
     let const formatted = format_shell_source(
         fragment.shell_source.view(), fragment.mood, ast_arena, errors,
-        ast_output != nullptr ? &fragment_ast : nullptr);
+        ast_output != nullptr ? &fragment_ast : nullptr, function_arena);
     if (!formatted.has_value()) return None;
     if (ast_output != nullptr) {
       if (!ast_output->is_empty()) ast_output->push('\n');
@@ -2239,7 +2241,7 @@ static fn run_format_operation(const ArrayList<String> &file_names,
     let ast_output = String{heap_allocator()};
     let formatted = format_document_source(
         source.view(), source_name, mood, ast_arena, errors,
-        context.show_ast() ? &ast_output : nullptr);
+        context.show_ast() ? &ast_output : nullptr, context.function_arena());
     if (!formatted.has_value()) {
       for (let const &error : errors)
         show_message(error.view());
@@ -2334,7 +2336,8 @@ static fn run_lint_apply_operation(const ArrayList<String> &file_names,
       let errors = ArrayList<String>{heap_allocator()};
       let formatted =
           format_document_source(final_source.view(), file_name.view(),
-                                 context.mood(), ast_arena, errors);
+                                 context.mood(), ast_arena, errors, nullptr,
+                                 context.function_arena());
       if (!formatted.has_value()) {
         for (let const &error : errors)
           show_message(error.view());
