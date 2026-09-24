@@ -417,7 +417,9 @@ hot fn CompoundListCondition::evaluate_root_status_impl(
   double system_before = 0.0;
   u64 start_nanos = 0;
   if (m_cmd->is_timed()) {
-    os::children_cpu_seconds(user_before, system_before);
+    let const child_times = os::read_child_cpu_times();
+    user_before = child_times.user_seconds;
+    system_before = child_times.system_seconds;
     start_nanos = os::monotonic_nanos();
   }
 
@@ -427,7 +429,9 @@ hot fn CompoundListCondition::evaluate_root_status_impl(
     let const elapsed_nanos = os::monotonic_nanos() - start_nanos;
     double user_after = 0.0;
     double system_after = 0.0;
-    os::children_cpu_seconds(user_after, system_after);
+    let const child_times = os::read_child_cpu_times();
+    user_after = child_times.user_seconds;
+    system_after = child_times.system_seconds;
     let const rss_after = os::children_peak_rss_bytes();
     const double real_seconds =
         static_cast<double>(elapsed_nanos) / 1000000000.0;

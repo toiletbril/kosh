@@ -134,16 +134,18 @@ fn subshell_bootstrap::close_owned_processes() wontthrow -> void
   owns_processes = false;
 }
 
-fn divide_u128_by_u64(u64 high, u64 low, u64 divisor, u64 &remainder) wontthrow
-    -> u64
+fn divide_u128_by_u64(u64 high, u64 low, u64 divisor) wontthrow
+    -> u128_division_result
 {
   ASSERT(high < divisor);
 
 #if defined _MSC_VER && defined _M_X64 && !defined __clang__
-  return _udiv128(high, low, divisor, &remainder);
+  u64 remainder = 0;
+  let const quotient = _udiv128(high, low, divisor, &remainder);
+  return {quotient, remainder};
 #elif defined _MSC_VER
   u64 quotient = 0;
-  remainder = high;
+  u64 remainder = high;
 
   for (u32 bit_position = 64; bit_position > 0; bit_position--) {
     let const has_overflow = (remainder >> 63u) != 0;
@@ -154,11 +156,11 @@ fn divide_u128_by_u64(u64 high, u64 low, u64 divisor, u64 &remainder) wontthrow
     }
   }
 
-  return quotient;
+  return {quotient, remainder};
 #else
   let const dividend = (static_cast<u128>(high) << 64u) | low;
-  remainder = static_cast<u64>(dividend % divisor);
-  return static_cast<u64>(dividend / divisor);
+  return {static_cast<u64>(dividend / divisor),
+          static_cast<u64>(dividend % divisor)};
 #endif
 }
 

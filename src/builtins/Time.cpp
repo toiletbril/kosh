@@ -52,7 +52,9 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   LOG(Debug, "time running command '%s' under the clock", command.c_str());
 
   double user_before = 0, system_before = 0;
-  os::children_cpu_seconds(user_before, system_before);
+  let const child_times_before = os::read_child_cpu_times();
+  user_before = child_times_before.user_seconds;
+  system_before = child_times_before.system_seconds;
 
   /* The tail-exec optimization would replace the shell process on the final
      command, so the report would never print. The flag is cleared around the
@@ -70,7 +72,9 @@ cold fn Time::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const elapsed_nanos = os::monotonic_nanos() - start_nanos;
 
   double user_after = 0, system_after = 0;
-  os::children_cpu_seconds(user_after, system_after);
+  let const child_times_after = os::read_child_cpu_times();
+  user_after = child_times_after.user_seconds;
+  system_after = child_times_after.system_seconds;
   let const rss_after = os::children_peak_rss_bytes();
 
   let const real_seconds = static_cast<double>(elapsed_nanos) / 1000000000.0;

@@ -226,24 +226,22 @@ fn logged_in_users() throws -> ArrayList<user_session>
   return result;
 }
 
-fn write_system_log(StringView tag, StringView priority, StringView message,
-                    bool should_include_pid,
-                    bool should_copy_to_stderr) wontthrow -> bool
+fn write_system_log(const system_log_options &options) wontthrow -> bool
 {
-  let output = String{heap_allocator(), tag};
-  if (should_include_pid) {
+  let output = String{heap_allocator(), options.tag};
+  if (options.should_include_pid) {
     output += '[';
     output += String::from(GetCurrentProcessId(), heap_allocator());
     output += ']';
   }
   if (!output.is_empty()) output += ": ";
-  output += message;
+  output += options.message;
   output += '\n';
 
   WORD event_type = EVENTLOG_INFORMATION_TYPE;
-  let const dot = priority.find_character('.');
-  let const severity =
-      dot.has_value() ? priority.substring(*dot + 1) : priority;
+  let const dot = options.priority.find_character('.');
+  let const severity = dot.has_value() ? options.priority.substring(*dot + 1)
+                                       : options.priority;
   static constexpr static_string_entry<WORD> EVENT_TYPES[] = {
       {SSK("alert"),   EVENTLOG_ERROR_TYPE      },
       {SSK("crit"),    EVENTLOG_ERROR_TYPE      },

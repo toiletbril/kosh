@@ -991,15 +991,15 @@ static fn unix_time_to_file_time(i64 seconds, u32 nanoseconds,
   return true;
 }
 
-fn set_file_times(StringView path, i64 access_time, u32 access_nanoseconds,
-                  i64 modification_time, u32 modification_nanoseconds) wontthrow
+fn set_file_times(StringView path, const file_time_values &times) wontthrow
     -> bool
 {
   FILETIME access_file_time{};
   FILETIME modification_file_time{};
-  if (!unix_time_to_file_time(access_time, access_nanoseconds,
+  if (!unix_time_to_file_time(times.access_time, times.access_nanoseconds,
                               access_file_time) ||
-      !unix_time_to_file_time(modification_time, modification_nanoseconds,
+      !unix_time_to_file_time(times.modification_time,
+                              times.modification_nanoseconds,
                               modification_file_time))
   {
     SetLastError(ERROR_INVALID_PARAMETER);

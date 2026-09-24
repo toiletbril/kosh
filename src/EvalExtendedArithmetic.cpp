@@ -239,8 +239,10 @@ fn divide_small(ArrayList<u64> &limbs, u64 divisor) throws -> u64
 
   for (usize index = limbs.count(); index > 0; index--) {
     if ((index & 1023u) == 0) throw_if_arithmetic_interrupted();
-    limbs[index - 1] =
-        os::divide_u128_by_u64(remainder, limbs[index - 1], divisor, remainder);
+    let const division =
+        os::divide_u128_by_u64(remainder, limbs[index - 1], divisor);
+    limbs[index - 1] = division.quotient;
+    remainder = division.remainder;
   }
 
   trim_limbs(limbs);
@@ -811,10 +813,10 @@ fn ArithmeticValue::to_string(Allocator allocator) const throws -> String
          chunk_position++)
     {
       if ((chunk_position & 1023u) == 0) throw_if_arithmetic_interrupted();
-      u64 remainder = 0;
-      carry = os::divide_u128_by_u64(chunks[chunk_position], carry,
-                                     DECIMAL_CHUNK_BASE, remainder);
-      chunks[chunk_position] = remainder;
+      let const division = os::divide_u128_by_u64(
+          chunks[chunk_position], carry, DECIMAL_CHUNK_BASE);
+      carry = division.quotient;
+      chunks[chunk_position] = division.remainder;
     }
 
     while (carry != 0) {

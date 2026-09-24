@@ -710,21 +710,21 @@ fn touch_file_times(StringView path) wontthrow -> bool
   return did_succeed;
 }
 
-fn set_file_times(StringView path, i64 access_time, u32 access_nanoseconds,
-                  i64 modification_time, u32 modification_nanoseconds) wontthrow
+fn set_file_times(StringView path, const file_time_values &times) wontthrow
     -> bool
 {
   bool did_succeed;
   int saved_errno;
   {
     const String path_string{path};
-    const struct timespec times[2] = {
-        {static_cast<time_t>(access_time),
-         static_cast<long>(access_nanoseconds)      },
-        {static_cast<time_t>(modification_time),
-         static_cast<long>(modification_nanoseconds)}
+    const struct timespec native_times[2] = {
+        {static_cast<time_t>(times.access_time),
+         static_cast<long>(times.access_nanoseconds)      },
+        {static_cast<time_t>(times.modification_time),
+         static_cast<long>(times.modification_nanoseconds)}
     };
-    did_succeed = ::utimensat(AT_FDCWD, path_string.c_str(), times, 0) == 0;
+    did_succeed =
+        ::utimensat(AT_FDCWD, path_string.c_str(), native_times, 0) == 0;
     saved_errno = errno;
   }
   errno = saved_errno;

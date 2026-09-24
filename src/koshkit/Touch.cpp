@@ -219,15 +219,15 @@ fn Touch::execute(const ExecContext &ec, EvalContext &cxt,
             : 0;
     if (!os::set_file_times(
             operand.view(),
-            should_change_access ? selected_access_time
-                                 : current_status.access_time,
-            should_change_access ? selected_access_nanoseconds
-                                 : current_status.access_nanoseconds,
-            should_change_modification ? selected_modification_time
-                                       : current_status.modification_time,
-            should_change_modification
-                ? selected_modification_nanoseconds
-                : current_status.modification_nanoseconds))
+            {should_change_access ? selected_access_time
+                                  : current_status.access_time,
+             should_change_access ? selected_access_nanoseconds
+                                  : current_status.access_nanoseconds,
+             should_change_modification ? selected_modification_time
+                                        : current_status.modification_time,
+             should_change_modification
+                 ? selected_modification_nanoseconds
+                 : current_status.modification_nanoseconds}))
     {
       report_soft_koshkit_util_error(
           ec, cxt, args[0].view(),

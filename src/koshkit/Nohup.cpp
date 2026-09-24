@@ -48,9 +48,9 @@ fn Nohup::execute(const ExecContext &ec, EvalContext &cxt,
   let const home_value = cxt.get_variable_value("HOME");
   let const home = home_value.has_value() ? home_value->view() : StringView{};
   unused(cxt.materialize_kosh_identity());
-  let const result = os::run_nohup(command, ec.in_fd.value_or(KOSH_STDIN),
-                                   ec.out_fd.value_or(KOSH_STDOUT),
-                                   ec.err_fd.value_or(KOSH_STDERR), home);
+  let const result = os::run_nohup(
+      command, {ec.in_fd.value_or(KOSH_STDIN), ec.out_fd.value_or(KOSH_STDOUT),
+                ec.err_fd.value_or(KOSH_STDERR), home});
   if (!result.has_value()) {
     report_soft_koshkit_util_error(
         ec, cxt, operand_locations[0], args[0].view(),

@@ -601,8 +601,15 @@ fn make_fifo(StringView path, u32 mode) wontthrow -> bool;
 fn make_device_node(StringView path, u32 mode, u32 major_number,
                     u32 minor_number) wontthrow -> bool;
 fn touch_file_times(StringView path) wontthrow -> bool;
-fn set_file_times(StringView path, i64 access_time, u32 access_nanoseconds,
-                  i64 modification_time, u32 modification_nanoseconds) wontthrow
+struct file_time_values
+{
+  i64 access_time{0};
+  u32 access_nanoseconds{0};
+  i64 modification_time{0};
+  u32 modification_nanoseconds{0};
+};
+
+fn set_file_times(StringView path, const file_time_values &times) wontthrow
     -> bool;
 fn remove_directory(StringView path) wontthrow -> bool;
 fn remove_file(StringView path) wontthrow -> bool;
@@ -901,8 +908,14 @@ fn system_uptime_seconds() wontthrow -> Maybe<u64>;
 
 fn processor_model_name(Allocator allocator) throws -> Maybe<String>;
 
-fn divide_u128_by_u64(u64 high, u64 low, u64 divisor, u64 &remainder) wontthrow
-    -> u64;
+struct u128_division_result
+{
+  u64 quotient{0};
+  u64 remainder{0};
+};
+
+fn divide_u128_by_u64(u64 high, u64 low, u64 divisor) wontthrow
+    -> u128_division_result;
 
 fn current_executable_path() wontthrow -> Maybe<String>;
 
@@ -1879,8 +1892,13 @@ fn apply_terminal_settings(descriptor terminal,
 
 /* The user and system seconds this process's children have consumed so far,
    read from RUSAGE_CHILDREN. Windows has no equivalent and reports zero. */
-fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
-    -> void;
+struct child_cpu_times
+{
+  double user_seconds{0};
+  double system_seconds{0};
+};
+
+fn read_child_cpu_times() wontthrow -> child_cpu_times;
 
 fn children_peak_rss_bytes() wontthrow -> u64;
 
@@ -1920,11 +1938,27 @@ fn run_measured(const ArrayList<String> &argv,
 fn get_priority(i64 id, priority_target target) wontthrow -> Maybe<i32>;
 fn set_priority(i64 id, i32 priority, priority_target target) wontthrow -> bool;
 fn run_nice(const ArrayList<String> &argv, i32 increment) throws -> Maybe<i32>;
-fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
-             descriptor error, StringView home) throws -> Maybe<i32>;
-fn write_system_log(StringView tag, StringView priority, StringView message,
-                    bool should_include_pid,
-                    bool should_copy_to_stderr) wontthrow -> bool;
+struct nohup_options
+{
+  descriptor input{KOSH_INVALID_FD};
+  descriptor output{KOSH_INVALID_FD};
+  descriptor error{KOSH_INVALID_FD};
+  StringView home{};
+};
+
+fn run_nohup(const ArrayList<String> &argv,
+             const nohup_options &options) throws -> Maybe<i32>;
+
+struct system_log_options
+{
+  StringView tag{};
+  StringView priority{};
+  StringView message{};
+  bool should_include_pid{false};
+  bool should_copy_to_stderr{false};
+};
+
+fn write_system_log(const system_log_options &options) wontthrow -> bool;
 
 struct program_execution_options
 {

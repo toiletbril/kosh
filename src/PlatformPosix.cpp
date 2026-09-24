@@ -564,16 +564,14 @@ static pure fn system_log_priority(StringView priority) wontthrow -> int
   return PRIORITIES.find(name).value_or(LOG_NOTICE);
 }
 
-fn write_system_log(StringView tag, StringView priority, StringView message,
-                    bool should_include_pid,
-                    bool should_copy_to_stderr) wontthrow -> bool
+fn write_system_log(const system_log_options &options) wontthrow -> bool
 {
-  let tag_text = String{heap_allocator(), tag};
-  let message_text = String{heap_allocator(), message};
-  let options = should_include_pid ? LOG_PID : 0;
-  if (should_copy_to_stderr) options |= LOG_PERROR;
-  openlog(tag_text.is_empty() ? nullptr : tag_text.c_str(), options, 0);
-  syslog(system_log_priority(priority), "%s", message_text.c_str());
+  let tag_text = String{heap_allocator(), options.tag};
+  let message_text = String{heap_allocator(), options.message};
+  let log_options = options.should_include_pid ? LOG_PID : 0;
+  if (options.should_copy_to_stderr) log_options |= LOG_PERROR;
+  openlog(tag_text.is_empty() ? nullptr : tag_text.c_str(), log_options, 0);
+  syslog(system_log_priority(options.priority), "%s", message_text.c_str());
   closelog();
   return true;
 }

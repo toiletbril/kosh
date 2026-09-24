@@ -1199,19 +1199,18 @@ fn format_local_time(StringView format, i64 epoch) throws -> String
   };
 }
 
-fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
-    -> void
+fn read_child_cpu_times() wontthrow -> child_cpu_times
 {
+  child_cpu_times result{};
   struct rusage usage{};
-  if (getrusage(RUSAGE_CHILDREN, &usage) != 0) {
-    user_seconds = 0;
-    system_seconds = 0;
-    return;
-  }
-  user_seconds = static_cast<double>(usage.ru_utime.tv_sec) +
-                 static_cast<double>(usage.ru_utime.tv_usec) / 1000000.0;
-  system_seconds = static_cast<double>(usage.ru_stime.tv_sec) +
-                   static_cast<double>(usage.ru_stime.tv_usec) / 1000000.0;
+  if (getrusage(RUSAGE_CHILDREN, &usage) != 0) return result;
+  result.user_seconds = static_cast<double>(usage.ru_utime.tv_sec) +
+                        static_cast<double>(usage.ru_utime.tv_usec) /
+                            1000000.0;
+  result.system_seconds = static_cast<double>(usage.ru_stime.tv_sec) +
+                          static_cast<double>(usage.ru_stime.tv_usec) /
+                              1000000.0;
+  return result;
 }
 
 fn children_peak_rss_bytes() wontthrow -> u64
@@ -1468,12 +1467,12 @@ fn run_nice(const ArrayList<String> &argv, i32 increment) throws -> Maybe<i32>
   return None;
 }
 
-fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
-             descriptor error, StringView home) throws -> Maybe<i32>
+fn run_nohup(const ArrayList<String> &argv,
+             const nohup_options &options) throws -> Maybe<i32>
 {
   if (argv.is_empty()) return None;
   let const raw_argv = make_os_args(argv);
-  let home_output = String{heap_allocator(), home};
+  let home_output = String{heap_allocator(), options.home};
   if (!home_output.is_empty() && home_output.back() != '/') home_output += '/';
   home_output += "nohup.out";
 
@@ -1498,9 +1497,9 @@ fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
   if (child == 0) {
     close(exec_error_pipe[0]);
     signal(SIGHUP, SIG_IGN);
-    let child_input = input;
-    let child_output = output;
-    let child_error = error;
+    let child_input = options.input;
+    let child_output = options.output;
+    let child_error = options.error;
     int null_input = -1;
     int nohup_output = -1;
     if (isatty(child_input)) {
@@ -1509,7 +1508,7 @@ fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
     }
     if (isatty(child_output)) {
       nohup_output = open("nohup.out", O_WRONLY | O_APPEND | O_CREAT, 0600);
-      if (nohup_output == -1 && !home.is_empty())
+      if (nohup_output == -1 && !options.home.is_empty())
         nohup_output =
             open(home_output.c_str(), O_WRONLY | O_APPEND | O_CREAT, 0600);
       if (nohup_output == -1) {

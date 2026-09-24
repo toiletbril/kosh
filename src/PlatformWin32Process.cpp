@@ -111,8 +111,8 @@ fn run_nice(const ArrayList<String> &argv, i32 increment) throws -> Maybe<i32>
   return static_cast<i32>(result->exit_status);
 }
 
-fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
-             descriptor error, StringView home) throws -> Maybe<i32>
+fn run_nohup(const ArrayList<String> &argv,
+             const nohup_options &options) throws -> Maybe<i32>
 {
   if (argv.is_empty()) return None;
 
@@ -121,9 +121,9 @@ fn run_nohup(const ArrayList<String> &argv, descriptor input, descriptor output,
   inheritable.bInheritHandle = TRUE;
   HANDLE null_input = INVALID_HANDLE_VALUE;
   HANDLE nohup_output = INVALID_HANDLE_VALUE;
-  let child_input = input;
-  let child_output = output;
-  let child_error = error;
+  let child_input = options.input;
+  let child_output = options.output;
+  let child_error = options.error;
   defer
   {
     if (null_input != INVALID_HANDLE_VALUE) CloseHandle(null_input);
@@ -2061,15 +2061,16 @@ fn format_local_time(StringView format, i64 epoch) throws -> String
   };
 }
 
-fn children_cpu_seconds(double &user_seconds, double &system_seconds) wontthrow
-    -> void
+fn read_child_cpu_times() wontthrow -> child_cpu_times
 {
-  user_seconds = static_cast<double>(
+  child_cpu_times result{};
+  result.user_seconds = static_cast<double>(
                      InterlockedCompareExchange64(&CHILD_USER_TICKS, 0, 0)) /
                  10000000.0;
-  system_seconds = static_cast<double>(InterlockedCompareExchange64(
+  result.system_seconds = static_cast<double>(InterlockedCompareExchange64(
                        &CHILD_SYSTEM_TICKS, 0, 0)) /
                    10000000.0;
+  return result;
 }
 
 fn children_peak_rss_bytes() wontthrow -> u64
@@ -2093,7 +2094,9 @@ fn read_process_cpu_times() wontthrow -> cpu_times
     result.self_system_seconds =
         static_cast<double>(filetime_ticks(kernel_time)) / 10000000.0;
   }
-  children_cpu_seconds(result.child_user_seconds, result.child_system_seconds);
+  let const child_times = read_child_cpu_times();
+  result.child_user_seconds = child_times.user_seconds;
+  result.child_system_seconds = child_times.system_seconds;
 
   return result;
 }

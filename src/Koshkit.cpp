@@ -888,9 +888,9 @@ fn scaled_filesystem_blocks(u64 block_count, u64 block_size,
   let const high = static_cast<u64>(rounded_byte_count >> 64u);
   if (high >= output_unit) return UINT64_MAX;
 
-  u64 remainder = 0;
   return os::divide_u128_by_u64(high, static_cast<u64>(rounded_byte_count),
-                                output_unit, remainder);
+                                output_unit)
+      .quotient;
 }
 
 fn filesystem_usage_percent(u64 used, u64 available) wontthrow -> u64
@@ -899,10 +899,10 @@ fn filesystem_usage_percent(u64 used, u64 available) wontthrow -> u64
   if (capacity_base == 0) return 0;
 
   let const numerator = static_cast<u128>(used) * 100 + capacity_base - 1;
-  u64 remainder = 0;
   return os::divide_u128_by_u64(static_cast<u64>(numerator >> 64u),
                                 static_cast<u64>(numerator),
-                                static_cast<u64>(capacity_base), remainder);
+                                static_cast<u64>(capacity_base))
+      .quotient;
 }
 
 pure fn file_type_name(const os::file_status &status) wontthrow -> StringView
