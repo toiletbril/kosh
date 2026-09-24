@@ -893,7 +893,7 @@ fn append_session_report(String &output, bool should_color,
                      colors::ansi::BOLD_CYAN);
   }
   for (let const &row : rows) {
-    let cells = ArrayList<report_table_cell_view>{heap_allocator()};
+    let cells = ArrayList<report_table_cell_view>{allocator};
     cells.push({row.user.view(), colors::ansi::BOLD_GREEN});
     cells.push({row.terminal.view(), colors::ansi::RESET});
     if (should_show_detail) {
