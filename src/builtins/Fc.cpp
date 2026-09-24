@@ -374,11 +374,11 @@ static fn edit_fc_commands(const ExecContext &ec, EvalContext &cxt,
 
   edited->normalize_crlf_line_endings();
   let const ast_mark = cxt.parse_arena()->mark();
-  let const function_mark = FUNCTION_ARENA->mark();
+  let const function_mark = cxt.function_arena()->mark();
   {
     defer
     {
-      FUNCTION_ARENA->release(function_mark);
+      cxt.function_arena()->release(function_mark);
       cxt.parse_arena()->release(ast_mark);
     };
     let parser = Parser{

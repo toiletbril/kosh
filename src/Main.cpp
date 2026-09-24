@@ -227,6 +227,7 @@ fn kosh_main(int argc, char **argv) -> int
       let context = koshka::EvalContext{
           false, false, false, false, false, koshka::String{invocation}};
       context.set_parse_arena(&ast_arena);
+      context.set_function_arena(&function_arena);
 
       koshka::ArrayList<koshka::String> operands{koshka::heap_allocator()};
       operands.reserve(static_cast<usize>(argc - 1));
@@ -922,6 +923,7 @@ fn kosh_main(int argc, char **argv) -> int
   let function_arena = koshka::BumpArena{};
   koshka::FUNCTION_ARENA = &function_arena;
   context.set_parse_arena(&ast_arena);
+  context.set_function_arena(&function_arena);
 
   if (is_language_server)
     return koshka::language_server::run(context, ast_arena);

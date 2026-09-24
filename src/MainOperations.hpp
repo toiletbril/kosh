@@ -506,7 +506,7 @@ static fn run_script_contents(
        that defined it, and that arena is never reset. */
     let function_arena_scope = FunctionArenaScope{
         (should_stream_units || should_stream_execution) ? nullptr
-                                                         : FUNCTION_ARENA};
+                                                         : context.function_arena()};
 
     /* A file with any parse error must not run, so every error is collected
        and reported at once. */

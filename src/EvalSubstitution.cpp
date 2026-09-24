@@ -362,7 +362,7 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
   defer { leave_substitution(); };
 
   let cache_arena = segment.is_substitution_cache_in_function_arena
-                        ? FUNCTION_ARENA
+                        ? function_arena()
                         : parse_arena();
   ASSERT(cache_arena != nullptr);
   let const did_push_source_frame = push_substitution_source_frame(
@@ -737,7 +737,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
     throw Error{"Function substitution outside of a parse"};
 
   let cache_arena = segment.is_substitution_cache_in_function_arena
-                        ? FUNCTION_ARENA
+                        ? function_arena()
                         : parse_arena();
   ASSERT(cache_arena != nullptr);
   let const did_push_source_frame = push_substitution_source_frame(

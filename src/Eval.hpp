@@ -410,6 +410,14 @@ public:
   {
     return m_parse_arena;
   }
+  fn set_function_arena(BumpArena *arena) wontthrow
+  {
+    m_function_arena = arena;
+  }
+  pure fn function_arena() const wontthrow -> BumpArena *
+  {
+    return m_function_arena;
+  }
   mustuse fn scratch_mark() const wontthrow -> BumpArena::Mark
   {
     return m_scratch_arena.mark();
@@ -2053,6 +2061,7 @@ protected:
 
   mutable BumpArena m_scratch_arena{};
   BumpArena *m_parse_arena{nullptr};
+  BumpArena *m_function_arena{nullptr};
   StringMap<String> m_shell_variables{heap_allocator()};
   StringMap<SourceLocation> m_special_variable_definition_locations{
       heap_allocator()};
