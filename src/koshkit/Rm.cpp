@@ -54,7 +54,7 @@ static fn remove_path_impl(StringView path, removal_mode mode,
     -> bool
 {
   let const is_recursive = mode == removal_mode::Recursive;
-  let const target = Path{path};
+  let const target = Path{path, allocator};
   let is_directory = false;
   let is_symbolic_link = false;
   if (known_kind == Path::entry_kind::Unknown) {
@@ -95,7 +95,7 @@ static fn remove_path_with_prompt(const ExecContext &ec, EvalContext &cxt,
     -> bool
 {
   let const is_recursive = mode == removal_mode::Recursive;
-  let const target = Path{path};
+  let const target = Path{path, allocator};
   let is_directory = false;
   let is_symbolic_link = false;
   if (known_kind == Path::entry_kind::Unknown) {
@@ -164,7 +164,7 @@ static fn report_dry_run_removal(const ExecContext &ec, EvalContext &cxt,
     -> bool
 {
   let const is_recursive = mode == removal_mode::Recursive;
-  let const target = Path{path};
+  let const target = Path{path, allocator};
   let is_directory = false;
   let is_symbolic_link = false;
   if (known_kind == Path::entry_kind::Unknown) {

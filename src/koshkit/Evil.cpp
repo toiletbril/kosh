@@ -36,7 +36,7 @@ namespace {
 
 fn read_first_line(StringView path, Allocator allocator) throws -> Maybe<String>
 {
-  let const body = Path{path}.read_entire_file();
+  let const body = Path{path, allocator}.read_entire_file();
   if (!body.has_value()) return None;
 
   let const view = body->view();

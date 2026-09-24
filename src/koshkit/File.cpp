@@ -346,7 +346,7 @@ static fn append_magic_database(StringView path,
                                 ArrayList<file_magic_rule> &rules,
                                 Allocator allocator) throws -> bool
 {
-  let const contents = Path{path}.read_entire_file();
+  let const contents = Path{path, allocator}.read_entire_file();
   if (!contents.has_value()) return false;
 
   usize position = 0;

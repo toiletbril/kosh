@@ -288,7 +288,7 @@ fn GoodNode::execute(
     let found = String{allocator};
     let const root = FLAG_GOODNODE_ROOT.is_set() ? FLAG_GOODNODE_ROOT.value()
                                                  : StringView{"."};
-    let const root_path = Path{root};
+    let const root_path = Path{root, allocator};
     let const inode = static_cast<u64>(parsed.value());
     if (let canonical_root = os::canonical_path(root_path);
         canonical_root.has_value() &&

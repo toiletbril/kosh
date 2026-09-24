@@ -748,7 +748,10 @@ fn parse_flags(const FlagList &flags, int argc, const char *const *argv,
           error_message += "Unknown flag '-";
 
           if (!is_long) {
-            error_message.push(*flag_offset);
+            let const flag_view = StringView{flag_offset};
+            let const decoded = utils::decode_utf8(flag_view, 0, 0);
+            let const byte_count = decoded.length > 1 ? decoded.length : 1;
+            error_message += flag_view.substring_of_length(0, byte_count);
           } else {
             error_message += "-";
 
