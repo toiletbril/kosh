@@ -490,6 +490,90 @@ private:
   usize m_local_scope_depth{0};
 };
 
+class ExecutionStore
+{
+public:
+  explicit ExecutionStore(bool shell_is_interactive = false) wontthrow
+      : m_shell_is_interactive(shell_is_interactive)
+  {}
+
+  fn last_exit_status() wontthrow -> i32 & { return m_last_exit_status; }
+  pure fn last_exit_status() const wontthrow -> i32
+  {
+    return m_last_exit_status;
+  }
+  fn last_command_duration_nanos() wontthrow -> u64 &
+  {
+    return m_last_command_duration_nanos;
+  }
+  pure fn last_command_duration_nanos() const wontthrow -> u64
+  {
+    return m_last_command_duration_nanos;
+  }
+  fn subshell_depth() wontthrow -> usize & { return m_subshell_depth; }
+  pure fn subshell_depth() const wontthrow -> usize { return m_subshell_depth; }
+  fn condition_depth() wontthrow -> usize & { return m_condition_depth; }
+  pure fn condition_depth() const wontthrow -> usize
+  {
+    return m_condition_depth;
+  }
+  fn loop_depth() wontthrow -> usize & { return m_loop_depth; }
+  pure fn loop_depth() const wontthrow -> usize { return m_loop_depth; }
+  fn terminal_exec_allowed() wontthrow -> bool &
+  {
+    return m_terminal_exec_allowed;
+  }
+  pure fn terminal_exec_allowed() const wontthrow -> bool
+  {
+    return m_terminal_exec_allowed;
+  }
+  fn completion_function_running() wontthrow -> bool &
+  {
+    return m_is_completion_function_running;
+  }
+  pure fn completion_function_running() const wontthrow -> bool
+  {
+    return m_is_completion_function_running;
+  }
+  fn prompt_command_running() wontthrow -> bool &
+  {
+    return m_is_prompt_command_running;
+  }
+  pure fn prompt_command_running() const wontthrow -> bool
+  {
+    return m_is_prompt_command_running;
+  }
+  fn pending_subshell_end_position() wontthrow -> u32 &
+  {
+    return m_pending_subshell_end_position;
+  }
+  fn should_elide_pending_subshell_fork() wontthrow -> bool &
+  {
+    return m_should_elide_pending_subshell_fork;
+  }
+  pure fn shell_is_interactive() const wontthrow -> bool
+  {
+    return m_shell_is_interactive;
+  }
+  fn set_shell_is_interactive(bool enabled) wontthrow -> void
+  {
+    m_shell_is_interactive = enabled;
+  }
+
+private:
+  i32 m_last_exit_status{0};
+  u64 m_last_command_duration_nanos{0};
+  usize m_subshell_depth{0};
+  usize m_condition_depth{0};
+  usize m_loop_depth{0};
+  u32 m_pending_subshell_end_position{0};
+  bool m_should_elide_pending_subshell_fork{false};
+  bool m_terminal_exec_allowed{false};
+  bool m_is_completion_function_running{false};
+  bool m_is_prompt_command_running{false};
+  bool m_shell_is_interactive{false};
+};
+
 class NameValueArg
 {
 public:
@@ -1156,6 +1240,14 @@ public:
   {
     return m_scope_store;
   }
+  fn execution_store() wontthrow -> ExecutionStore &
+  {
+    return m_execution_store;
+  }
+  pure fn execution_store() const wontthrow -> const ExecutionStore &
+  {
+    return m_execution_store;
+  }
   pure fn expansion_store() const wontthrow -> const ExpansionStore &
   {
     return m_expansion_store;
@@ -1707,7 +1799,7 @@ public:
      number orders every frame the DEBUG and ERR traps care about. */
   pure fn nesting_depth() const wontthrow -> usize
   {
-    return function_store().call_depth() + m_subshell_depth +
+    return function_store().call_depth() + execution_store().subshell_depth() +
            expansion_store().substitution_depth();
   }
   pure fn should_run_debug_trap() const wontthrow -> bool
@@ -2566,19 +2658,19 @@ public:
 
   fn set_completion_function_running(bool running) wontthrow -> void
   {
-    m_is_completion_function_running = running;
+    execution_store().completion_function_running() = running;
   }
   pure fn is_completion_function_running() const wontthrow -> bool
   {
-    return m_is_completion_function_running;
+    return execution_store().completion_function_running();
   }
   fn set_prompt_command_running(bool running) wontthrow -> void
   {
-    m_is_prompt_command_running = running;
+    execution_store().prompt_command_running() = running;
   }
   pure fn is_prompt_command_running() const wontthrow -> bool
   {
-    return m_is_prompt_command_running;
+    return execution_store().prompt_command_running();
   }
   fn get_prompt_command_arena() wontthrow -> BumpArena &
   {
@@ -2633,24 +2725,25 @@ public:
      publishes its own span. */
   fn set_pending_subshell_end_position(u32 end_position) wontthrow -> void
   {
-    m_pending_subshell_end_position = end_position;
+    execution_store().pending_subshell_end_position() = end_position;
   }
   fn take_pending_subshell_end_position() wontthrow -> u32
   {
-    let const end_position = m_pending_subshell_end_position;
-    m_pending_subshell_end_position = 0;
+    let const end_position = execution_store().pending_subshell_end_position();
+    execution_store().pending_subshell_end_position() = 0;
 
     return end_position;
   }
 
   fn set_pending_subshell_fork_elision() wontthrow -> void
   {
-    m_should_elide_pending_subshell_fork = true;
+    execution_store().should_elide_pending_subshell_fork() = true;
   }
   fn take_pending_subshell_fork_elision() wontthrow -> bool
   {
-    let const should_elide = m_should_elide_pending_subshell_fork;
-    m_should_elide_pending_subshell_fork = false;
+    let const should_elide =
+        execution_store().should_elide_pending_subshell_fork();
+    execution_store().should_elide_pending_subshell_fork() = false;
 
     return should_elide;
   }
@@ -2932,12 +3025,10 @@ protected:
      splitting does not look it up per word. */
   VariableStore m_variable_store{};
   pure fn is_field_separator(char c) const wontthrow -> bool;
-  i32 m_last_exit_status{0};
+  ExecutionStore m_execution_store{};
   /* The status the shell held when the return builtin last ran. The RETURN trap
      action reads this status, and the frame it leaves takes the status the
      return supplied only after the action has finished. */
-
-  u64 m_last_command_duration_nanos{0};
 
   String m_shell_name{heap_allocator()};
   String m_shell_executable_path{heap_allocator()};
@@ -2950,7 +3041,6 @@ protected:
      The lazily allocated object stores flattened values and one count per
      frame. */
   FunctionStore m_function_store{};
-  usize m_subshell_depth{0};
   /* The shell descriptors the live coprocess is reached through, -1 when no
      coprocess runs. Only one coprocess is live at a time, the way bash counts
      them. */
@@ -2960,8 +3050,6 @@ protected:
      as a stack so leave_subshell unwinds its own depth's entries in reverse. */
   ArrayList<subshell_saved_descriptor> m_subshell_saved_descriptors{
       heap_allocator()};
-  usize m_condition_depth{0};
-  usize m_loop_depth{0};
 
   /* The prior values of process-environment names written while a subshell ran,
      rewound by restore_state on the subshell's exit. The log is appended to
@@ -3037,11 +3125,6 @@ protected:
      DEBUG action has returned. */
   /* The end of the source span a redirected wrapper holds for the subshell it
      evaluates next. Zero when no wrapper is waiting. */
-  u32 m_pending_subshell_end_position{0};
-  bool m_should_elide_pending_subshell_fork{false};
-  bool m_terminal_exec_allowed{false};
-  bool m_is_completion_function_running{false};
-  bool m_is_prompt_command_running{false};
   BumpArena m_prompt_command_arena{};
   String m_prompt_command_cached_text{heap_allocator()};
   Expression *m_prompt_command_cached_ast{nullptr};
@@ -3053,7 +3136,6 @@ protected:
   ScopeStore m_scope_store{};
 
   JobTable m_job_table{heap_allocator()};
-  bool m_shell_is_interactive;
 
   fn option_flags_string() const throws -> String;
 

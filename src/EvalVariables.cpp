@@ -373,7 +373,9 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 
   if (name.count() == 1) {
     switch (first_byte) {
-    case '?': return String::from(m_last_exit_status, heap_allocator());
+    case '?':
+      return String::from(execution_store().last_exit_status(),
+                          heap_allocator());
     case '$': return String::from(os::get_shell_process_id(), heap_allocator());
     case '!':
       return m_job_table.m_last_background_pid
@@ -567,7 +569,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
             return String{heap_allocator(), m_execution_string.view()};
           break;
         case dynamic_var::BASH_SUBSHELL:
-          return String::from(static_cast<i64>(m_subshell_depth),
+          return String::from(
+              static_cast<i64>(execution_store().subshell_depth()),
                               heap_allocator());
         case dynamic_var::BASH_SOURCE:
           return String{heap_allocator(), bash_source_frame_at(0)};

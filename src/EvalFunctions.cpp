@@ -394,7 +394,7 @@ fn EvalContext::run_named_trap(StringView condition,
     trap_store().m_trap_action_function_depth = saved_action_function_depth;
   };
 
-  let const saved_exit_status = m_last_exit_status;
+  let const saved_exit_status = execution_store().last_exit_status();
   let const *current_pipe_statuses = indexed_arrays().find("PIPESTATUS");
   let const has_saved_pipe_statuses = current_pipe_statuses != nullptr;
   ArrayList<String> saved_pipe_statuses{heap_allocator()};
@@ -411,8 +411,8 @@ fn EvalContext::run_named_trap(StringView condition,
   let was_pipe_status_restored = false;
   defer
   {
-    trap_store().m_last_trap_action_status = m_last_exit_status;
-    m_last_exit_status = saved_exit_status;
+    trap_store().m_last_trap_action_status = execution_store().last_exit_status();
+    execution_store().last_exit_status() = saved_exit_status;
 
     if (!was_pipe_status_restored) {
       restore_trap_pipe_statuses(has_saved_pipe_statuses,
@@ -463,9 +463,9 @@ fn EvalContext::run_return_trap(i32 status_before_return) throws -> void
 {
   /* Bash never applies the status the return supplied before the action runs.
      The action reads the status the last command of the frame left. */
-  let const saved_exit_status = m_last_exit_status;
-  m_last_exit_status = status_before_return;
-  defer { m_last_exit_status = saved_exit_status; };
+  let const saved_exit_status = execution_store().last_exit_status();
+  execution_store().last_exit_status() = status_before_return;
+  defer { execution_store().last_exit_status() = saved_exit_status; };
 
   let frame_control_flow = steal(m_control_flow);
   clear_control_flow();
@@ -682,7 +682,7 @@ fn EvalContext::run_pending_traps() throws -> void
     os::clear_reaped_child_arrival();
   }
 
-  let const saved_exit_status = m_last_exit_status;
+  let const saved_exit_status = execution_store().last_exit_status();
   let const *current_pipe_statuses = indexed_arrays().find("PIPESTATUS");
   let const has_saved_pipe_statuses = current_pipe_statuses != nullptr;
   ArrayList<String> saved_pipe_statuses{heap_allocator()};
@@ -696,7 +696,7 @@ fn EvalContext::run_pending_traps() throws -> void
   let was_pipe_status_restored = false;
   defer
   {
-    m_last_exit_status = saved_exit_status;
+    execution_store().last_exit_status() = saved_exit_status;
 
     if (!was_pipe_status_restored) {
       restore_trap_pipe_statuses(has_saved_pipe_statuses,
@@ -791,7 +791,8 @@ cold fn EvalContext::run_exit_trap(Maybe<i32> final_status) throws -> void
   if (trap_store().m_exit_trap_ran) return;
   trap_store().m_exit_trap_ran = true;
 
-  if (final_status.has_value()) m_last_exit_status = *final_status;
+  if (final_status.has_value())
+    execution_store().last_exit_status() = *final_status;
 
   /* A Ctrl-C that ended the last command leaves the interrupt flag set, so it
      is dropped before the action evaluates. */
@@ -800,7 +801,7 @@ cold fn EvalContext::run_exit_trap(Maybe<i32> final_status) throws -> void
   trap_store().m_trap_action_depth += 1;
   defer { trap_store().m_trap_action_depth -= 1; };
 
-  let const saved_exit_status = m_last_exit_status;
+  let const saved_exit_status = execution_store().last_exit_status();
   let const *current_pipe_statuses = indexed_arrays().find("PIPESTATUS");
   let const has_saved_pipe_statuses = current_pipe_statuses != nullptr;
   ArrayList<String> saved_pipe_statuses{heap_allocator()};
@@ -816,7 +817,7 @@ cold fn EvalContext::run_exit_trap(Maybe<i32> final_status) throws -> void
   let was_pipe_status_restored = false;
   defer
   {
-    m_last_exit_status = saved_exit_status;
+    execution_store().last_exit_status() = saved_exit_status;
 
     if (!was_pipe_status_restored) {
       restore_trap_pipe_statuses(has_saved_pipe_statuses,
@@ -857,7 +858,7 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> Maybe<i32>
   trap_store().m_trap_action_depth += 1;
   defer { trap_store().m_trap_action_depth -= 1; };
 
-  let const saved_exit_status = m_last_exit_status;
+  let const saved_exit_status = execution_store().last_exit_status();
   let const *current_pipe_statuses = indexed_arrays().find("PIPESTATUS");
   let const has_saved_pipe_statuses = current_pipe_statuses != nullptr;
   ArrayList<String> saved_pipe_statuses{heap_allocator()};
@@ -873,7 +874,7 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> Maybe<i32>
   let was_pipe_status_restored = false;
   defer
   {
-    m_last_exit_status =
+    execution_store().last_exit_status() =
         requested_status.has_value() ? *requested_status : saved_exit_status;
 
     if (!was_pipe_status_restored) {

@@ -802,7 +802,7 @@ fn EvalContext::write_xtrace(StringView command) throws -> void
   let trace = String{scratch_allocator()};
   let const ps4 = get_variable_value("PS4").value_or(String{"+ "});
   if (!ps4.is_empty()) {
-    for (usize i = 0; i < m_subshell_depth; i++)
+    for (usize i = 0; i < execution_store().subshell_depth(); i++)
       trace.push(ps4[0]);
     trace.append(ps4.view());
   }

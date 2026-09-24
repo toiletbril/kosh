@@ -61,53 +61,59 @@ fn EvalContext::set_shopt_option(StringView name, bool is_enabled) throws
 
 fn EvalContext::enter_subshell() wontthrow -> void
 {
-  m_subshell_depth++;
-  LOG(Debug, "entered a subshell, depth now %zu", m_subshell_depth);
+  execution_store().subshell_depth()++;
+  LOG(Debug, "entered a subshell, depth now %zu",
+      execution_store().subshell_depth());
 }
 
 pure fn EvalContext::get_subshell_depth() const wontthrow -> usize
 {
-  return m_subshell_depth;
+  return execution_store().subshell_depth();
 }
 
 fn EvalContext::set_subshell_depth(usize depth) wontthrow -> void
 {
-  m_subshell_depth = depth;
+  execution_store().subshell_depth() = depth;
   lower_trap_depths_to_current();
 }
 
 fn EvalContext::leave_subshell() wontthrow -> void
 {
-  ASSERT(m_subshell_depth > 0);
+  ASSERT(execution_store().subshell_depth() > 0);
   /* Stacked exec moves unwind newest first so the descriptors land back in
      order. */
   while (!m_subshell_saved_descriptors.is_empty() &&
-         m_subshell_saved_descriptors.back().depth == m_subshell_depth)
+         m_subshell_saved_descriptors.back().depth ==
+             execution_store().subshell_depth())
   {
     LOG(Debug, "restoring descriptor %d a subshell exec moved at depth %zu",
-        m_subshell_saved_descriptors.back().saved.shell_fd, m_subshell_depth);
+        m_subshell_saved_descriptors.back().saved.shell_fd,
+        execution_store().subshell_depth());
     os::restore_descriptor(m_subshell_saved_descriptors.back().saved);
     m_subshell_saved_descriptors.remove(m_subshell_saved_descriptors.count() -
                                         1);
   }
-  m_subshell_depth--;
+  execution_store().subshell_depth()--;
   lower_trap_depths_to_current();
-  LOG(Debug, "left a subshell, depth now %zu", m_subshell_depth);
+  LOG(Debug, "left a subshell, depth now %zu",
+      execution_store().subshell_depth());
 }
 
 fn EvalContext::snapshot_subshell_descriptor(i32 shell_fd) throws -> void
 {
-  if (m_subshell_depth == 0) return;
+  if (execution_store().subshell_depth() == 0) return;
   for (let const &entry : m_subshell_saved_descriptors) {
-    if (entry.depth == m_subshell_depth && entry.saved.shell_fd == shell_fd) {
+    if (entry.depth == execution_store().subshell_depth() &&
+        entry.saved.shell_fd == shell_fd) {
       return;
     }
   }
   LOG(Debug,
       "backing up descriptor %d before a subshell exec moves it at depth %zu",
-      shell_fd, m_subshell_depth);
+      shell_fd, execution_store().subshell_depth());
   m_subshell_saved_descriptors.push(subshell_saved_descriptor{
-      m_subshell_depth, os::save_descriptor_out_of_reach(shell_fd)});
+      execution_store().subshell_depth(),
+      os::save_descriptor_out_of_reach(shell_fd)});
 }
 
 fn EvalContext::set_coprocess_descriptors(i32 read_fd, i32 write_fd) wontthrow
@@ -124,7 +130,7 @@ fn EvalContext::hide_coprocess_descriptors() throws -> void
   if (m_coprocess_read_fd < 0 && m_coprocess_write_fd < 0) return;
 
   LOG(Debug, "taking the coprocess descriptors away at subshell depth %zu",
-      m_subshell_depth);
+      execution_store().subshell_depth());
 
   /* The backup is what leave_subshell hands back. An in-process subshell
      returns the descriptors to the shell that owns them. Both backups are
@@ -143,20 +149,20 @@ fn EvalContext::hide_coprocess_descriptors() throws -> void
 
 pure fn EvalContext::in_subshell() const wontthrow -> bool
 {
-  return m_subshell_depth > 0;
+  return execution_store().subshell_depth() > 0;
 }
 
 fn EvalContext::request_loop_control(control_flow::Kind kind, i64 level,
                                      SourceLocation location) throws -> void
 {
-  if (m_loop_depth == 0) {
+  if (execution_store().loop_depth() == 0) {
     LOG(Debug, "loop control requested outside a loop, ignored");
     return;
   }
-  if (static_cast<usize>(level) > m_loop_depth)
-    level = static_cast<i64>(m_loop_depth);
+  if (static_cast<usize>(level) > execution_store().loop_depth())
+    level = static_cast<i64>(execution_store().loop_depth());
   LOG(All, "loop control requested, level %lld of depth %zu", (long long) level,
-      m_loop_depth);
+      execution_store().loop_depth());
   m_control_flow =
       control_flow{kind, level, location, source_store().m_current_source,
                    String{source_store().m_current_origin}};
@@ -177,7 +183,7 @@ fn EvalContext::request_return(i64 status, SourceLocation location) throws
     -> void
 {
   LOG(Debug, "return requested, status %lld", (long long) status);
-  trap_store().m_status_before_return = m_last_exit_status;
+  trap_store().m_status_before_return = execution_store().last_exit_status();
   m_control_flow = control_flow{control_flow::Kind::Return, status, location,
                                 source_store().m_current_source,
                                 String{source_store().m_current_origin}};
@@ -570,25 +576,31 @@ pure fn EvalContext::failglob() const wontthrow -> bool
   return m_runtime.option_is_enabled(shell_option_id::Failglob);
 }
 
-fn EvalContext::enter_condition() wontthrow -> void { m_condition_depth++; }
+fn EvalContext::enter_condition() wontthrow -> void
+{
+  execution_store().condition_depth()++;
+}
 
 fn EvalContext::leave_condition() wontthrow -> void
 {
-  ASSERT(m_condition_depth > 0);
-  m_condition_depth--;
+  ASSERT(execution_store().condition_depth() > 0);
+  execution_store().condition_depth()--;
 }
 
 pure fn EvalContext::in_condition() const wontthrow -> bool
 {
-  return m_condition_depth > 0;
+  return execution_store().condition_depth() > 0;
 }
 
-fn EvalContext::enter_loop() wontthrow -> void { m_loop_depth++; }
+fn EvalContext::enter_loop() wontthrow -> void
+{
+  execution_store().loop_depth()++;
+}
 
 fn EvalContext::leave_loop() wontthrow -> void
 {
-  ASSERT(m_loop_depth > 0);
-  m_loop_depth--;
+  ASSERT(execution_store().loop_depth() > 0);
+  execution_store().loop_depth()--;
 }
 
 /* The count is bounded so a target past the bound reopens every iteration
@@ -644,22 +656,22 @@ fn EvalContext::retain_loop_redirect_fd(i32 target_fd, const String &path,
 
 pure fn EvalContext::loop_depth() const wontthrow -> usize
 {
-  return m_loop_depth;
+  return execution_store().loop_depth();
 }
 
 fn EvalContext::set_loop_depth(usize depth) wontthrow -> void
 {
-  m_loop_depth = depth;
+  execution_store().loop_depth() = depth;
 }
 
 fn EvalContext::set_terminal_exec_allowed(bool enabled) wontthrow -> void
 {
-  m_terminal_exec_allowed = enabled;
+  execution_store().terminal_exec_allowed() = enabled;
 }
 
 pure fn EvalContext::terminal_exec_allowed() const wontthrow -> bool
 {
-  return m_terminal_exec_allowed;
+  return execution_store().terminal_exec_allowed();
 }
 
 pure fn EvalContext::getopts_char_index() const wontthrow -> usize
@@ -800,7 +812,7 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       m_job_table.take_snapshot(),
       expansion_store().getopts_char_index(),
       expansion_store().getopts_last_optind(),
-      m_terminal_exec_allowed,
+      execution_store().terminal_exec_allowed(),
       m_coprocess_read_fd,
       m_coprocess_write_fd};
   return snapshot;
@@ -865,7 +877,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_job_table.restore_snapshot(steal(snapshot.job_state));
   expansion_store().set_getopts_char_index(snapshot.getopts_char_index);
   expansion_store().set_getopts_last_optind(snapshot.getopts_last_optind);
-  m_terminal_exec_allowed = snapshot.terminal_exec_allowed;
+  execution_store().terminal_exec_allowed() = snapshot.terminal_exec_allowed;
   m_coprocess_read_fd = snapshot.coprocess_read_fd;
   m_coprocess_write_fd = snapshot.coprocess_write_fd;
 
@@ -1705,22 +1717,22 @@ fn EvalContext::option_flags_string() const throws -> String
 
 fn EvalContext::set_last_exit_status(i32 status) wontthrow -> void
 {
-  m_last_exit_status = status;
+  execution_store().last_exit_status() = status;
 }
 
 fn EvalContext::set_last_command_duration_nanos(u64 nanos) wontthrow -> void
 {
-  m_last_command_duration_nanos = nanos;
+  execution_store().last_command_duration_nanos() = nanos;
 }
 
 pure fn EvalContext::last_command_duration_nanos() const wontthrow -> u64
 {
-  return m_last_command_duration_nanos;
+  return execution_store().last_command_duration_nanos();
 }
 
 pure fn EvalContext::last_exit_status() const wontthrow -> i32
 {
-  return m_last_exit_status;
+  return execution_store().last_exit_status();
 }
 
 fn EvalContext::apply_indirect_or_name_listing(StringView body) throws -> String
@@ -1839,7 +1851,7 @@ pure fn EvalContext::should_echo_expanded() const wontthrow -> bool
 
 pure fn EvalContext::shell_is_interactive() const wontthrow -> bool
 {
-  return m_shell_is_interactive;
+  return execution_store().shell_is_interactive();
 }
 
 fn EvalContext::set_show_ast(bool enabled) wontthrow -> void

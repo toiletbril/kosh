@@ -43,8 +43,8 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
                          bool should_error_exit, String shell_name,
                          ArrayList<String> positional_params)
     : m_variable_store(steal(positional_params)),
-      m_shell_name(steal(shell_name)),
-      m_shell_is_interactive(shell_is_interactive)
+      m_execution_store(shell_is_interactive),
+      m_shell_name(steal(shell_name))
 {
   set_no_glob(should_disable_path_expansion);
   set_echo(should_echo);
@@ -211,7 +211,7 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
     m_variable_store.special_variable_definition_locations().set(
         name, source_store().m_current_location);
   if (is_exported(name)) {
-    if (m_subshell_depth > 0)
+    if (execution_store().subshell_depth() > 0)
       m_environment_undo_log.push(environment_undo_entry{
           String{name}, os::get_environment_variable(name), None});
     os::set_environment_variable(name, value);
@@ -857,7 +857,7 @@ pure fn EvalContext::special_variable_definition_location(
 
 fn EvalContext::record_environment_change(StringView name) throws -> void
 {
-  if (m_subshell_depth == 0) return;
+  if (execution_store().subshell_depth() == 0) return;
   m_environment_undo_log.push(environment_undo_entry{
       String{name}, os::get_environment_variable(name), None});
 }

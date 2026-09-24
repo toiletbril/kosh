@@ -509,7 +509,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
       was_pipe_handed_off = true;
       if (child == 0) {
         os::close_fd(pipe->in);
-        m_shell_is_interactive = false;
+        execution_store().set_shell_is_interactive(false);
         enter_subshell();
         hide_coprocess_descriptors();
         if (mood() == mimic_mood::Bash && !is_shopt_enabled("inherit_errexit"))
@@ -622,14 +622,14 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
     bool did_change_interactive_state = false;
     bool did_enter_subshell = false;
     os::descriptor saved_stdout = KOSH_INVALID_FD;
-    let const was_interactive = m_shell_is_interactive;
+    let const was_interactive = execution_store().shell_is_interactive();
     let const do_cleanup = [&]() wontthrow -> void {
       if (did_enter_subshell) {
         leave_subshell();
         did_enter_subshell = false;
       }
       if (did_change_interactive_state) {
-        m_shell_is_interactive = was_interactive;
+        execution_store().set_shell_is_interactive(was_interactive);
         did_change_interactive_state = false;
       }
       if (is_stdout_redirected) {
@@ -661,7 +661,7 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
     saved_stdout = os::redirect_stdout(pipe->out);
     is_stdout_redirected = true;
 
-    m_shell_is_interactive = false;
+    execution_store().set_shell_is_interactive(false);
     did_change_interactive_state = true;
 
     /* A break, continue, return, or exit inside a substitution acts only within
@@ -814,8 +814,8 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
   koshka::flush();
   let const saved = os::redirect_stdout(pipe->out);
 
-  let const was_interactive = m_shell_is_interactive;
-  m_shell_is_interactive = false;
+  let const was_interactive = execution_store().shell_is_interactive();
+  execution_store().set_shell_is_interactive(false);
 
   std::exception_ptr error;
   try {
@@ -832,7 +832,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
     clear_control_flow();
   }
 
-  m_shell_is_interactive = was_interactive;
+  execution_store().set_shell_is_interactive(was_interactive);
 
   koshka::flush();
   os::restore_stdout(saved);
