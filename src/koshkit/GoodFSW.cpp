@@ -345,7 +345,7 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
   operand_statuses.reserve(operands.count());
   operand_batch.reserve(operands.count());
   for (let const &operand : operands) {
-    operand_paths.push(Path{operand.view()});
+    operand_paths.push(Path{operand.view(), allocator});
     operand_statuses.push({});
   }
   for (usize index = 0; index < operands.count(); index++)

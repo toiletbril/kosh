@@ -352,11 +352,11 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
   let target_statuses = ArrayList<os::file_status>{allocator};
   let is_target_status_known = ArrayList<bool>{allocator};
   if (operands.is_empty()) {
-    targets.push(Path{"."});
+    targets.push(Path{".", allocator});
   } else {
     targets.reserve(operands.count());
     for (let const &operand : operands)
-      targets.push(Path{operand.view()});
+      targets.push(Path{operand.view(), allocator});
   }
 
   target_statuses.reserve(targets.count());
