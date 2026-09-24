@@ -127,8 +127,8 @@ fn EvalContext::end_command() wontthrow -> void
   m_expressions_executed_total += m_expressions_executed_last;
   m_commands_evaluated++;
 
-  if (AST_ARENA != nullptr) {
-    let const used = AST_ARENA->bytes_used();
+  if (parse_arena() != nullptr) {
+    let const used = parse_arena()->bytes_used();
     if (used > m_peak_ast_arena_bytes) m_peak_ast_arena_bytes = used;
   }
 

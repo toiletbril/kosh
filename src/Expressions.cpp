@@ -1574,7 +1574,8 @@ fn expressions::internal::analyze_followed_source(
 {
   if (actx.followed_source_paths == nullptr ||
       actx.followed_source_effects_cache == nullptr ||
-      actx.eval_context == nullptr || AST_ARENA == nullptr ||
+      actx.eval_context == nullptr ||
+      actx.eval_context->parse_arena() == nullptr ||
       command_index + 1 >= args.count())
   {
     return true;
@@ -1646,13 +1647,13 @@ fn expressions::internal::analyze_followed_source(
   if (!actx.followed_source_paths->add(canonical_path->text().view()))
     return false;
 
-  let const arena_mark = AST_ARENA->mark();
-  defer { AST_ARENA->release(arena_mark); };
+  let const arena_mark = actx.eval_context->parse_arena()->mark();
+  defer { actx.eval_context->parse_arena()->release(arena_mark); };
   let const function_arena_scope = FunctionArenaScope{nullptr};
 
   let parser = Parser{
-      Lexer{contents->view(), *AST_ARENA, false, canonical_path->text().view(),
-            actx.eval_context->mood()}
+      Lexer{contents->view(), *actx.eval_context->parse_arena(), false,
+            canonical_path->text().view(), actx.eval_context->mood()}
   };
   parser.set_should_collect_analysis_metadata(true);
 
