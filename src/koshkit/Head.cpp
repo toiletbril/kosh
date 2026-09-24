@@ -96,11 +96,16 @@ static fn read_regular_all_but_last(os::descriptor fd, u64 file_size,
                                     head_unit unit) throws -> Maybe<String>
 {
   constexpr usize block_byte_count = 64 * 1024;
+  constexpr usize batch_block_count = 16;
   char block[block_byte_count];
   let batch = os::Batch{allocator};
   let results = ArrayList<os::batch_result>{allocator};
-  batch.reserve(1);
-  results.reserve(1);
+  let buffers = ArrayList<ArrayList<char>>{allocator};
+  let byte_counts = ArrayList<usize>{allocator};
+  batch.reserve(batch_block_count);
+  results.reserve(batch_block_count);
+  buffers.reserve(batch_block_count);
+  byte_counts.reserve(batch_block_count);
 
   let const do_read_block = [&](u64 offset,
                                 usize byte_count) -> os::batch_result {
@@ -151,20 +156,43 @@ static fn read_regular_all_but_last(os::descriptor fd, u64 file_size,
   while (next_offset < prefix_end) {
     if (os::INTERRUPT_REQUESTED) return String{allocator};
 
-    let const remaining = prefix_end - next_offset;
-    let const byte_count = remaining > block_byte_count
-                               ? block_byte_count
-                               : static_cast<usize>(remaining);
-    let const read_result = do_read_block(next_offset, byte_count);
-    if (read_result.error_number != 0) {
-      os::set_last_system_error(read_result.error_number);
-      return None;
+    batch.clear();
+    results.clear();
+    buffers.clear();
+    byte_counts.clear();
+    while (next_offset < prefix_end &&
+           byte_counts.count() < batch_block_count)
+    {
+      let const remaining = prefix_end - next_offset;
+      let const byte_count = remaining > block_byte_count
+                                 ? block_byte_count
+                                 : static_cast<usize>(remaining);
+      buffers.push(ArrayList<char>{allocator});
+      buffers.back().reserve(byte_count);
+      byte_counts.push(byte_count);
+      batch.add(os::batch_operation::read(fd, buffers.back().begin(),
+                                          byte_count, next_offset));
+      next_offset += byte_count;
     }
-    if (read_result.transferred_byte_count != byte_count)
-      return read_all_but_last(fd, drop_count, allocator, unit);
 
-    result.append(StringView{block, byte_count});
-    next_offset += byte_count;
+    batch.execute(results);
+    if (os::INTERRUPT_REQUESTED) return String{allocator};
+    for (usize result_index = 0; result_index < results.count();
+         result_index++)
+    {
+      let const &read_result = results[result_index];
+      if (read_result.error_number != 0) {
+        os::set_last_system_error(read_result.error_number);
+        return None;
+      }
+      if (read_result.transferred_byte_count != byte_counts[result_index])
+        return read_all_but_last(fd, drop_count, allocator, unit);
+    }
+
+    for (usize result_index = 0; result_index < results.count();
+         result_index++)
+      result.append(StringView{buffers[result_index].begin(),
+                               byte_counts[result_index]});
   }
 
   return result;
