@@ -223,12 +223,25 @@ static fn find_canonical_operation_positions(
   return has_repeated_request ? unique_operation_count : 0;
 }
 
-fn Batch::execute(ArrayList<batch_result> &results) throws -> void
+fn Batch::execute(ArrayList<batch_result> &results,
+                  batch_deduplication deduplication) throws -> void
 {
   m_canonical_positions.clear();
   m_buckets.clear();
   m_optimized_operations.clear();
   defer { m_optimized_operations.clear(); };
+
+  if (deduplication == batch_deduplication::Disabled) {
+    results.clear();
+    results.reserve(m_operations.count());
+    for (usize index = 0; index < m_operations.count(); index++)
+      results.push({});
+
+    batch_internal::execute_batch_operations(
+        m_operations.begin(), m_operations.count(), results.begin());
+    return;
+  }
+
   let const unique_operation_count = find_canonical_operation_positions(
       m_operations, m_canonical_positions, m_buckets);
   if (unique_operation_count == 0) {
@@ -289,10 +302,11 @@ fn Batch::execute(ArrayList<batch_result> &results) throws -> void
   }
 }
 
-fn Batch::execute() throws -> ArrayList<batch_result>
+fn Batch::execute(batch_deduplication deduplication) throws
+    -> ArrayList<batch_result>
 {
   let results = ArrayList<batch_result>{m_operations.allocator()};
-  execute(results);
+  execute(results, deduplication);
   return results;
 }
 

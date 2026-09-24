@@ -90,6 +90,12 @@ struct batch_result
 
 static_assert(sizeof(usize) != 8 || sizeof(batch_result) == 24);
 
+enum class batch_deduplication : u8
+{
+  Enabled,
+  Disabled,
+};
+
 namespace batch_internal {
 
 using batched_syscall_id = batch_operation::Kind;
@@ -192,8 +198,13 @@ public:
   fn reserve(usize operation_count) throws -> void;
   fn add(batch_operation operation) throws -> void;
   fn clear() wontthrow -> void;
-  fn execute(ArrayList<batch_result> &results) throws -> void;
-  fn execute() throws -> ArrayList<batch_result>;
+  fn execute(
+      ArrayList<batch_result> &results,
+      batch_deduplication deduplication = batch_deduplication::Enabled) throws
+      -> void;
+  fn execute(batch_deduplication deduplication =
+                 batch_deduplication::Enabled) throws
+      -> ArrayList<batch_result>;
 
   pure fn count() const wontthrow -> usize;
 

@@ -398,7 +398,7 @@ cold static fn list_directory_status_fallback(StringView dir,
   for (usize index = 0; index < entries.count(); index++)
     batch.add(batch_operation::lstat(paths[index], entries[index].status));
 
-  let const results = batch.execute();
+  let const results = batch.execute(batch_deduplication::Disabled);
   for (usize index = 0; index < entries.count(); index++)
     entries[index].has_status = results[index].error_number == 0;
 

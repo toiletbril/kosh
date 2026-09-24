@@ -201,7 +201,7 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
     stat_batch.clear();
     for (let &work : stat_work)
       stat_batch.add(os::batch_operation::lstat(work.path, work.status));
-    stat_batch.execute(batch_results);
+    stat_batch.execute(batch_results, os::batch_deduplication::Disabled);
     for (usize index = 0; index < stat_work.count(); index++) {
       let &work = stat_work[index];
       let const parent_index = work.parent_index;

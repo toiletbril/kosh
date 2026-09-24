@@ -211,7 +211,8 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
         unknown_batch.add(os::batch_operation::lstat(
             unknown_paths[index], unknown_statuses[index]));
 
-      unknown_batch.execute(unknown_results);
+      unknown_batch.execute(unknown_results,
+                            os::batch_deduplication::Disabled);
       for (usize index = 0; index < unknown_indices.count(); index++) {
         let &kind = (*children)[unknown_indices[index]].kind;
         if (unknown_results[index].error_number != 0) {

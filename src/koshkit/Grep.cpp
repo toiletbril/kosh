@@ -143,7 +143,7 @@ static fn collect_recursive_sources(const ExecContext &ec, EvalContext &cxt,
         batch.add(os::batch_operation::stat(
             child_paths[unknown_indices[index]], unknown_statuses[index]));
 
-      batch.execute(results);
+      batch.execute(results, os::batch_deduplication::Disabled);
       for (usize index = 0; index < unknown_indices.count(); index++) {
         let &kind = (*children)[unknown_indices[index]].kind;
         if (results[index].error_number != 0) {

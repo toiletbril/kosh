@@ -319,7 +319,7 @@ static fn prepare_entries(ArrayList<listing_entry> &entries,
                                             symlink_statuses[index]));
       }
 
-      let const results = batch.execute();
+      let const results = batch.execute(os::batch_deduplication::Disabled);
       usize symlink_index = 0;
       for (listing_entry &entry : entries) {
         if (entry.type != entry_type::Symlink) continue;
