@@ -845,13 +845,18 @@ fn eviliso_sessions() throws -> ArrayList<os::user_session>
 
 struct session_report_row
 {
-  String user{heap_allocator()};
-  String terminal{heap_allocator()};
-  String login_time{heap_allocator()};
+  explicit session_report_row(Allocator allocator)
+      : user(allocator), terminal(allocator), login_time(allocator)
+  {}
+
+  String user;
+  String terminal;
+  String login_time;
 };
 
 fn append_session_report(String &output, bool should_color,
-                         bool should_show_detail) throws -> void
+                         bool should_show_detail, Allocator allocator) throws
+    -> void
 {
   let sessions = eviliso_sessions();
   sessions.sort([](const os::user_session &left,
@@ -861,23 +866,24 @@ fn append_session_report(String &output, bool should_color,
     return left.login_time < right.login_time;
   });
 
-  let rows = ArrayList<session_report_row>{heap_allocator()};
+  let rows = ArrayList<session_report_row>{allocator};
   for (let const &session : sessions) {
-    let login_time = String{heap_allocator()};
+    let login_time = String{allocator};
     if (should_show_detail) {
       login_time = session.login_time == 0
-                       ? String{heap_allocator(), "unavailable"}
-                       : utils::format_unix_timestamp(
-                             session.login_time, "%Y-%m-%d %H:%M:%S");
+                       ? String{allocator, "unavailable"}
+                       : String{allocator,
+                               utils::format_unix_timestamp(
+                                   session.login_time, "%Y-%m-%d %H:%M:%S")};
     }
-    rows.push({
-        String{heap_allocator(), session.user.view()},
-        String{heap_allocator(), session.terminal.view()},
-        steal(login_time),
-    });
+    let row = session_report_row{allocator};
+    row.user = String{allocator, session.user.view()};
+    row.terminal = String{allocator, session.terminal.view()};
+    row.login_time = steal(login_time);
+    rows.push(steal(row));
   }
 
-  let table = ReportTable{heap_allocator()};
+  let table = ReportTable{allocator};
   table.add_column("USER", report_table_alignment::Left,
                    colors::ansi::BOLD_CYAN);
   table.add_column("TERMINAL", report_table_alignment::Left,
@@ -1915,7 +1921,8 @@ fn EvilIso::execute(const ExecContext &ec, EvalContext &cxt,
     append_cgroup_report(output, should_color, FLAG_EVILISO_ALL.is_enabled(),
                          process_cgroups);
   if (show_sessions)
-    append_session_report(output, should_color, FLAG_EVILISO_ALL.is_enabled());
+    append_session_report(output, should_color, FLAG_EVILISO_ALL.is_enabled(),
+                          cxt.scratch_allocator());
   if (show_remote)
     append_remote_report(output, should_color, true,
                          should_show_remote_detail, process_cgroups,
