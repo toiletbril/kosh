@@ -672,6 +672,23 @@ private:
   usize m_peak_ast_arena_bytes{0};
 };
 
+class PromptCommandStore
+{
+public:
+  fn get_arena() wontthrow -> BumpArena & { return m_arena; }
+  fn get_cached_text() wontthrow -> String & { return m_cached_text; }
+  pure fn get_cached_ast() const wontthrow -> Expression *
+  {
+    return m_cached_ast;
+  }
+  fn set_cached_ast(Expression *ast) wontthrow -> void { m_cached_ast = ast; }
+
+private:
+  BumpArena m_arena{};
+  String m_cached_text{heap_allocator()};
+  Expression *m_cached_ast{nullptr};
+};
+
 class NameValueArg
 {
 public:
@@ -1354,6 +1371,15 @@ public:
       -> const EvaluationMetricsStore &
   {
     return m_evaluation_metrics_store;
+  }
+  fn prompt_command_store() wontthrow -> PromptCommandStore &
+  {
+    return m_prompt_command_store;
+  }
+  pure fn prompt_command_store() const wontthrow
+      -> const PromptCommandStore &
+  {
+    return m_prompt_command_store;
   }
   pure fn expansion_store() const wontthrow -> const ExpansionStore &
   {
@@ -2781,19 +2807,19 @@ public:
   }
   fn get_prompt_command_arena() wontthrow -> BumpArena &
   {
-    return m_prompt_command_arena;
+    return prompt_command_store().get_arena();
   }
   fn get_prompt_command_cached_text() wontthrow -> String &
   {
-    return m_prompt_command_cached_text;
+    return prompt_command_store().get_cached_text();
   }
   pure fn get_prompt_command_cached_ast() const wontthrow -> Expression *
   {
-    return m_prompt_command_cached_ast;
+    return prompt_command_store().get_cached_ast();
   }
   fn set_prompt_command_cached_ast(Expression *ast) wontthrow -> void
   {
-    m_prompt_command_cached_ast = ast;
+    prompt_command_store().set_cached_ast(ast);
   }
   fn get_foreground_program_title_buffer() wontthrow -> String &
   {
@@ -3220,9 +3246,7 @@ protected:
      DEBUG action has returned. */
   /* The end of the source span a redirected wrapper holds for the subshell it
      evaluates next. Zero when no wrapper is waiting. */
-  BumpArena m_prompt_command_arena{};
-  String m_prompt_command_cached_text{heap_allocator()};
-  Expression *m_prompt_command_cached_ast{nullptr};
+  PromptCommandStore m_prompt_command_store{};
 
   fn install_trap_dispositions() throws -> void;
 
