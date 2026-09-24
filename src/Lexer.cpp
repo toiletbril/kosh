@@ -203,11 +203,12 @@ Lexer::Lexer(StringView source, BumpArena &arena,
              bool should_collect_debug_words, Maybe<StringView> filename,
              mimic_mood mood, ParseSession::AllocationKind allocation_kind)
     : m_source(source), m_parse_session(arena),
-      m_source_name_index(filename.has_value() ? intern_source_name(*filename)
-                                               : 0),
-      m_mood(mood), m_should_collect_debug_words(should_collect_debug_words)
+      m_should_collect_debug_words(should_collect_debug_words)
 {
   m_parse_session.set_arena(arena, allocation_kind);
+  m_parse_session.set_source_name_index(
+      filename.has_value() ? intern_source_name(*filename) : 0);
+  m_parse_session.set_mood(mood);
   LOG(Debug, "starting a lexer over %zu bytes of source", m_source.length);
 }
 

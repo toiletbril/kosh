@@ -55,6 +55,20 @@ public:
     return m_allocation_kind;
   }
 
+  pure fn source_name_index() const wontthrow -> u32
+  {
+    return m_source_name_index;
+  }
+
+  fn set_source_name_index(u32 index) wontthrow -> void
+  {
+    m_source_name_index = index;
+  }
+
+  pure fn mood() const wontthrow -> mimic_mood { return m_mood; }
+
+  fn set_mood(mimic_mood mood) wontthrow -> void { m_mood = mood; }
+
   fn set_arena(BumpArena &arena, AllocationKind allocation_kind) wontthrow
       -> void
   {
@@ -66,6 +80,8 @@ private:
   BumpArena *m_syntax_arena;
   BumpArena *m_active_arena;
   AllocationKind m_allocation_kind{AllocationKind::Syntax};
+  u32 m_source_name_index{0};
+  mimic_mood m_mood{mimic_mood::Default};
 };
 
 struct heredoc_contents
@@ -132,11 +148,14 @@ public:
             ParseSession::AllocationKind::Syntax);
   ~Lexer();
 
-  pure fn mood() const wontthrow -> mimic_mood { return m_mood; }
+  pure fn mood() const wontthrow -> mimic_mood
+  {
+    return m_parse_session.mood();
+  }
 
   pure fn is_bash_compatible() const wontthrow -> bool
   {
-    return m_mood == mimic_mood::Bash || m_mood == mimic_mood::BashPosix;
+    return mood() == mimic_mood::Bash || mood() == mimic_mood::BashPosix;
   }
 
   /* Whether strict POSIX lexing is active. The default mood is neither bash nor
@@ -144,7 +163,7 @@ public:
      literal stays on in the default mood and is suppressed only here. */
   pure fn is_posix_mode() const wontthrow -> bool
   {
-    return m_mood == mimic_mood::Posix;
+    return mood() == mimic_mood::Posix;
   }
 
   /* The token-level bash additions, $'...' and <<< and |& and &>, ride every
@@ -152,7 +171,7 @@ public:
      predicate for the additions the evaluator gates. */
   pure fn bash_additions_enabled() const wontthrow -> bool
   {
-    return m_mood != mimic_mood::Posix;
+    return mood() != mimic_mood::Posix;
   }
 
   Lexer(Lexer &&) = default;
@@ -198,7 +217,8 @@ protected:
   pure alwaysinline fn here(usize position, usize length) const wontthrow
       -> SourceLocation
   {
-    return SourceLocation{position, length, m_source_name_index};
+    return SourceLocation{position, length,
+                          m_parse_session.source_name_index()};
   }
 
   fn peek_cache_is_live() const wontthrow -> bool;
@@ -208,8 +228,6 @@ protected:
   /* The interned name of the file this source came from, or zero for an unnamed
      source such as an interactive line. It travels into every SourceLocation
      the lexer stamps. */
-  u32 m_source_name_index{0};
-  mimic_mood m_mood{mimic_mood::Default};
   usize m_cursor_position{0};
   usize m_cached_offset{0};
 
