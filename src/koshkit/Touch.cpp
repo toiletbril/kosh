@@ -174,9 +174,10 @@ fn Touch::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_change_modification =
       FLAG_TOUCH_MODIFICATION.is_enabled() || !FLAG_TOUCH_ACCESS.is_enabled();
 
+  let const allocator = cxt.scratch_allocator();
   i32 status = 0;
   for (let const &operand : operands) {
-    if (!Path{operand.view()}.exists()) {
+    if (!Path{operand.view(), allocator}.exists()) {
       if (FLAG_TOUCH_NO_CREATE.is_enabled()) continue;
 
       let const fd =

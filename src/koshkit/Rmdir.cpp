@@ -43,6 +43,7 @@ fn Rmdir::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
+  let const allocator = cxt.scratch_allocator();
   i32 status = 0;
   for (usize operand_index = 0; operand_index < operands.count();
        operand_index++)
@@ -57,7 +58,7 @@ fn Rmdir::execute(const ExecContext &ec, EvalContext &cxt,
     }
 
     if (FLAG_RMDIR_PARENTS.is_enabled()) {
-      let current = Path{operand.view()};
+      let current = Path{operand.view(), allocator};
       loop
       {
         let parent = current.parent();

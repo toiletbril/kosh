@@ -47,13 +47,14 @@ cold fn Realpath::execute(
 
   if (operands.is_empty()) return report_usage_error(ec, cxt, args[0].view());
 
-  let output = String{cxt.scratch_allocator()};
+  let const allocator = cxt.scratch_allocator();
+  let output = String{allocator};
   i32 status = 0;
   for (usize operand_index = 0; operand_index < operands.count();
        operand_index++)
   {
     let const &operand = operands[operand_index];
-    let const resolved = os::canonical_path(Path{operand.view()});
+    let const resolved = os::canonical_path(Path{operand.view(), allocator});
     if (!resolved) {
       KOSHKIT_REPORT_ERROR_AT(operand_locations[operand_index],
                               "'" + operand +
