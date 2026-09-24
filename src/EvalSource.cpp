@@ -148,12 +148,12 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     throw ErrorWithLocation{ec.source_location(),
                             "Unable to mimic '" + ec.program() +
                                 "' because the script nesting is too deep"};
-  if (AST_ARENA == nullptr)
+  if (parse_arena() == nullptr)
     throw ErrorWithLocation{ec.source_location(), "Unable to mimic '" +
                                                       ec.program() +
                                                       "' outside of a parse"};
-  let const ast_mark = AST_ARENA->mark();
-  defer { AST_ARENA->release(ast_mark); };
+  let const ast_mark = parse_arena()->mark();
+  defer { parse_arena()->release(ast_mark); };
 
   let contents = ec.program_path().read_entire_file();
   if (!contents.has_value())
@@ -261,7 +261,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     m_source_frames.pop_back();
   };
   let parser = Parser{
-      Lexer{contents->view(), *AST_ARENA, false, script_filename, mood()}
+      Lexer{contents->view(), *parse_arena(), false, script_filename, mood()}
   };
 
   let params = ArrayList<String>{heap_allocator()};
@@ -472,7 +472,8 @@ fn EvalContext::run_source(StringView source, StringView origin,
 
   let const consume_return = handling == return_handling::Consume;
   let const reject_return = handling == return_handling::Reject;
-  if (AST_ARENA == nullptr) throw Error{"Cannot run source outside of a parse"};
+  if (parse_arena() == nullptr)
+    throw Error{"Cannot run source outside of a parse"};
 
   LOG(Debug, "running source '%.*s' of %zu bytes at depth %zu",
       static_cast<int>(origin.length), origin.data, source.length,
@@ -528,7 +529,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
       retained_source = cached_body->get_source();
     } else {
       let parser = Parser{
-          Lexer{source, *AST_ARENA, false, filename, mood()}
+          Lexer{source, *parse_arena(), false, filename, mood()}
       };
 
       let const parsed_ast = parser.construct_ast();
