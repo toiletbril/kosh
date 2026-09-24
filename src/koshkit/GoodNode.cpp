@@ -340,7 +340,7 @@ fn GoodNode::execute(
   report_statuses.reserve(paths.count());
   report_batch.reserve(paths.count());
   for (let const &path : paths) {
-    report_paths.push(Path{path.view()});
+    report_paths.push(Path{path.view(), allocator});
     report_statuses.push({});
   }
   for (usize index = 0; index < paths.count(); index++)
