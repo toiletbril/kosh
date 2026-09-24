@@ -475,8 +475,8 @@ fn EvalContext::associative_keys(StringView name) const throws
 {
   let keys = ArrayList<String>{heap_allocator()};
   if (is_bash_aliases_special(name)) {
-    keys.reserve(m_aliases.count());
-    m_aliases.for_each([&](StringView key, const String &value) {
+    keys.reserve(scope_store().aliases().count());
+    scope_store().aliases().for_each([&](StringView key, const String &value) {
       unused(value);
       keys.push_managed(key);
     });
@@ -498,11 +498,12 @@ fn EvalContext::associative_values(StringView name) const throws
 {
   let values = ArrayList<String>{heap_allocator()};
   if (is_bash_aliases_special(name)) {
-    values.reserve(m_aliases.count());
-    m_aliases.for_each([&](StringView key, const String &value) {
+    values.reserve(scope_store().aliases().count());
+    scope_store().aliases().for_each(
+        [&](StringView key, const String &value) {
       unused(key);
       values.push_managed(value.view());
-    });
+        });
     return values;
   }
 
@@ -593,16 +594,18 @@ fn EvalContext::unset_array_element(StringView name,
 fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
     -> void
 {
-  if (m_local_scope_depth == 0) return;
+  if (scope_store().local_scope_depth() == 0) return;
   if (is_readonly(name))
     throw Error{"Unable to assign '" + name + "' because it is read only"};
-  ASSERT(m_local_scope_depth <= m_local_scopes.count());
+  ASSERT(scope_store().local_scope_depth() <=
+         scope_store().local_scopes().count());
   /* One binding per scope, the bash rule. A second local of the same name keeps
      the first's saved caller state, so the scope pop restores the true pre-call
      value and the unset peel finds one entry to consume. */
   if (is_local_in_current_scope(name)) return;
   LOG(All, "declaring '%.*s' local in scope depth %zu",
-      static_cast<int>(name.length), name.data, m_local_scope_depth);
+      static_cast<int>(name.length), name.data,
+      scope_store().local_scope_depth());
 
   let const was_bash_directory_stack_special =
       is_bash_directory_stack_special(name);
@@ -668,11 +671,12 @@ fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
     previous_value = get_variable_value(name);
   }
 
-  m_local_scopes[m_local_scope_depth - 1].push(local_binding{
+  scope_store().local_scopes()[scope_store().local_scope_depth() - 1].push(
+      local_binding{
       String{name}, steal(previous_value), previous_special_definition_location,
       steal(previous_array), steal(previous_keys), steal(previous_values),
       steal(previous_sparse_indices), steal(previous_sparse_values),
-      previous_attributes, previous_was_associative, previous_was_exported});
+          previous_attributes, previous_was_associative, previous_was_exported});
 
   if (should_inherit_value && was_bash_directory_stack_special)
     set_indexed_array(name, steal(inherited_directory_stack));
@@ -734,7 +738,7 @@ fn EvalContext::array_element_count(StringView name) const throws -> usize
       return dynamic_array_element_count(*which);
   }
 
-  if (is_bash_aliases_special(name)) return m_aliases.count();
+  if (is_bash_aliases_special(name)) return scope_store().aliases().count();
   if (is_bash_directory_stack_special(name))
     return bash_directory_stack_element_count();
 

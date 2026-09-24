@@ -316,6 +316,180 @@ namespace completion {
 class shell_highlight_cache;
 } /* namespace completion */
 
+class RuntimeControlStore
+{
+public:
+  fn set_init_mood_sourcing(mimic_mood mood, bool active) wontthrow -> void
+  {
+    let const bit = static_cast<u8>(1U << static_cast<u8>(mood));
+    if (active)
+      m_init_moods_sourcing |= bit;
+    else
+      m_init_moods_sourcing &= static_cast<u8>(~bit);
+  }
+
+  pure fn init_mood_sourcing(mimic_mood mood) const wontthrow -> bool
+  {
+    return (m_init_moods_sourcing & (1U << static_cast<u8>(mood))) != 0;
+  }
+
+  fn mark_mood_initialized(mimic_mood mood) wontthrow -> void
+  {
+    m_initialized_moods |= static_cast<u8>(1U << static_cast<u8>(mood));
+  }
+
+  pure fn mood_initialized(mimic_mood mood) const wontthrow -> bool
+  {
+    return (m_initialized_moods & (1U << static_cast<u8>(mood))) != 0;
+  }
+
+  fn note_explicit_mood() wontthrow -> void
+  {
+    m_was_mood_set_explicitly = true;
+    m_mood_mutation_revision++;
+  }
+
+  pure fn was_mood_set_explicitly() const wontthrow -> bool
+  {
+    return m_was_mood_set_explicitly;
+  }
+
+  fn note_warning_option_mutation() wontthrow -> void
+  {
+    m_warning_mutation_revision++;
+  }
+
+  pure fn warning_mutation_revision() const wontthrow -> u64
+  {
+    return m_warning_mutation_revision;
+  }
+
+  fn note_diagnostics_option_mutation() wontthrow -> void
+  {
+    m_diagnostics_mutation_revision++;
+  }
+
+  pure fn diagnostics_mutation_revision() const wontthrow -> u64
+  {
+    return m_diagnostics_mutation_revision;
+  }
+
+  fn note_annoying_diagnostics_option_mutation() wontthrow -> void
+  {
+    m_annoying_diagnostics_mutation_revision++;
+  }
+
+  pure fn annoying_diagnostics_mutation_revision() const wontthrow -> u64
+  {
+    return m_annoying_diagnostics_mutation_revision;
+  }
+
+  fn set_warning_suppressed(suppressible_warning which, bool enabled) wontthrow
+      -> void
+  {
+    let const bit = u32{1} << static_cast<u32>(which);
+    if (enabled)
+      m_suppressed_warnings |= bit;
+    else
+      m_suppressed_warnings &= ~bit;
+  }
+
+  pure fn is_warning_suppressed(suppressible_warning which) const wontthrow
+      -> bool
+  {
+    return (m_suppressed_warnings &
+            (u32{1} << static_cast<u32>(which))) != 0;
+  }
+
+  fn option_mutations() wontthrow -> shell_option_mutations &
+  {
+    return m_shell_option_mutations;
+  }
+
+  pure fn option_mutations() const wontthrow -> const shell_option_mutations &
+  {
+    return m_shell_option_mutations;
+  }
+
+  pure fn mood_mutation_revision() const wontthrow -> u64
+  {
+    return m_mood_mutation_revision;
+  }
+
+  pure fn init_moods_sourcing_mask() const wontthrow -> u8
+  {
+    return m_init_moods_sourcing;
+  }
+
+  pure fn initialized_moods_mask() const wontthrow -> u8
+  {
+    return m_initialized_moods;
+  }
+
+  pure fn was_mood_set_explicitly_flag() const wontthrow -> bool
+  {
+    return m_was_mood_set_explicitly;
+  }
+
+  fn restore_snapshot_state(
+      u8 init_moods_sourcing, u8 initialized_moods,
+      bool was_mood_set_explicitly, u64 mood_mutation_revision,
+      u64 warning_mutation_revision, u64 diagnostics_mutation_revision,
+      u64 annoying_diagnostics_mutation_revision,
+      shell_option_mutations option_mutations) wontthrow -> void
+  {
+    m_init_moods_sourcing = init_moods_sourcing;
+    m_initialized_moods = initialized_moods;
+    m_was_mood_set_explicitly = was_mood_set_explicitly;
+    m_mood_mutation_revision = mood_mutation_revision;
+    m_warning_mutation_revision = warning_mutation_revision;
+    m_diagnostics_mutation_revision = diagnostics_mutation_revision;
+    m_annoying_diagnostics_mutation_revision =
+        annoying_diagnostics_mutation_revision;
+    m_shell_option_mutations = option_mutations;
+  }
+
+private:
+  u8 m_init_moods_sourcing{0};
+  u8 m_initialized_moods{0};
+  bool m_was_mood_set_explicitly{false};
+  u64 m_mood_mutation_revision{0};
+  u64 m_warning_mutation_revision{0};
+  u64 m_diagnostics_mutation_revision{0};
+  u64 m_annoying_diagnostics_mutation_revision{0};
+  shell_option_mutations m_shell_option_mutations{};
+  u32 m_suppressed_warnings{0};
+};
+
+class ScopeStore
+{
+public:
+  fn aliases() wontthrow -> StringMap<String> & { return m_aliases; }
+  pure fn aliases() const wontthrow -> const StringMap<String> &
+  {
+    return m_aliases;
+  }
+  fn local_scopes() wontthrow -> ArrayList<ArrayList<local_binding>> &
+  {
+    return m_local_scopes;
+  }
+  pure fn local_scopes() const wontthrow
+      -> const ArrayList<ArrayList<local_binding>> &
+  {
+    return m_local_scopes;
+  }
+  fn local_scope_depth() wontthrow -> usize & { return m_local_scope_depth; }
+  pure fn local_scope_depth() const wontthrow -> usize
+  {
+    return m_local_scope_depth;
+  }
+
+private:
+  StringMap<String> m_aliases{heap_allocator()};
+  ArrayList<ArrayList<local_binding>> m_local_scopes{heap_allocator()};
+  usize m_local_scope_depth{0};
+};
+
 class NameValueArg
 {
 public:
@@ -967,6 +1141,20 @@ public:
   pure fn source_store() const wontthrow -> const SourceStore &
   {
     return m_source_store;
+  }
+  fn runtime_control_store() wontthrow -> RuntimeControlStore &
+  {
+    return m_runtime_control_store;
+  }
+  pure fn runtime_control_store() const wontthrow
+      -> const RuntimeControlStore &
+  {
+    return m_runtime_control_store;
+  }
+  fn scope_store() wontthrow -> ScopeStore & { return m_scope_store; }
+  pure fn scope_store() const wontthrow -> const ScopeStore &
+  {
+    return m_scope_store;
   }
   pure fn expansion_store() const wontthrow -> const ExpansionStore &
   {
@@ -1788,9 +1976,10 @@ public:
   fn for_each_local_name_in_current_scope(Callback callback) const throws
       -> void
   {
-    if (m_local_scope_depth == 0) return;
+    if (scope_store().local_scope_depth() == 0) return;
 
-    for (let const &binding : m_local_scopes[m_local_scope_depth - 1])
+    for (let const &binding : scope_store().local_scopes()[
+             scope_store().local_scope_depth() - 1])
       callback(binding.name.view());
   }
 
@@ -1802,10 +1991,11 @@ public:
   template <typename Callback>
   fn for_each_alias_name(Callback callback) const throws -> void
   {
-    m_aliases.for_each([&](StringView name, const String &value) throws {
+    scope_store().aliases().for_each(
+        [&](StringView name, const String &value) throws {
       unused(value);
       callback(name);
-    });
+        });
   }
 
   fn snapshot_state() throws -> eval_state_snapshot;
@@ -1903,7 +2093,7 @@ public:
   }
   fn note_shell_option_mutation(shell_option_id option) wontthrow -> void
   {
-    m_shell_option_mutations.note(option);
+    runtime_control_store().option_mutations().note(option);
   }
   pure fn shell_option_state(shell_option_id option) const wontthrow -> bool
   {
@@ -1925,16 +2115,12 @@ public:
   fn set_warning_suppressed(suppressible_warning which, bool enabled) wontthrow
       -> void
   {
-    let const bit = u32{1} << static_cast<u32>(which);
-    if (enabled)
-      m_suppressed_warnings |= bit;
-    else
-      m_suppressed_warnings &= ~bit;
+    runtime_control_store().set_warning_suppressed(which, enabled);
   }
   pure fn is_warning_suppressed(suppressible_warning which) const wontthrow
       -> bool
   {
-    return (m_suppressed_warnings & (u32{1} << static_cast<u32>(which))) != 0;
+    return runtime_control_store().is_warning_suppressed(which);
   }
   fn set_warnings_enabled(bool enabled) wontthrow -> void
   {
@@ -1945,7 +2131,7 @@ public:
   }
   fn note_warning_option_mutation() wontthrow -> void
   {
-    m_warning_mutation_revision++;
+    runtime_control_store().note_warning_option_mutation();
   }
   pure fn warnings_enabled() const wontthrow -> bool
   {
@@ -2162,13 +2348,20 @@ public:
     apply_strictness_for_mood();
     return function_runtime_state{previous,
                                   RuntimeState::capture(*this),
-                                  m_shell_option_mutations,
-                                  m_shell_option_mutations.revision,
-                                  m_mood_mutation_revision,
-                                  m_warning_mutation_revision,
-                                  m_diagnostics_mutation_revision,
-                                  m_annoying_diagnostics_mutation_revision,
-                                  m_was_mood_set_explicitly};
+                                  runtime_control_store().option_mutations(),
+                                  runtime_control_store()
+                                      .option_mutations()
+                                      .revision,
+                                  runtime_control_store()
+                                      .mood_mutation_revision(),
+                                  runtime_control_store()
+                                      .warning_mutation_revision(),
+                                  runtime_control_store()
+                                      .diagnostics_mutation_revision(),
+                                  runtime_control_store()
+                                      .annoying_diagnostics_mutation_revision(),
+                                  runtime_control_store()
+                                      .was_mood_set_explicitly()};
   }
 
   fn leave_definition_state(
@@ -2178,19 +2371,21 @@ public:
   {
     if (exit == definition_state_exit::RestoreCaller) {
       state.previous.restore(*this);
-      m_shell_option_mutations = state.previous_shell_option_mutations;
-      m_mood_mutation_revision = state.mood_mutation_revision;
-      m_warning_mutation_revision = state.warning_mutation_revision;
-      m_diagnostics_mutation_revision = state.diagnostics_mutation_revision;
-      m_annoying_diagnostics_mutation_revision =
-          state.annoying_diagnostics_mutation_revision;
-      m_was_mood_set_explicitly = state.was_mood_set_explicitly;
+      runtime_control_store().restore_snapshot_state(
+          runtime_control_store().init_moods_sourcing_mask(),
+          runtime_control_store().initialized_moods_mask(),
+          state.was_mood_set_explicitly, state.mood_mutation_revision,
+          state.warning_mutation_revision,
+          state.diagnostics_mutation_revision,
+          state.annoying_diagnostics_mutation_revision,
+          state.previous_shell_option_mutations);
       return;
     }
 
     let const finished = RuntimeState::capture(*this);
     let changed_options = state.entered.shell_options ^ finished.shell_options;
-    if (state.mood_mutation_revision != m_mood_mutation_revision) {
+    if (state.mood_mutation_revision !=
+        runtime_control_store().mood_mutation_revision()) {
       changed_options |= RuntimeState::option_mask(shell_option_id::Nounset);
       changed_options |= RuntimeState::option_mask(shell_option_id::Pipefail);
       changed_options |= RuntimeState::option_mask(shell_option_id::Failglob);
@@ -2201,7 +2396,7 @@ public:
          option++)
     {
       let const option_id = static_cast<shell_option_id>(option);
-      if (m_shell_option_mutations.touched_since(
+      if (runtime_control_store().option_mutations().touched_since(
               option_id, state.shell_option_mutation_revision))
         changed_options |= RuntimeState::option_mask(option_id);
     }
@@ -2211,31 +2406,34 @@ public:
 
     state.previous.restore(*this);
     m_runtime.shell_options = merged_options;
-    if (m_shell_option_mutations.touched_since(
+    if (runtime_control_store().option_mutations().touched_since(
             shell_option_id::Nounset, state.shell_option_mutation_revision))
       m_runtime.set_error_unset_set_explicitly(
           finished.was_error_unset_set_explicitly());
-    if (m_shell_option_mutations.touched_since(
+    if (runtime_control_store().option_mutations().touched_since(
             shell_option_id::Pipefail, state.shell_option_mutation_revision))
       m_runtime.set_pipefail_set_explicitly(
           finished.was_pipefail_set_explicitly());
-    if (m_shell_option_mutations.touched_since(
+    if (runtime_control_store().option_mutations().touched_since(
             shell_option_id::Failglob, state.shell_option_mutation_revision))
       m_runtime.set_failglob_set_explicitly(
           finished.was_failglob_set_explicitly());
-    if (m_shell_option_mutations.touched_since(
+    if (runtime_control_store().option_mutations().touched_since(
             shell_option_id::ExtendedArithmetic,
             state.shell_option_mutation_revision))
       m_runtime.set_extended_arithmetic_set_explicitly(
           finished.was_extended_arithmetic_set_explicitly());
-    if (state.mood_mutation_revision != m_mood_mutation_revision)
+    if (state.mood_mutation_revision !=
+        runtime_control_store().mood_mutation_revision())
       m_runtime.mood = finished.mood;
-    if (state.warning_mutation_revision != m_warning_mutation_revision)
+    if (state.warning_mutation_revision !=
+        runtime_control_store().warning_mutation_revision())
       m_runtime.warning_level = finished.warning_level;
-    if (state.diagnostics_mutation_revision != m_diagnostics_mutation_revision)
+    if (state.diagnostics_mutation_revision !=
+        runtime_control_store().diagnostics_mutation_revision())
       m_runtime.set_diagnostics_disabled(finished.is_diagnostics_disabled());
     if (state.annoying_diagnostics_mutation_revision !=
-        m_annoying_diagnostics_mutation_revision)
+        runtime_control_store().annoying_diagnostics_mutation_revision())
       m_runtime.set_annoying_diagnostics_enabled(
           finished.is_annoying_diagnostics_enabled());
   }
@@ -2246,51 +2444,46 @@ public:
      re-source the same rc and recurse without end. */
   fn set_init_mood_sourcing(mimic_mood mood, bool active) wontthrow -> void
   {
-    let const bit = static_cast<u8>(1U << static_cast<u8>(mood));
-    if (active)
-      m_init_moods_sourcing |= bit;
-    else
-      m_init_moods_sourcing &= static_cast<u8>(~bit);
+    runtime_control_store().set_init_mood_sourcing(mood, active);
   }
   pure fn init_mood_sourcing(mimic_mood mood) const wontthrow -> bool
   {
-    return (m_init_moods_sourcing & (1U << static_cast<u8>(mood))) != 0;
+    return runtime_control_store().init_mood_sourcing(mood);
   }
 
   /* set --mood records that the user chose the mood, so the post-rc restore in
      main leaves a mood the rc selected in place. */
   fn note_explicit_mood() wontthrow -> void
   {
-    m_was_mood_set_explicitly = true;
-    m_mood_mutation_revision++;
+    runtime_control_store().note_explicit_mood();
   }
   pure fn was_mood_set_explicitly() const wontthrow -> bool
   {
-    return m_was_mood_set_explicitly;
+    return runtime_control_store().was_mood_set_explicitly();
   }
 
   /* The moods whose startup files have finished sourcing this session, so set
      --init-moods with no value reports what loaded. */
   fn mark_mood_initialized(mimic_mood mood) wontthrow -> void
   {
-    m_initialized_moods |= static_cast<u8>(1U << static_cast<u8>(mood));
+    runtime_control_store().mark_mood_initialized(mood);
   }
   pure fn mood_initialized(mimic_mood mood) const wontthrow -> bool
   {
-    return (m_initialized_moods & (1U << static_cast<u8>(mood))) != 0;
+    return runtime_control_store().mood_initialized(mood);
   }
 
   fn note_diagnostics_option_mutation() wontthrow -> void
   {
-    m_diagnostics_mutation_revision++;
+    runtime_control_store().note_diagnostics_option_mutation();
   }
   pure fn diagnostics_mutation_revision() const wontthrow -> u64
   {
-    return m_diagnostics_mutation_revision;
+    return runtime_control_store().diagnostics_mutation_revision();
   }
   fn note_annoying_diagnostics_option_mutation() wontthrow -> void
   {
-    m_annoying_diagnostics_mutation_revision++;
+    runtime_control_store().note_annoying_diagnostics_option_mutation();
   }
 
   fn set_mimicry(bool enabled) wontthrow -> void
@@ -2811,19 +3004,11 @@ protected:
      state so a scope that swaps them saves and restores the whole set with one
      RuntimeState copy. failglob defaults on, the other toggles default off. */
   RuntimeState m_runtime{};
+  RuntimeControlStore m_runtime_control_store{};
   ProgramResolver m_program_resolver{};
-  u8 m_init_moods_sourcing{0};
-  u8 m_initialized_moods{0};
   /* Each bit names a dynamic_reader_id whose reader an unset has taken
      away. */
-  bool m_was_mood_set_explicitly{false};
-  u64 m_mood_mutation_revision{0};
-  u64 m_warning_mutation_revision{0};
-  u64 m_diagnostics_mutation_revision{0};
-  u64 m_annoying_diagnostics_mutation_revision{0};
-  shell_option_mutations m_shell_option_mutations{};
   /* Each bit names a suppressible_warning value. */
-  u32 m_suppressed_warnings{0};
   /* The nesting of mimicked scripts, bounded so a script that mimics another
      cannot recurse without limit. */
   /* This is the base $SECONDS counts from. */
@@ -2863,11 +3048,9 @@ protected:
 
   fn install_trap_dispositions() throws -> void;
 
-  StringMap<String> m_aliases{heap_allocator()};
   /* One entry per active function call, holding the bindings a local shadowed.
    */
-  ArrayList<ArrayList<local_binding>> m_local_scopes{heap_allocator()};
-  usize m_local_scope_depth{0};
+  ScopeStore m_scope_store{};
 
   JobTable m_job_table{heap_allocator()};
   bool m_shell_is_interactive;

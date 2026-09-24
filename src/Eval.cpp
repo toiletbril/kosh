@@ -446,11 +446,12 @@ fn EvalContext::disable_ignoreeof() throws -> void
 
 fn EvalContext::peel_caller_local_binding(StringView name) throws -> bool
 {
-  if (m_local_scope_depth < 2) return false;
+  if (scope_store().local_scope_depth() < 2) return false;
   if (is_local_in_current_scope(name)) return false;
 
-  for (usize frame_index = m_local_scope_depth - 1; frame_index-- > 0;) {
-    ArrayList<local_binding> &frame = m_local_scopes[frame_index];
+  for (usize frame_index = scope_store().local_scope_depth() - 1;
+       frame_index-- > 0;) {
+    ArrayList<local_binding> &frame = scope_store().local_scopes()[frame_index];
     for (usize i = frame.count(); i-- > 0;) {
       let &binding = frame[i];
       if (binding.name.view() != name) continue;
@@ -1158,22 +1159,25 @@ fn EvalContext::leave_bash_argument_frame(
 
 fn EvalContext::enter_function_scope() throws -> void
 {
-  if (m_local_scope_depth == m_local_scopes.count())
-    m_local_scopes.push(ArrayList<local_binding>{heap_allocator()});
-  ASSERT(m_local_scopes[m_local_scope_depth].is_empty());
-  m_local_scope_depth++;
+  if (scope_store().local_scope_depth() ==
+      scope_store().local_scopes().count())
+    scope_store().local_scopes().push(ArrayList<local_binding>{heap_allocator()});
+  ASSERT(scope_store().local_scopes()[scope_store().local_scope_depth()].is_empty());
+  scope_store().local_scope_depth()++;
   LOG(Debug, "entered function scope, local scope depth now %zu",
-      m_local_scope_depth);
+      scope_store().local_scope_depth());
 }
 
 fn EvalContext::leave_function_scope() throws -> void
 {
-  if (m_local_scope_depth == 0) return;
+  if (scope_store().local_scope_depth() == 0) return;
 
   /* Restore each shadowed binding in reverse, so a name declared local twice
      ends with the value it held before the function ran. */
-  ASSERT(m_local_scope_depth <= m_local_scopes.count());
-  let &scope = m_local_scopes[m_local_scope_depth - 1];
+  ASSERT(scope_store().local_scope_depth() <=
+         scope_store().local_scopes().count());
+  let &scope =
+      scope_store().local_scopes()[scope_store().local_scope_depth() - 1];
   LOG(Debug, "leaving function scope, restoring %zu shadowed locals",
       scope.count());
   for (usize i = scope.count(); i > 0; i--) {
@@ -1181,12 +1185,13 @@ fn EvalContext::leave_function_scope() throws -> void
     restore_local_binding(scope[i - 1]);
   }
   scope.clear();
-  m_local_scope_depth--;
+  scope_store().local_scope_depth()--;
   constexpr usize RETAINED_LOCAL_SCOPE_COUNT = 16;
-  if (m_local_scopes.count() > RETAINED_LOCAL_SCOPE_COUNT &&
-      m_local_scopes.count() > m_local_scope_depth)
+  if (scope_store().local_scopes().count() > RETAINED_LOCAL_SCOPE_COUNT &&
+      scope_store().local_scopes().count() > scope_store().local_scope_depth())
   {
-    m_local_scopes.remove(m_local_scopes.count() - 1);
+    scope_store().local_scopes().remove(
+        scope_store().local_scopes().count() - 1);
   }
 }
 
@@ -1474,14 +1479,15 @@ fn EvalContext::dynamic_array_element_text(
 
 pure fn EvalContext::in_function_scope() const wontthrow -> bool
 {
-  return m_local_scope_depth != 0;
+  return scope_store().local_scope_depth() != 0;
 }
 
 fn EvalContext::is_local_in_current_scope(StringView name) const wontthrow
     -> bool
 {
-  if (m_local_scope_depth == 0) return false;
-  for (let const &binding : m_local_scopes[m_local_scope_depth - 1])
+  if (scope_store().local_scope_depth() == 0) return false;
+  for (let const &binding :
+       scope_store().local_scopes()[scope_store().local_scope_depth() - 1])
     if (binding.name.view() == name) return true;
   return false;
 }
@@ -1489,8 +1495,9 @@ fn EvalContext::is_local_in_current_scope(StringView name) const wontthrow
 fn EvalContext::is_local_in_any_active_scope(StringView name) const wontthrow
     -> bool
 {
-  for (usize frame_index = m_local_scope_depth; frame_index-- > 0;)
-    for (let const &binding : m_local_scopes[frame_index])
+  for (usize frame_index = scope_store().local_scope_depth();
+       frame_index-- > 0;)
+    for (let const &binding : scope_store().local_scopes()[frame_index])
       if (binding.name.view() == name) return true;
 
   return false;
@@ -1500,25 +1507,25 @@ fn EvalContext::set_alias(StringView name, StringView value) throws -> void
 {
   LOG(All, "setting alias '%.*s' to a %zu byte value",
       static_cast<int>(name.length), name.data, value.length);
-  m_aliases.set(name, value);
+  scope_store().aliases().set(name, value);
 }
 
 fn EvalContext::remove_alias(StringView name) throws -> bool
 {
-  if (m_aliases.find(name) == nullptr) return false;
+  if (scope_store().aliases().find(name) == nullptr) return false;
   LOG(All, "removing alias '%.*s'", static_cast<int>(name.length), name.data);
-  m_aliases.erase(name);
+  scope_store().aliases().erase(name);
   return true;
 }
 
 pure fn EvalContext::has_aliases() const wontthrow -> bool
 {
-  return m_aliases.count() != 0;
+  return scope_store().aliases().count() != 0;
 }
 
 fn EvalContext::get_alias(StringView name) const throws -> Maybe<String>
 {
-  if (let const *value = m_aliases.find(name); value != nullptr)
+  if (let const *value = scope_store().aliases().find(name); value != nullptr)
     return String{heap_allocator(), value->view()};
   return None;
 }
@@ -1526,7 +1533,7 @@ fn EvalContext::get_alias(StringView name) const throws -> Maybe<String>
 fn EvalContext::alias_definitions() const throws -> ArrayList<String>
 {
   let out = ArrayList<String>{heap_allocator()};
-  m_aliases.for_each([&out](StringView key, const String &value) {
+  scope_store().aliases().for_each([&out](StringView key, const String &value) {
     let definition = String{heap_allocator(), key};
     definition.push('=');
     append_shell_quoted_arg(definition, value.view());
@@ -1539,7 +1546,7 @@ fn EvalContext::alias_definitions() const throws -> ArrayList<String>
 fn EvalContext::alias_names() const throws -> HashSet
 {
   let out = HashSet{heap_allocator()};
-  m_aliases.for_each([&out](StringView key, const String &value) {
+  scope_store().aliases().for_each([&out](StringView key, const String &value) {
     unused(value);
     out.add(key);
   });

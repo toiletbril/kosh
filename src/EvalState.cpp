@@ -757,7 +757,7 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       m_runtime.shopt_option_overrides,
       m_runtime.shopt_option_values,
       function_store().definitions(),
-      m_aliases,
+      scope_store().aliases(),
       positional_params(),
       bash_argument_arrays() != nullptr
           ? static_cast<u32>(bash_argument_arrays()->values.count())
@@ -782,21 +782,21 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       m_environment_undo_log.count(),
       RuntimeState::capture(*this),
       m_program_resolver,
-      m_init_moods_sourcing,
-      m_initialized_moods,
+      runtime_control_store().init_moods_sourcing_mask(),
+      runtime_control_store().initialized_moods_mask(),
       variable_store().disabled_bash_special_arrays(),
       variable_store().unset_dynamic_readers(),
-      m_was_mood_set_explicitly,
-      m_mood_mutation_revision,
-      m_warning_mutation_revision,
-      m_diagnostics_mutation_revision,
-      m_annoying_diagnostics_mutation_revision,
+      runtime_control_store().was_mood_set_explicitly_flag(),
+      runtime_control_store().mood_mutation_revision(),
+      runtime_control_store().warning_mutation_revision(),
+      runtime_control_store().diagnostics_mutation_revision(),
+      runtime_control_store().annoying_diagnostics_mutation_revision(),
       m_random_state,
       m_shell_start_time,
       m_seconds_base,
-      m_shell_option_mutations,
-      m_local_scopes,
-      m_local_scope_depth,
+      runtime_control_store().option_mutations(),
+      scope_store().local_scopes(),
+      scope_store().local_scope_depth(),
       m_job_table.take_snapshot(),
       expansion_store().getopts_char_index(),
       expansion_store().getopts_last_optind(),
@@ -822,7 +822,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   m_runtime.shopt_option_overrides = snapshot.shopt_option_overrides;
   m_runtime.shopt_option_values = snapshot.shopt_option_values;
   function_store().definitions() = steal(snapshot.functions);
-  m_aliases = steal(snapshot.aliases);
+  scope_store().aliases() = steal(snapshot.aliases);
   positional_params() = steal(snapshot.positional_params);
   if (!snapshot.had_bash_argument_arrays) {
     reset_bash_argument_arrays();
@@ -847,23 +847,21 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
 
   snapshot.runtime.restore(*this);
   m_program_resolver = steal(snapshot.program_resolver);
-  m_init_moods_sourcing = snapshot.init_moods_sourcing;
-  m_initialized_moods = snapshot.initialized_moods;
   variable_store().disabled_bash_special_arrays() =
       snapshot.disabled_bash_special_arrays;
   variable_store().unset_dynamic_readers() = snapshot.unset_dynamic_readers;
-  m_was_mood_set_explicitly = snapshot.was_mood_set_explicitly;
-  m_mood_mutation_revision = snapshot.mood_mutation_revision;
-  m_warning_mutation_revision = snapshot.warning_mutation_revision;
-  m_diagnostics_mutation_revision = snapshot.diagnostics_mutation_revision;
-  m_annoying_diagnostics_mutation_revision =
-      snapshot.annoying_diagnostics_mutation_revision;
+  runtime_control_store().restore_snapshot_state(
+      snapshot.init_moods_sourcing, snapshot.initialized_moods,
+      snapshot.was_mood_set_explicitly, snapshot.mood_mutation_revision,
+      snapshot.warning_mutation_revision,
+      snapshot.diagnostics_mutation_revision,
+      snapshot.annoying_diagnostics_mutation_revision,
+      snapshot.option_mutations);
   m_random_state = snapshot.random_state;
   m_shell_start_time = snapshot.shell_start_time;
   m_seconds_base = snapshot.seconds_base;
-  m_shell_option_mutations = snapshot.option_mutations;
-  m_local_scopes = steal(snapshot.local_scopes);
-  m_local_scope_depth = snapshot.local_scope_depth;
+  scope_store().local_scopes() = steal(snapshot.local_scopes);
+  scope_store().local_scope_depth() = snapshot.local_scope_depth;
   m_job_table.restore_snapshot(steal(snapshot.job_state));
   expansion_store().set_getopts_char_index(snapshot.getopts_char_index);
   expansion_store().set_getopts_last_optind(snapshot.getopts_last_optind);
@@ -1287,7 +1285,8 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
   }
   append_subshell_bootstrap_u64(
       body, static_cast<u64>(function_store().call_depth()));
-  append_subshell_bootstrap_u64(body, static_cast<u64>(m_local_scope_depth));
+  append_subshell_bootstrap_u64(
+      body, static_cast<u64>(scope_store().local_scope_depth()));
   append_subshell_bootstrap_u32(
       body, static_cast<u32>(function_store().call_names().count()));
   for (let const &name : function_store().call_names())
