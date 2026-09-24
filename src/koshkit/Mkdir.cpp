@@ -10,8 +10,8 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../Path.hpp"
-#include "../Trace.hpp"
+#include "../base/Path.hpp"
+#include "../base/Trace.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();

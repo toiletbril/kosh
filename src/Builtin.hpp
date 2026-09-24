@@ -12,8 +12,8 @@
 #pragma once
 
 #include "CLI.hpp"
-#include "Common.hpp"
-#include "Maybe.hpp"
+#include "base/Common.hpp"
+#include "base/Maybe.hpp"
 #include "MimicMood.hpp"
 #include "Platform.hpp"
 

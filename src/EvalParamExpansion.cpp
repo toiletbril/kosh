@@ -9,17 +9,17 @@
  * coordinator.
  */
 
-#include "Arena.hpp"
-#include "Common.hpp"
-#include "Debug.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
-#include "Path.hpp"
+#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
-#include "Trace.hpp"
+#include "base/Trace.hpp"
 #include "Utils.hpp"
 
 namespace koshka {

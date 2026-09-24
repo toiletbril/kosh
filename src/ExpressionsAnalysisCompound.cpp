@@ -8,13 +8,13 @@
  * constant conditions outside runtime expression code.
  */
 
-#include "Arena.hpp"
+#include "base/Arena.hpp"
 #include "Builtin.hpp"
 #include "CLI.hpp"
 #include "CLIColors.hpp"
-#include "Common.hpp"
+#include "base/Common.hpp"
 #include "Completion.hpp"
-#include "Debug.hpp"
+#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
@@ -27,7 +27,7 @@
 #include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
-#include "Trace.hpp"
+#include "base/Trace.hpp"
 #include "Utils.hpp"
 
 namespace koshka {

@@ -11,16 +11,16 @@
 
 #pragma once
 
-#include "Arena.hpp"
-#include "Bitset.hpp"
+#include "base/Arena.hpp"
+#include "base/Bitset.hpp"
 #include "Builtin.hpp"
-#include "Common.hpp"
-#include "Containers.hpp"
+#include "base/Common.hpp"
+#include "base/Containers.hpp"
 #include "Errors.hpp"
 #include "EvalTypes.hpp"
-#include "Maybe.hpp"
+#include "base/Maybe.hpp"
 #include "MimicMood.hpp"
-#include "Path.hpp"
+#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "ProgramResolver.hpp"
 

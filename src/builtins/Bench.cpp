@@ -12,7 +12,7 @@
 #include "../Completion.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
-#include "../Trace.hpp"
+#include "../base/Trace.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();

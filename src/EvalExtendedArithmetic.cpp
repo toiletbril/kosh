@@ -10,8 +10,8 @@
 
 #include "EvalExtendedArithmetic.hpp"
 
-#include "Common.hpp"
-#include "Debug.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Platform.hpp"
 #include "Utils.hpp"

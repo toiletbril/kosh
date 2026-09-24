@@ -10,16 +10,16 @@
 
 #pragma once
 
-#include "Arena.hpp"
-#include "Common.hpp"
-#include "HashSet.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/HashSet.hpp"
 #include "Highlight.hpp"
-#include "Maybe.hpp"
-#include "Path.hpp"
+#include "base/Maybe.hpp"
+#include "base/Path.hpp"
 #include "StaticStringMap.hpp"
-#include "String.hpp"
-#include "StringMap.hpp"
-#include "StringView.hpp"
+#include "base/String.hpp"
+#include "base/StringMap.hpp"
+#include "base/StringView.hpp"
 
 namespace koshka {
 

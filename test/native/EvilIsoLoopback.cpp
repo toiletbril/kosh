@@ -8,7 +8,7 @@
  * bounded release FIFO so the CLI fixture needs no timing sleeps.
  */
 
-#include "Common.hpp"
+#include "base/Common.hpp"
 
 #include <arpa/inet.h>
 #include <cerrno>

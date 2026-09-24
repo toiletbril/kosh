@@ -9,7 +9,7 @@
 
 #include "DiagnosticsChecksInternal.hpp"
 #include "Lexer.hpp"
-#include "PackedStringKey.hpp"
+#include "base/PackedStringKey.hpp"
 #include "StaticStringMap.hpp"
 #include "Tokens.hpp"
 #include "Utils.hpp"

@@ -12,7 +12,7 @@
 #include "Allocator.hpp"
 #include "Common.hpp"
 #include "Debug.hpp"
-#include "Errors.hpp"
+#include "../Errors.hpp"
 
 namespace koshka {
 

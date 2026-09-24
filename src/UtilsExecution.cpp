@@ -11,8 +11,8 @@
 
 #include "Builtin.hpp"
 #include "CLI.hpp"
-#include "Containers.hpp"
-#include "Debug.hpp"
+#include "base/Containers.hpp"
+#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "EvalVariablesInternal.hpp"
@@ -20,7 +20,7 @@
 #include "Lexer.hpp"
 #include "Platform.hpp"
 #include "Toiletline.hpp"
-#include "Trace.hpp"
+#include "base/Trace.hpp"
 #include "Utils.hpp"
 
 namespace koshka {

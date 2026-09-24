@@ -7,9 +7,9 @@
  * and ownership transfer.
  */
 
-#include "String.hpp"
+#include "base/String.hpp"
 
-#include "ErrorOr.hpp"
+#include "base/ErrorOr.hpp"
 #include "Utils.hpp"
 
 namespace koshka {

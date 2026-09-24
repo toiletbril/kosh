@@ -12,10 +12,10 @@
 #pragma once
 
 #include "Builtin.hpp"
-#include "Common.hpp"
-#include "ErrorOr.hpp"
+#include "base/Common.hpp"
+#include "base/ErrorOr.hpp"
 #include "Eval.hpp"
-#include "Path.hpp"
+#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "Tokens.hpp"
 

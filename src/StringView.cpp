@@ -6,10 +6,10 @@
  * slicing, comparison, parsing, and conversion helpers.
  */
 
-#include "StringView.hpp"
+#include "base/StringView.hpp"
 
-#include "ErrorOr.hpp"
-#include "String.hpp"
+#include "base/ErrorOr.hpp"
+#include "base/String.hpp"
 
 namespace koshka {
 

@@ -8,20 +8,20 @@
  * split keeps argument formation separate from segment and parameter expansion.
  */
 
-#include "Arena.hpp"
+#include "base/Arena.hpp"
 #include "CLI.hpp"
-#include "Common.hpp"
-#include "Debug.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Lexer.hpp"
-#include "PackedStringKey.hpp"
+#include "base/PackedStringKey.hpp"
 #include "Parser.hpp"
-#include "Path.hpp"
+#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
-#include "Trace.hpp"
+#include "base/Trace.hpp"
 #include "Utils.hpp"
 
 namespace koshka {

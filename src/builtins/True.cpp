@@ -8,7 +8,7 @@
 
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
-#include "../Trace.hpp"
+#include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
 

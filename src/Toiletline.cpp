@@ -12,19 +12,19 @@
 /* The toiletline configuration macros are defined here, so Toiletline.hpp is
    not included. */
 
-#include "Allocator.hpp"
+#include "base/Allocator.hpp"
 #include "CLI.hpp"
 #include "CLIColors.hpp"
 #include "Completion.hpp"
-#include "Debug.hpp"
-#include "ErrorOr.hpp"
+#include "base/Debug.hpp"
+#include "base/ErrorOr.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "ExecContext.hpp"
-#include "Path.hpp"
+#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "ToiletlineHistory.hpp"
-#include "Trace.hpp"
+#include "base/Trace.hpp"
 #include "Utils.hpp"
 
 namespace toiletline {

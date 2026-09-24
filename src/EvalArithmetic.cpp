@@ -9,16 +9,16 @@
  * storage.
  */
 
-#include "Common.hpp"
-#include "Debug.hpp"
-#include "ErrorOr.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
+#include "base/ErrorOr.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "EvalExtendedArithmetic.hpp"
 #include "Lexer.hpp"
-#include "Maybe.hpp"
+#include "base/Maybe.hpp"
 #include "Tokens.hpp"
-#include "Trace.hpp"
+#include "base/Trace.hpp"
 #include "Utils.hpp"
 
 namespace koshka {

@@ -21,7 +21,7 @@
 #include "MimicMood.hpp"
 #include "Parser.hpp"
 #include "ParserFormats.hpp"
-#include "Path.hpp"
+#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
 #include "Utils.hpp"

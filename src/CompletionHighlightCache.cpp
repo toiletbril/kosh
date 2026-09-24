@@ -8,19 +8,19 @@
  * mutable cache state and rendering above the semantic classifier.
  */
 
-#include "Arena.hpp"
+#include "base/Arena.hpp"
 #include "Builtin.hpp"
 #include "CLIColors.hpp"
 #include "Completion.hpp"
 #include "CompletionInternal.hpp"
-#include "Debug.hpp"
-#include "HashSet.hpp"
+#include "base/Debug.hpp"
+#include "base/HashSet.hpp"
 #include "Koshkit.hpp"
 #include "Lexer.hpp"
-#include "Path.hpp"
+#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "Tokens.hpp"
-#include "Trace.hpp"
+#include "base/Trace.hpp"
 #include "Utils.hpp"
 
 namespace koshka {

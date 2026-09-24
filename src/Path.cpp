@@ -7,13 +7,13 @@
  * filesystem-facing conversions.
  */
 
-#include "Path.hpp"
+#include "base/Path.hpp"
 
 #include "MimicMood.hpp"
-#include "PackedStringKey.hpp"
+#include "base/PackedStringKey.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
-#include "Trace.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 

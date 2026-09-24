@@ -17,7 +17,7 @@
 #include "../Lexer.hpp"
 #include "../Platform.hpp"
 #include "../Toiletline.hpp"
-#include "../Trace.hpp"
+#include "../base/Trace.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();

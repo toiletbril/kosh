@@ -13,7 +13,7 @@
 #include "../Eval.hpp"
 #include "../Platform.hpp"
 #include "../StaticStringMap.hpp"
-#include "../Trace.hpp"
+#include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
 

@@ -7,12 +7,12 @@
  * the interactive loop.
  */
 
-#include "Arena.hpp"
+#include "base/Arena.hpp"
 #include "CLI.hpp"
 #include "CLIColors.hpp"
-#include "Common.hpp"
+#include "base/Common.hpp"
 #include "Completion.hpp"
-#include "Debug.hpp"
+#include "base/Debug.hpp"
 #include "Diagnostics.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
@@ -22,13 +22,13 @@
 #include "Koshkit.hpp"
 #include "LanguageServer.hpp"
 #include "Lexer.hpp"
-#include "PackedStringKey.hpp"
+#include "base/PackedStringKey.hpp"
 #include "Parser.hpp"
-#include "Path.hpp"
+#include "base/Path.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
 #include "Toiletline.hpp"
-#include "Trace.hpp"
+#include "base/Trace.hpp"
 #include "Utils.hpp"
 
 FLAG_LIST_DECL();

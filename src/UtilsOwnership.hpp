@@ -8,10 +8,10 @@
 
 #pragma once
 
-#include "Common.hpp"
-#include "Maybe.hpp"
-#include "Path.hpp"
-#include "StringView.hpp"
+#include "base/Common.hpp"
+#include "base/Maybe.hpp"
+#include "base/Path.hpp"
+#include "base/StringView.hpp"
 
 namespace koshka {
 

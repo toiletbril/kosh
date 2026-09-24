@@ -11,10 +11,10 @@
 
 #pragma once
 
-#include "ArrayList.hpp"
-#include "Common.hpp"
-#include "String.hpp"
-#include "StringView.hpp"
+#include "base/ArrayList.hpp"
+#include "base/Common.hpp"
+#include "base/String.hpp"
+#include "base/StringView.hpp"
 
 #include <type_traits>
 

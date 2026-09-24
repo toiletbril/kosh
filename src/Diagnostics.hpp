@@ -10,9 +10,9 @@
 
 #pragma once
 
-#include "Containers.hpp"
-#include "String.hpp"
-#include "StringView.hpp"
+#include "base/Containers.hpp"
+#include "base/String.hpp"
+#include "base/StringView.hpp"
 
 namespace koshka {
 

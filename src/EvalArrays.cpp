@@ -11,15 +11,15 @@
  * are shared even when an array has no ordinary indexed-array allocation.
  */
 
-#include "Arena.hpp"
+#include "base/Arena.hpp"
 #include "Builtin.hpp"
-#include "Common.hpp"
-#include "Debug.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
-#include "Trace.hpp"
+#include "base/Trace.hpp"
 #include "Utils.hpp"
 
 namespace koshka {

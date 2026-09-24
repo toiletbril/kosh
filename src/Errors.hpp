@@ -9,10 +9,10 @@
 
 #pragma once
 
-#include "Common.hpp"
-#include "Maybe.hpp"
-#include "String.hpp"
-#include "StringView.hpp"
+#include "base/Common.hpp"
+#include "base/Maybe.hpp"
+#include "base/String.hpp"
+#include "base/StringView.hpp"
 
 namespace koshka {
 

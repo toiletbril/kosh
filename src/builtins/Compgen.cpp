@@ -14,11 +14,11 @@
 #include "../Completion.hpp"
 #include "../Eval.hpp"
 #include "../Lexer.hpp"
-#include "../Path.hpp"
+#include "../base/Path.hpp"
 #include "../Platform.hpp"
 #include "../StaticStringMap.hpp"
 #include "../Tokens.hpp"
-#include "../Trace.hpp"
+#include "../base/Trace.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();

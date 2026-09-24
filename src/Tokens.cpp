@@ -9,12 +9,12 @@
 
 #include "Tokens.hpp"
 
-#include "Arena.hpp"
-#include "Debug.hpp"
+#include "base/Arena.hpp"
+#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Lexer.hpp"
 #include "Optimizer.hpp"
-#include "Trace.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 

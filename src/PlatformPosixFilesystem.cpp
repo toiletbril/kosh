@@ -8,12 +8,12 @@
  */
 
 #include "CLI.hpp"
-#include "Common.hpp"
-#include "Debug.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"
-#include "Trace.hpp"
+#include "base/Trace.hpp"
 #include "Utils.hpp"
 
 #if defined __linux__

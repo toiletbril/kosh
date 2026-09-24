@@ -10,7 +10,7 @@
 #pragma once
 
 #include "Common.hpp"
-#include "Platform.hpp"
+#include "../Platform.hpp"
 #include "String.hpp"
 #include "StringView.hpp"
 

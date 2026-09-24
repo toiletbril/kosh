@@ -9,7 +9,7 @@
 
 #include "Formatter.hpp"
 
-#include "Debug.hpp"
+#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"

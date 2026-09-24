@@ -9,7 +9,7 @@
 
 #include "../Builtin.hpp"
 #include "../Eval.hpp"
-#include "../Trace.hpp"
+#include "../base/Trace.hpp"
 #include "../Utils.hpp"
 
 /* An option whose pattern engine is not yet wired still records its state so a

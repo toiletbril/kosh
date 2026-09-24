@@ -9,14 +9,14 @@
 
 #pragma once
 
-#include "Allocator.hpp"
-#include "Arena.hpp"
+#include "base/Allocator.hpp"
+#include "base/Arena.hpp"
 #include "Completion.hpp"
-#include "Containers.hpp"
+#include "base/Containers.hpp"
 #include "Eval.hpp"
-#include "HashSet.hpp"
-#include "String.hpp"
-#include "StringView.hpp"
+#include "base/HashSet.hpp"
+#include "base/String.hpp"
+#include "base/StringView.hpp"
 
 namespace koshka {
 

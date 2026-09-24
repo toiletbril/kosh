@@ -9,13 +9,13 @@
 
 #pragma once
 
-#include "Common.hpp"
+#include "base/Common.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Expressions.hpp"
 #include "Platform.hpp"
-#include "String.hpp"
-#include "StringView.hpp"
+#include "base/String.hpp"
+#include "base/StringView.hpp"
 #include "Utils.hpp"
 
 #define SET_AND_RETURN_EXIT_STATUS(cxt, status)                                \

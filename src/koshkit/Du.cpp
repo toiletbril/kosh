@@ -7,14 +7,14 @@
  * totals.
  */
 
-#include "../Arena.hpp"
+#include "../base/Arena.hpp"
 #include "../CLI.hpp"
 #include "../CLIColors.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
-#include "../HashSet.hpp"
+#include "../base/HashSet.hpp"
 #include "../Koshkit.hpp"
-#include "../Path.hpp"
+#include "../base/Path.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();

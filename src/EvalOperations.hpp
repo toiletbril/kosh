@@ -9,10 +9,10 @@
 
 #pragma once
 
-#include "Arena.hpp"
-#include "Common.hpp"
-#include "Containers.hpp"
-#include "Maybe.hpp"
+#include "base/Arena.hpp"
+#include "base/Common.hpp"
+#include "base/Containers.hpp"
+#include "base/Maybe.hpp"
 #include "MimicMood.hpp"
 
 namespace koshka {

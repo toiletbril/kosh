@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "StringView.hpp"
+#include "base/StringView.hpp"
 
 namespace koshka::internal {
 

@@ -9,11 +9,11 @@
 
 #pragma once
 
-#include "ArrayList.hpp"
-#include "Maybe.hpp"
+#include "base/ArrayList.hpp"
+#include "base/Maybe.hpp"
 #include "MimicMood.hpp"
-#include "String.hpp"
-#include "StringView.hpp"
+#include "base/String.hpp"
+#include "base/StringView.hpp"
 
 namespace koshka {
 

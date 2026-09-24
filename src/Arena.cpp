@@ -7,11 +7,11 @@
  * objects when their arena is released.
  */
 
-#include "Arena.hpp"
+#include "base/Arena.hpp"
 
-#include "Allocator.hpp"
-#include "Containers.hpp"
-#include "Trace.hpp"
+#include "base/Allocator.hpp"
+#include "base/Containers.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 

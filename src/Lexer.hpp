@@ -10,12 +10,12 @@
 
 #pragma once
 
-#include "Common.hpp"
-#include "Containers.hpp"
+#include "base/Common.hpp"
+#include "base/Containers.hpp"
 #include "Diagnostics.hpp"
 #include "MimicMood.hpp"
-#include "String.hpp"
-#include "StringView.hpp"
+#include "base/String.hpp"
+#include "base/StringView.hpp"
 #include "Tokens.hpp"
 
 namespace koshka {

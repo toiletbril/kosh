@@ -10,7 +10,7 @@
 #include "CLIColors.hpp"
 
 #include "Platform.hpp"
-#include "Trace.hpp"
+#include "base/Trace.hpp"
 
 namespace koshka {
 

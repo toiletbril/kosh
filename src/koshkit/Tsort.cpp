@@ -10,7 +10,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../StringMap.hpp"
+#include "../base/StringMap.hpp"
 
 FLAG_LIST_DECL();
 

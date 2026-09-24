@@ -11,7 +11,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
-#include "../Trace.hpp"
+#include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
 

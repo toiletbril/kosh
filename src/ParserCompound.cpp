@@ -7,15 +7,15 @@
  * productions are separate from simple-command and pipeline parsing.
  */
 
-#include "Arena.hpp"
-#include "Debug.hpp"
+#include "base/Arena.hpp"
+#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Expressions.hpp"
 #include "Optimizer.hpp"
 #include "Parser.hpp"
 #include "ParserInternal.hpp"
 #include "Tokens.hpp"
-#include "Trace.hpp"
+#include "base/Trace.hpp"
 #include "Utils.hpp"
 
 namespace koshka {

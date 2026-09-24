@@ -12,7 +12,7 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
-#include "../Trace.hpp"
+#include "../base/Trace.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();

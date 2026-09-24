@@ -9,7 +9,7 @@
 #include "../Builtin.hpp"
 #include "../CLI.hpp"
 #include "../Eval.hpp"
-#include "../Trace.hpp"
+#include "../base/Trace.hpp"
 #include "../Utils.hpp"
 
 FLAG_LIST_DECL();

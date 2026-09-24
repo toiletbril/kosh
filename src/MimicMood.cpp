@@ -9,7 +9,7 @@
 
 #include "MimicMood.hpp"
 
-#include "PackedStringKey.hpp"
+#include "base/PackedStringKey.hpp"
 
 namespace koshka {
 

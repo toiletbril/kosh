@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Common.hpp"
+#include "base/Common.hpp"
 #include "Platform.hpp"
 
 namespace koshka::os {

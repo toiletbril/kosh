@@ -12,14 +12,14 @@
  */
 
 #include "CLI.hpp"
-#include "Common.hpp"
-#include "Debug.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "EvalVariablesInternal.hpp"
 #include "Platform.hpp"
 #include "StaticStringMap.hpp"
-#include "Trace.hpp"
+#include "base/Trace.hpp"
 #include "Utils.hpp"
 
 #include <fcntl.h>

@@ -8,11 +8,11 @@
  * split keeps process lifetime and job bookkeeping separate from evaluation.
  */
 
-#include "Common.hpp"
-#include "Debug.hpp"
+#include "base/Common.hpp"
+#include "base/Debug.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"
-#include "Trace.hpp"
+#include "base/Trace.hpp"
 #include "Utils.hpp"
 
 namespace koshka {

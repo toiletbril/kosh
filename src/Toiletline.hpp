@@ -8,13 +8,13 @@
  * while ToiletlineStubs.cpp supplies noninteractive builds.
  */
 
-#include "ArrayList.hpp"
+#include "base/ArrayList.hpp"
 #include "Completion.hpp"
-#include "Common.hpp"
-#include "ErrorOr.hpp"
-#include "Path.hpp"
-#include "String.hpp"
-#include "StringView.hpp"
+#include "base/Common.hpp"
+#include "base/ErrorOr.hpp"
+#include "base/Path.hpp"
+#include "base/String.hpp"
+#include "base/StringView.hpp"
 #include "ToiletlineHistory.hpp"
 
 #define TL_HISTORY_MAX_SIZE (1024 * 4)

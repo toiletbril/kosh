@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "Common.hpp"
+#include "base/Common.hpp"
 
 #define KOSH_PLATFORM_POSIX 0b1
 #define KOSH_PLATFORM_WIN32 0b10
@@ -153,10 +153,10 @@ hot alwaysinline fn read_native_endian_bytes(const char *bytes,
 
 } /* namespace koshka::os */
 
-#include "ArrayList.hpp"
-#include "Maybe.hpp"
-#include "Path.hpp"
-#include "String.hpp"
+#include "base/ArrayList.hpp"
+#include "base/Maybe.hpp"
+#include "base/Path.hpp"
+#include "base/String.hpp"
 
 namespace koshka {
 

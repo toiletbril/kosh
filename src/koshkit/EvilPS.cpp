@@ -10,7 +10,7 @@
 
 #include "../CLI.hpp"
 #include "../CLIColors.hpp"
-#include "../Arena.hpp"
+#include "../base/Arena.hpp"
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"

@@ -22,9 +22,9 @@
    evaluator reads it, so this unit holds the algorithms and the rules and the
    nodes hold the storage and the dispatch. */
 
-#include "Common.hpp"
-#include "Containers.hpp"
-#include "Maybe.hpp"
+#include "base/Common.hpp"
+#include "base/Containers.hpp"
+#include "base/Maybe.hpp"
 #include "Tokens.hpp"
 
 namespace koshka {
