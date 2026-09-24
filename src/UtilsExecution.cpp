@@ -202,13 +202,14 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
   let const source = cxt.current_source();
   unused(cxt.materialize_kosh_identity());
   os::process p = os::execute_program(
-      ec, source != nullptr ? source->view() : StringView{}, 0,
-      is_async ? os::script_fallback_policy::Reject
-               : os::script_fallback_policy::Allow,
-      os::terminal_handoff::Keep,
-      is_async            ? os::process_group_mode::NewBackground
-      : is_foreground_job ? os::process_group_mode::New
-                          : os::process_group_mode::Inherit);
+      ec, os::program_execution_options{
+              .source = source != nullptr ? source->view() : StringView{},
+              .fallback = is_async ? os::script_fallback_policy::Reject
+                                   : os::script_fallback_policy::Allow,
+              .process_group =
+                  is_async            ? os::process_group_mode::NewBackground
+                  : is_foreground_job ? os::process_group_mode::New
+                                      : os::process_group_mode::Inherit});
   if (p == KOSH_INVALID_PROCESS) {
     LOG(Debug, "running the file as a shell script in this process");
     const mimic_mood mode = cxt.mood();
@@ -453,9 +454,11 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
           !is_async ? os::process_group_mode::Inherit
                     : os::background_process_group_mode(process_group_id);
       let const child = os::execute_program(
-          ec, source != nullptr ? source->view() : StringView{},
-          process_group_id, os::script_fallback_policy::Reject,
-          os::terminal_handoff::Keep, process_group);
+          ec, os::program_execution_options{
+                  .source = source != nullptr ? source->view() : StringView{},
+                  .process_group_id = process_group_id,
+                  .fallback = os::script_fallback_policy::Reject,
+                  .process_group = process_group});
       if (is_async && process_group_id == 0) {
         process_group_id = os::process_id_of(child);
       }

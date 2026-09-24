@@ -831,24 +831,24 @@ static pure fn is_batch_program(StringView path) wontthrow -> bool
          utils::ascii_to_lower(suffix[3]) == 't';
 }
 
-fn execute_program(ExecContext &ec, StringView, i64 process_group_id,
-                   script_fallback_policy fallback, terminal_handoff handoff,
-                   process_group_mode process_group) -> process
+fn execute_program(ExecContext &ec,
+                   const program_execution_options &options) -> process
 {
-  let const allow_script_fallback = fallback == script_fallback_policy::Allow;
-  unused(process_group_id);
+  let const allow_script_fallback =
+      options.fallback == script_fallback_policy::Allow;
   let const should_create_new_process_group =
-      process_group == process_group_mode::New ||
-      process_group == process_group_mode::NewBackground ||
-      process_group == process_group_mode::NewLeaderOwned;
+      options.process_group == process_group_mode::New ||
+      options.process_group == process_group_mode::NewBackground ||
+      options.process_group == process_group_mode::NewLeaderOwned;
   let const should_attach_timeout_job =
       should_create_new_process_group &&
-      process_group != process_group_mode::NewBackground;
-  let const job_lifetime = process_group == process_group_mode::NewLeaderOwned
+      options.process_group != process_group_mode::NewBackground;
+  let const job_lifetime =
+      options.process_group == process_group_mode::NewLeaderOwned
                                ? timeout_job_lifetime::LeaderOwned
                                : timeout_job_lifetime::DescendantOwned;
   let const should_hand_off_controlling_terminal_before_start =
-      handoff == terminal_handoff::BeforeStart;
+      options.handoff == terminal_handoff::BeforeStart;
   let const should_start_suspended =
       should_attach_timeout_job ||
       should_hand_off_controlling_terminal_before_start;
@@ -1422,7 +1422,8 @@ fn replace_process(ExecContext &&ec) -> void
      shell exits with its status. */
   LOG(Debug, "running '%s' to completion in place of an exec",
       ec.program_path().c_str());
-  process child = execute_program(ec, {}, 0, script_fallback_policy::Allow);
+  process child = execute_program(
+      ec, program_execution_options{.fallback = script_fallback_policy::Allow});
   if (child == KOSH_INVALID_PROCESS) {
     redirect_self(ec);
     ec.close_fds();

@@ -86,15 +86,16 @@ cold fn spawn_failure_child(SourceLocation location, const Path &program_path,
   return child_pid;
 }
 
-hot fn execute_program(ExecContext &ec, StringView source, i64 process_group_id,
-                       script_fallback_policy fallback,
-                       terminal_handoff handoff,
-                       process_group_mode process_group) throws -> process
+hot fn execute_program(ExecContext &ec,
+                       const program_execution_options &options) throws
+    -> process
 {
-  let const allow_script_fallback = fallback == script_fallback_policy::Allow;
-  let const new_process_group = process_group != process_group_mode::Inherit;
+  let const allow_script_fallback =
+      options.fallback == script_fallback_policy::Allow;
+  let const new_process_group =
+      options.process_group != process_group_mode::Inherit;
   let const should_hand_off_controlling_terminal_before_start =
-      handoff == terminal_handoff::BeforeStart;
+      options.handoff == terminal_handoff::BeforeStart;
   ASSERT(ec.args().count() > 0, "a program needs at least argv[0]");
 
   LOG(Debug, "spawning '%s' with %zu arguments", ec.program_path().c_str(),
@@ -140,7 +141,7 @@ hot fn execute_program(ExecContext &ec, StringView source, i64 process_group_id,
         os::close_fd(outcome_pipe->out);
         os::exit_process_immediately(0);
       } catch (const ErrorBase &error) {
-        show_message(error.to_string(source));
+        show_message(error.to_string(options.source));
         flush();
         os::exit_process_immediately(static_cast<i32>(error.command_status()));
       } catch (...) {
@@ -261,10 +262,12 @@ hot fn execute_program(ExecContext &ec, StringView source, i64 process_group_id,
 
   short spawn_flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
   if (new_process_group) {
-    ASSERT(process_group != process_group_mode::Join || process_group_id > 0);
-    posix_spawnattr_setpgroup(&attr, process_group == process_group_mode::Join
-                                         ? static_cast<pid_t>(process_group_id)
-                                         : 0);
+    ASSERT(options.process_group != process_group_mode::Join ||
+           options.process_group_id > 0);
+    posix_spawnattr_setpgroup(
+        &attr, options.process_group == process_group_mode::Join
+                   ? static_cast<pid_t>(options.process_group_id)
+                   : 0);
     spawn_flags |= POSIX_SPAWN_SETPGROUP;
   }
   posix_spawnattr_setflags(&attr, spawn_flags);
@@ -289,8 +292,9 @@ hot fn execute_program(ExecContext &ec, StringView source, i64 process_group_id,
 
   if (spawn_error != 0)
     return spawn_failure_child(ec.source_location(), ec.program_path(),
-                               spawn_error, source, process_group_id,
-                               process_group);
+                               spawn_error, options.source,
+                               options.process_group_id,
+                               options.process_group);
 
   return child_pid;
 }

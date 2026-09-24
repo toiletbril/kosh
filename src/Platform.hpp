@@ -1926,13 +1926,19 @@ fn write_system_log(StringView tag, StringView priority, StringView message,
                     bool should_include_pid,
                     bool should_copy_to_stderr) wontthrow -> bool;
 
+struct program_execution_options
+{
+  StringView source{};
+  i64 process_group_id{0};
+  script_fallback_policy fallback{script_fallback_policy::Reject};
+  terminal_handoff handoff{terminal_handoff::Keep};
+  process_group_mode process_group{process_group_mode::Inherit};
+};
+
 /* Script fallback returns KOSH_INVALID_PROCESS when it is allowed and the file
    has no executable format. */
-fn execute_program(
-    ExecContext &ec, StringView source = {}, i64 process_group_id = 0,
-    script_fallback_policy fallback = script_fallback_policy::Reject,
-    terminal_handoff handoff = terminal_handoff::Keep,
-    process_group_mode process_group = process_group_mode::Inherit) throws
+fn execute_program(ExecContext &ec,
+                   const program_execution_options &options = {}) throws
     -> process;
 
 fn shell_has_controlling_terminal() wontthrow -> bool;
