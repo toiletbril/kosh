@@ -412,7 +412,9 @@ static fn collect_directory(const Path &directory,
   for (let const &child : *children) {
     if (!options.is_showing_dot_names && child.name.starts_with(".")) continue;
 
-    if (options.needs_type) {
+    if (options.needs_full_status || options.should_classify ||
+        options.should_color)
+    {
       let child_path = Path{directory_text, allocator};
       child_path.append(child.name.view());
       entries.push(make_entry(child_path, child.name.view(), options,
