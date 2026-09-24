@@ -774,8 +774,8 @@ fn EvalContext::apply_array_subscript(
         let separator = ' ';
         let has_separator = true;
         if (subscript == "*") {
-          has_separator = !m_field_separators.is_empty();
-          if (has_separator) separator = m_field_separators.first_character();
+          has_separator = !field_separators().is_empty();
+          if (has_separator) separator = field_separators()[0];
         }
 
         let out = String{scratch_allocator()};
@@ -815,8 +815,8 @@ fn EvalContext::apply_array_subscript(
       let separator = ' ';
       let has_separator = true;
       if (subscript == "*") {
-        has_separator = !m_field_separators.is_empty();
-        if (has_separator) separator = m_field_separators.first_character();
+        has_separator = !field_separators().is_empty();
+        if (has_separator) separator = field_separators()[0];
       }
 
       let out = String{scratch_allocator()};
@@ -849,8 +849,8 @@ fn EvalContext::apply_array_subscript(
       let separator = ' ';
       let has_separator = true;
       if (subscript == "*") {
-        has_separator = !m_field_separators.is_empty();
-        if (has_separator) separator = m_field_separators.first_character();
+        has_separator = !field_separators().is_empty();
+        if (has_separator) separator = field_separators()[0];
       }
       let out = String{scratch_allocator()};
       let const values = associative_values(name);
@@ -879,8 +879,8 @@ fn EvalContext::apply_array_subscript(
     let separator = ' ';
     let has_separator = true;
     if (subscript == "*") {
-      has_separator = !m_field_separators.is_empty();
-      if (has_separator) separator = m_field_separators.first_character();
+      has_separator = !field_separators().is_empty();
+      if (has_separator) separator = field_separators()[0];
     }
     let out = String{scratch_allocator()};
     for (usize i = 0; i < array->count(); i++) {

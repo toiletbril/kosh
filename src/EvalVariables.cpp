@@ -389,9 +389,9 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       let separator = ' ';
       let has_separator = true;
       if (first_byte == '*') {
-        let const &ifs = m_field_separators;
+        let const ifs = field_separators();
         has_separator = !ifs.is_empty();
-        if (has_separator) separator = ifs.first_character();
+        if (has_separator) separator = ifs[0];
       }
       let joined = String{heap_allocator()};
       usize joined_length = 0;
@@ -454,7 +454,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     if (let const info = ALWAYS_DYNAMIC.find(name); info.has_value()) {
       switch (info->kind) {
       case dynamic_var::IFS:
-        return String{heap_allocator(), m_field_separators.view()};
+        return String{heap_allocator(), field_separators()};
       case dynamic_var::LINENO: {
         if (let const trigger_line = trap_trigger_line_number();
             trigger_line.has_value())

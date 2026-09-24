@@ -374,6 +374,39 @@ enum class shopt_option_id : u8
 inline constexpr StringView EXTDEBUG_SHOPT_OPTION{"extdebug"};
 pure fn shopt_option_index(shopt_option_id option) wontthrow -> u8;
 
+class VariableStore
+{
+public:
+  fn set_field_separators(StringView value) throws -> void
+  {
+    for (u64 &bits : m_field_separator_bits) bits = 0;
+    for (usize i = 0; i < value.length; i++) {
+      let const byte = static_cast<u8>(value.data[i]);
+      m_field_separator_bits[byte >> 6] |= u64{1} << (byte & 63);
+    }
+    if (value.data != m_field_separators.data()) {
+      m_field_separators.clear();
+      m_field_separators.append(value);
+    }
+  }
+
+  pure fn field_separators() const wontthrow -> StringView
+  {
+    return m_field_separators.view();
+  }
+
+  hot pure fn is_field_separator(char c) const wontthrow -> bool
+  {
+    let const byte = static_cast<u8>(c);
+    return (m_field_separator_bits[byte >> 6] &
+            (u64{1} << (byte & 63))) != 0;
+  }
+
+private:
+  String m_field_separators{" \t\n"};
+  u64 m_field_separator_bits[4]{};
+};
+
 class EvalContext
 {
 public:
@@ -568,7 +601,7 @@ public:
   fn set_field_separators(StringView value) throws -> void;
   pure fn field_separators() const wontthrow -> StringView
   {
-    return m_field_separators.view();
+    return m_variable_store.field_separators();
   }
   fn get_variable_value(StringView name) const throws -> Maybe<String>;
   fn get_variable_value_checked(StringView name) const throws -> Maybe<String>;
@@ -2082,12 +2115,7 @@ protected:
   StringMap<CompiledRegex> m_regex_cache{heap_allocator()};
   /* The cached value of IFS, kept current by set_shell_variable, so word
      splitting does not look it up per word. */
-  String m_field_separators{" \t\n"};
-
-  /* A byte-indexed table that answers whether a character is a field separator
-     in one load, instead of scanning IFS per byte. It is rebuilt whenever IFS
-     changes. */
-  u64 m_field_separator_bits[4]{};
+  VariableStore m_variable_store{};
   pure fn is_field_separator(char c) const wontthrow -> bool;
   i32 m_last_exit_status{0};
   /* The status the shell held when the return builtin last ran. The RETURN trap

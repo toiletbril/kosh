@@ -53,7 +53,7 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
   set_emacs_mode(shell_is_interactive);
   set_shell_option_state(shell_option_id::History, shell_is_interactive);
   set_shell_option_state(shell_option_id::Histexpand, shell_is_interactive);
-  set_field_separators(m_field_separators.view());
+  set_field_separators(field_separators());
 
   m_shell_start_time = static_cast<i64>(std::time(nullptr));
   m_startup_ignored_signals = os::get_entry_ignored_signals();
@@ -296,24 +296,12 @@ fn EvalContext::rollback_confined_variable_writes(usize mark) wontthrow -> void
 fn EvalContext::set_field_separators(StringView value) throws -> void
 {
   LOG(Debug, "caching %zu field separator bytes", value.length);
-  /* The table is built before m_field_separators is touched, since value may
-     alias the buffer the assignment below rewrites. */
-  for (u64 &bits : m_field_separator_bits)
-    bits = 0;
-  for (usize i = 0; i < value.length; i++) {
-    let const byte = static_cast<u8>(value.data[i]);
-    m_field_separator_bits[byte >> 6] |= u64{1} << (byte & 63);
-  }
-  if (value.data != m_field_separators.data()) {
-    m_field_separators.clear();
-    m_field_separators.append(value);
-  }
+  m_variable_store.set_field_separators(value);
 }
 
 hot pure fn EvalContext::is_field_separator(char c) const wontthrow -> bool
 {
-  let const byte = static_cast<u8>(c);
-  return (m_field_separator_bits[byte >> 6] & (u64{1} << (byte & 63))) != 0;
+  return m_variable_store.is_field_separator(c);
 }
 
 fn EvalContext::guard_restricted_path(StringView path,

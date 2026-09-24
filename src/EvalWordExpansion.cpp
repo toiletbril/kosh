@@ -155,7 +155,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
   let const do_emit_elements = [&](const ArrayList<String> &values, bool quoted,
                                    bool star) throws {
     if (quoted && star) {
-      let const ifs = m_field_separators.view();
+      let const ifs = field_separators();
       let joined = String{scratch_allocator()};
       for (usize i = 0; i < values.count(); i++) {
         if (i > 0 && !ifs.is_empty()) {
@@ -381,7 +381,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
         let const end = bounds.end;
 
         if (segment.is_in_double_quotes && is_star) {
-          let const ifs = m_field_separators.view();
+          let const ifs = field_separators();
           let joined = String{scratch_allocator()};
           for (i64 j = start; j < end; j++) {
             if (j > start && !ifs.is_empty()) {
@@ -430,7 +430,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
                                       modifier_location_pointer);
         };
         if (segment.is_in_double_quotes && is_star) {
-          let const ifs = m_field_separators.view();
+          let const ifs = field_separators();
           let joined = String{scratch_allocator()};
           for (usize i = 0; i < m_positional_params.count(); i++) {
             if (i > 0 && !ifs.is_empty()) {
@@ -499,7 +499,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
           let const end = bounds.end;
 
           if (segment.is_in_double_quotes && is_star) {
-            let const ifs = m_field_separators.view();
+            let const ifs = field_separators();
             let joined = String{scratch_allocator()};
             for (i64 j = start; j < end; j++) {
               if (j > start && !ifs.is_empty()) {
@@ -557,7 +557,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
                                         modifier_location_pointer);
           };
           if (segment.is_in_double_quotes && is_star) {
-            let const ifs = m_field_separators.view();
+            let const ifs = field_separators();
             let joined = String{scratch_allocator()};
             for (usize i = 0; i < elements.count(); i++) {
               if (i > 0 && !ifs.is_empty()) {
