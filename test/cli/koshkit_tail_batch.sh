@@ -7,6 +7,7 @@ printf 'a\nb\nc\n' > "$d/with-final.txt"
 printf 'a\nb\nc' > "$d/no-final.txt"
 : > "$d/empty.txt"
 printf '0123456789' > "$d/bytes.txt"
+printf 'one\ntwo\nthree\nfour\n' > "$d/forward-lines.txt"
 awk 'BEGIN { for (i = 1; i <= 70000; i++) print "x" }' \
   > "$d/large-forward.txt"
 for batch_source_index in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18; do
@@ -28,6 +29,9 @@ printf '\n'
 echo "--- positive offsets and standard input ---"
 echo "tail -n +2:"
 "$BIN" -c "koshkit tail -n +2 '$d/with-final.txt'"
+printf '\n'
+echo "tail -n +2 preserves the complete positioned suffix:"
+"$BIN" -c "koshkit tail -n +2 '$d/forward-lines.txt'"
 printf '\n'
 echo "tail -c +4:"
 "$BIN" -c "koshkit tail -c +4 '$d/bytes.txt'"

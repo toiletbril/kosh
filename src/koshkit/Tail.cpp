@@ -172,9 +172,9 @@ static fn read_regular_tails(ArrayList<regular_tail_state> &states,
         for (usize position = transferred; position > 0; position--) {
           let const absolute = block_offset + position - 1;
           if (absolute + 1 == state.file_size &&
-              state.buffer[position - 1] == '\n')
+              state.buffer.begin()[position - 1] == '\n')
             continue;
-          if (state.buffer[position - 1] != '\n') continue;
+          if (state.buffer.begin()[position - 1] != '\n') continue;
 
           if (--state.remaining_newline_count == 0) {
             state.start_offset = absolute;
@@ -290,7 +290,7 @@ static fn read_regular_forward_tails(ArrayList<forward_tail_state> &states,
       usize append_start = 0;
       if (state.unit != tail_unit::Bytes && state.skipped_newlines != 0) {
         for (usize position = 0; position < transferred; position++) {
-          if (state.buffer[position] != '\n') continue;
+          if (state.buffer.begin()[position] != '\n') continue;
           state.skipped_newlines--;
           append_start = position + 1;
           if (state.skipped_newlines == 0) break;
@@ -544,13 +544,15 @@ fn Tail::execute(const ExecContext &ec, EvalContext &cxt,
     let const text = content->view();
     let const wanted_count = static_cast<usize>(count);
     usize start = 0;
-    if (origin == count_origin::FromStart && !did_use_positioned_read) {
-      usize remaining_newline_count = count > 0 ? wanted_count - 1 : 0;
-      while (start < text.length && remaining_newline_count > 0) {
-        if (text[start] == '\n') remaining_newline_count--;
-        start++;
+    if (origin == count_origin::FromStart) {
+      if (!did_use_positioned_read) {
+        usize remaining_newline_count = count > 0 ? wanted_count - 1 : 0;
+        while (start < text.length && remaining_newline_count > 0) {
+          if (text[start] == '\n') remaining_newline_count--;
+          start++;
+        }
+        if (remaining_newline_count > 0) start = text.length;
       }
-      if (remaining_newline_count > 0) start = text.length;
     } else if (wanted_count == 0) {
       start = text.length;
     } else {

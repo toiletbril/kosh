@@ -251,6 +251,8 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
         let const opened_fd = os::open_file_descriptor(
             sources[source_index], os::file_open_mode::Read);
         if (!opened_fd.has_value()) {
+          if (os::INTERRUPT_REQUESTED) return 130;
+
           report_soft_koshkit_util_error(
               ec, cxt, args[0].view(),
               "cannot open '" +

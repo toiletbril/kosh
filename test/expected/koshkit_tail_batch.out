@@ -11,6 +11,11 @@ tail -n +2:
 b
 c
 
+tail -n +2 preserves the complete positioned suffix:
+two
+three
+four
+
 tail -c +4:
 3456789
 tail from standard input:
