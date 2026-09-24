@@ -163,9 +163,9 @@ fn EvalContext::request_loop_control(control_flow::Kind kind, i64 level,
     level = static_cast<i64>(execution_store().loop_depth());
   LOG(All, "loop control requested, level %lld of depth %zu", (long long) level,
       execution_store().loop_depth());
-  m_control_flow =
+  control_flow_store().set(
       control_flow{kind, level, location, source_store().m_current_source,
-                   String{source_store().m_current_origin}};
+                   String{source_store().m_current_origin}});
 }
 
 fn EvalContext::request_break(i64 level, SourceLocation location) throws -> void
@@ -184,22 +184,24 @@ fn EvalContext::request_return(i64 status, SourceLocation location) throws
 {
   LOG(Debug, "return requested, status %lld", (long long) status);
   trap_store().m_status_before_return = execution_store().last_exit_status();
-  m_control_flow = control_flow{control_flow::Kind::Return, status, location,
-                                source_store().m_current_source,
-                                String{source_store().m_current_origin}};
+  control_flow_store().set(
+      control_flow{control_flow::Kind::Return, status, location,
+                   source_store().m_current_source,
+                   String{source_store().m_current_origin}});
 }
 
 fn EvalContext::request_exit(i64 status, SourceLocation location) throws -> void
 {
   LOG(Debug, "exit requested, status %lld", (long long) status);
-  m_control_flow = control_flow{control_flow::Kind::Exit, status, location,
-                                source_store().m_current_source,
-                                String{source_store().m_current_origin}};
+  control_flow_store().set(
+      control_flow{control_flow::Kind::Exit, status, location,
+                   source_store().m_current_source,
+                   String{source_store().m_current_origin}});
 }
 
 pure fn EvalContext::has_pending_control_flow() const wontthrow -> bool
 {
-  return m_control_flow.kind != control_flow::Kind::Normal;
+  return control_flow_store().has_pending();
 }
 
 /* A break or a continue stops every later command until a loop consumes it. A
@@ -207,24 +209,23 @@ pure fn EvalContext::has_pending_control_flow() const wontthrow -> bool
    runs under a pending one. Neither of them answers here. */
 pure fn EvalContext::has_pending_loop_jump() const wontthrow -> bool
 {
-  return m_control_flow.kind == control_flow::Kind::Break ||
-         m_control_flow.kind == control_flow::Kind::Continue;
+  return control_flow_store().has_pending_loop_jump();
 }
 
 fn EvalContext::pending_control_flow() wontthrow -> control_flow &
 {
-  return m_control_flow;
+  return control_flow_store().pending();
 }
 
 pure fn EvalContext::pending_control_flow() const wontthrow
     -> const control_flow &
 {
-  return m_control_flow;
+  return control_flow_store().pending();
 }
 
 fn EvalContext::clear_control_flow() wontthrow -> void
 {
-  m_control_flow.kind = control_flow::Kind::Normal;
+  control_flow_store().clear();
 }
 
 fn EvalContext::set_current_source(const String *source,

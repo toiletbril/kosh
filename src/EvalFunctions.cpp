@@ -467,7 +467,7 @@ fn EvalContext::run_return_trap(i32 status_before_return) throws -> void
   execution_store().last_exit_status() = status_before_return;
   defer { execution_store().last_exit_status() = saved_exit_status; };
 
-  let frame_control_flow = steal(m_control_flow);
+  let frame_control_flow = steal(control_flow_store().pending());
   clear_control_flow();
 
   let action_control_flow = control_flow{};
@@ -476,17 +476,18 @@ fn EvalContext::run_return_trap(i32 status_before_return) throws -> void
     run_named_trap(StringView{"RETURN", 6});
     if (!has_pending_control_flow()) break;
 
-    if (m_control_flow.kind != control_flow::Kind::Return) return;
+    if (control_flow_store().pending().kind != control_flow::Kind::Return)
+      return;
 
     LOG(Info, "the RETURN action returned with status %lld, firing again",
-        (long long) m_control_flow.value);
-    action_control_flow = steal(m_control_flow);
+        (long long) control_flow_store().pending().value);
+    action_control_flow = steal(control_flow_store().pending());
     clear_control_flow();
     did_action_return = true;
   }
 
-  m_control_flow = did_action_return ? steal(action_control_flow)
-                                     : steal(frame_control_flow);
+  control_flow_store().set(did_action_return ? steal(action_control_flow)
+                                             : steal(frame_control_flow));
 }
 
 fn EvalContext::reset_inherited_signal_traps() wontthrow -> void

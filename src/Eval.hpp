@@ -689,6 +689,30 @@ private:
   Expression *m_cached_ast{nullptr};
 };
 
+class ControlFlowStore
+{
+public:
+  fn set(control_flow value) throws -> void { m_pending = steal(value); }
+  fn pending() wontthrow -> control_flow & { return m_pending; }
+  pure fn pending() const wontthrow -> const control_flow &
+  {
+    return m_pending;
+  }
+  pure fn has_pending() const wontthrow -> bool
+  {
+    return m_pending.kind != control_flow::Kind::Normal;
+  }
+  pure fn has_pending_loop_jump() const wontthrow -> bool
+  {
+    return m_pending.kind == control_flow::Kind::Break ||
+           m_pending.kind == control_flow::Kind::Continue;
+  }
+  fn clear() wontthrow -> void { m_pending.kind = control_flow::Kind::Normal; }
+
+private:
+  control_flow m_pending{};
+};
+
 class NameValueArg
 {
 public:
@@ -1380,6 +1404,14 @@ public:
       -> const PromptCommandStore &
   {
     return m_prompt_command_store;
+  }
+  fn control_flow_store() wontthrow -> ControlFlowStore &
+  {
+    return m_control_flow_store;
+  }
+  pure fn control_flow_store() const wontthrow -> const ControlFlowStore &
+  {
+    return m_control_flow_store;
   }
   pure fn expansion_store() const wontthrow -> const ExpansionStore &
   {
@@ -3200,7 +3232,7 @@ protected:
   bool m_startup_finished{false};
 
   /* The pending non-local jump, Normal when none is pending. */
-  control_flow m_control_flow{};
+  ControlFlowStore m_control_flow_store{};
   /* The source and name of the text being evaluated, for caret formatting. */
   bool m_should_print_source_traces{true};
   completion::shell_highlight_cache *m_diagnostic_highlight_cache{nullptr};
