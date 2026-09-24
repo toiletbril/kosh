@@ -1524,22 +1524,22 @@ fn terminal_size(u32 &columns, u32 &rows, descriptor output) wontthrow -> bool
 fn terminal_settings(descriptor terminal, Allocator allocator,
                      terminal_settings_output_mode mode) throws -> Maybe<String>
 {
-  DWORD mode = 0;
-  if (GetConsoleMode(terminal, &mode) == FALSE) return None;
+  DWORD console_mode = 0;
+  if (GetConsoleMode(terminal, &console_mode) == FALSE) return None;
   if (mode == terminal_settings_output_mode::Encoded) {
     char encoded[32];
     let const length = std::snprintf(encoded, sizeof(encoded), "win32:%08lx\n",
-                                     static_cast<unsigned long>(mode));
+                                     static_cast<unsigned long>(console_mode));
     return String{
         allocator, StringView{encoded, static_cast<usize>(length)}
     };
   }
   let output = String{allocator, "speed 0 baud; "};
-  if ((mode & ENABLE_ECHO_INPUT) == 0) output += '-';
+  if ((console_mode & ENABLE_ECHO_INPUT) == 0) output += '-';
   output += "echo ";
-  if ((mode & ENABLE_LINE_INPUT) == 0) output += '-';
+  if ((console_mode & ENABLE_LINE_INPUT) == 0) output += '-';
   output += "icanon ";
-  if ((mode & ENABLE_PROCESSED_INPUT) == 0) output += '-';
+  if ((console_mode & ENABLE_PROCESSED_INPUT) == 0) output += '-';
   output += "isig";
   if (mode == terminal_settings_output_mode::All)
     output += "; rows 0; columns 0";

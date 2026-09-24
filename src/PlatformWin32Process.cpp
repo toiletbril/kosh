@@ -1164,8 +1164,9 @@ fn launch_process_substitution(
       unset_environment_variable(internal::CONNECT_NAMED_PIPE);
   };
   let const child = spawn_subshell_stage(
-      source, None, None, None, source_traces_enabled, bootstrap, shell_name,
-      previous_exit_status, shell_process_id, subshell_depth, mood,
+      options.source, None, None, None, options.source_traces_enabled,
+      options.bootstrap, options.shell_name, options.previous_exit_status,
+      options.shell_process_id, options.subshell_depth, options.mood,
       process_group_mode::Inherit);
   if (!child.has_value())
     throw Error{"Unable to run the process substitution because the inner "
