@@ -811,7 +811,7 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
   target_is_broken_symlink.reserve(targets.count());
   target_batch.reserve(targets.count());
   for (let const target : targets) {
-    target_paths.push(Path{target});
+    target_paths.push(Path{target, allocator});
     target_statuses.push({});
     target_is_broken_symlink.push(false);
   }

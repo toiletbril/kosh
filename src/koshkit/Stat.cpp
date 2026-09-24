@@ -717,7 +717,7 @@ fn Stat::execute(const ExecContext &ec, EvalContext &cxt,
     file_statuses.reserve(operands.count());
     batch.reserve(operands.count());
     for (let const &operand : operands) {
-      operand_paths.push(Path{operand.view()});
+      operand_paths.push(Path{operand.view(), allocator});
       file_statuses.push({});
     }
     for (usize index = 0; index < operands.count(); index++) {
