@@ -97,8 +97,6 @@ fn append_node_report(String &output, const ExecContext &ec, StringView path,
                       Allocator allocator,
                       goodnode_verification_mode verification) throws -> void
 {
-  append_report_text(output, path, colors::ansi::BOLD_BLUE, should_color);
-  output += '\n';
   let table = ReportTable{allocator};
   table.add_column("FIELD", report_table_alignment::Left,
                    colors::ansi::BOLD_CYAN);
@@ -129,6 +127,8 @@ fn append_node_report(String &output, const ExecContext &ec, StringView path,
     do_append_field("Name limit", String::from(filesystem.name_max, allocator));
     let const features = filesystem_features(filesystem_type);
     if (features.has_value()) do_append_field("Features", *features);
+  } else {
+    do_append_field("Filesystem", "unavailable");
   }
 
   if (let const evidence = os::read_filesystem_integrity_evidence(path);
@@ -208,7 +208,7 @@ fn append_node_report(String &output, const ExecContext &ec, StringView path,
     if (digest.has_value()) do_append_field("CRC32C", digest->view());
   }
 
-  output += table.to_string(should_color).view();
+  append_titled_report_table(output, path, table, should_color);
 }
 
 fn find_inode(const Path &path, const os::file_status &status, u64 inode,

@@ -140,8 +140,6 @@ fn append_subject(String &output, StringView operand,
                   goodstat_filesystem_report filesystem_report,
                   goodstat_checksum_report checksum_report) throws -> void
 {
-  append_report_text(output, operand, colors::ansi::BOLD_BLUE, should_color);
-  output += "\n";
   let table = ReportTable{allocator};
   table.add_column("FIELD", report_table_alignment::Left,
                    colors::ansi::BOLD_CYAN);
@@ -249,6 +247,9 @@ fn append_subject(String &output, StringView operand,
       do_append_field("Filesystem id",
                       String::from(filesystem.filesystem_id, allocator).view(),
                       colors::ansi::BOLD_CYAN, should_color);
+    } else {
+      do_append_field("Filesystem", "unavailable", colors::ansi::BOLD_CYAN,
+                      should_color);
     }
   }
 
@@ -260,7 +261,7 @@ fn append_subject(String &output, StringView operand,
                       should_color);
   }
 
-  output += table.to_string(should_color).view();
+  append_titled_report_table(output, operand, table, should_color);
 }
 
 } // namespace
