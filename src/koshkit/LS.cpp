@@ -302,7 +302,7 @@ static fn prepare_entries(ArrayList<listing_entry> &entries,
       if (entry.type != entry_type::Symlink) continue;
 
       if (is_name_path) {
-        symlink_paths.push(Path{entry.name.view()});
+        symlink_paths.push(Path{entry.name.view(), allocator});
       } else {
         let path = Path{directory, allocator};
         path.append(entry.name.view());
@@ -376,7 +376,7 @@ static fn collect_directory(const Path &directory,
     if (options.is_listing_dot_and_dotdot) {
       entries.push(make_entry(directory, StringView{"."}, options,
                               Path::entry_kind::Directory, allocator));
-      let parent = Path{directory_text};
+      let parent = Path{directory_text, allocator};
       parent.append(StringView{".."});
       entries.push(make_entry(parent, StringView{".."}, options,
                               Path::entry_kind::Directory, allocator));
@@ -640,7 +640,9 @@ static fn render_tree_level(StringView directory,
 {
   if (os::INTERRUPT_REQUESTED) return;
   ArrayList<listing_entry> entries{allocator};
-  if (!collect_directory(Path{directory}, options, allocator, entries)) return;
+  if (!collect_directory(Path{directory, allocator}, options, allocator,
+                         entries))
+    return;
 
   for (usize index = 0; index < entries.count(); index++) {
     if (os::INTERRUPT_REQUESTED) return;
@@ -677,7 +679,8 @@ static fn render_directory_block(
 {
   if (os::INTERRUPT_REQUESTED) return;
   ArrayList<listing_entry> entries{allocator};
-  if (!collect_directory(Path{directory}, options, allocator, entries)) {
+  if (!collect_directory(Path{directory, allocator}, options, allocator,
+                         entries)) {
     report_soft_koshkit_util_error(ec, cxt, "ls",
                                    "cannot open directory '" +
                                        String{allocator, directory} + "'");
