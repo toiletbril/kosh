@@ -707,6 +707,47 @@ pure fn process_snapshot_status_name(process_snapshot_status status) wontthrow
   unreachable("unknown process snapshot status");
 }
 
+fn append_cgroup_failure_report(
+    String &output, bool should_color,
+    const ArrayList<process_cgroup_snapshot> &snapshot) throws -> void
+{
+  let const allocator = snapshot.allocator();
+  let table = ReportTable{allocator};
+  table.add_column("PID", report_table_alignment::Right,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("PROCESS", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("STATUS", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+
+  bool has_failure = false;
+  for (let const &process : snapshot) {
+    if (process.status == process_snapshot_status::Available) continue;
+
+    has_failure = true;
+    let const process_id = String::from(process.process_id, allocator);
+    let cells = ArrayList<report_table_cell_view>{allocator};
+    cells.push({process_id.view(), colors::ansi::BOLD_GREEN});
+    cells.push({process.name.is_empty() ? StringView{"-"}
+                                          : process.name.view(),
+                colors::ansi::RESET});
+    cells.push({process_snapshot_status_name(process.status),
+                colors::ansi::BOLD_YELLOW});
+    table.add_row(cells);
+  }
+
+  if (!has_failure) {
+    let cells = ArrayList<report_table_cell_view>{allocator};
+    cells.reserve(3);
+    cells.push({"-", colors::ansi::BOLD_GREEN});
+    cells.push({"self", colors::ansi::RESET});
+    cells.push({"Unavailable", colors::ansi::BOLD_YELLOW});
+    table.add_row(cells);
+  }
+  append_titled_report_table(output, "Cgroup status failures", table,
+                             should_color);
+}
+
 fn append_cgroup_report(String &output, bool should_color,
                         const ArrayList<process_cgroup_snapshot> &snapshot,
                         eviliso_detail_mode detail) throws -> void
@@ -722,17 +763,7 @@ fn append_cgroup_report(String &output, bool should_color,
     }
   }
   if (!self_index.has_value()) {
-    table.add_column("FIELD", report_table_alignment::Left,
-                     colors::ansi::BOLD_CYAN);
-    table.add_column("VALUE", report_table_alignment::Left,
-                     colors::ansi::BOLD_CYAN);
-    let cells = ArrayList<report_table_cell_view>{allocator};
-    cells.reserve(2);
-    cells.push({"Membership", colors::ansi::BOLD_CYAN});
-    cells.push({"unavailable", colors::ansi::BOLD_YELLOW});
-    table.add_row(cells);
-    append_titled_report_table(output, "Cgroup membership", table,
-                               should_color);
+    append_cgroup_failure_report(output, should_color, snapshot);
     return;
   }
 
@@ -763,14 +794,6 @@ fn append_cgroup_report(String &output, bool should_color,
           break;
         }
       }
-    }
-    for (let const &process : snapshot) {
-      if (process.status == process_snapshot_status::Available) continue;
-      rows.push(cgroup_report_row{
-          "-", static_cast<u64>(-1), "-", "-", process,
-          process.process_id == self_process_id ? StringView{"self"}
-                                                : StringView{"other"},
-          process_snapshot_status_name(process.status), allocator});
     }
   }
 
@@ -816,6 +839,7 @@ fn append_cgroup_report(String &output, bool should_color,
     report.add_row(cells);
   }
   append_titled_report_table(output, "Cgroup membership", report, should_color);
+  append_cgroup_failure_report(output, should_color, snapshot);
 }
 
 fn eviliso_sessions() throws -> ArrayList<os::user_session>
@@ -995,16 +1019,20 @@ fn append_remote_report(String &output, bool should_color,
 {
   let table = ReportTable{allocator};
   if (!os::has_network_socket_listing()) {
-    table.add_column("FIELD", report_table_alignment::Left,
+    table.add_column("RESOURCE", report_table_alignment::Left,
                      colors::ansi::BOLD_CYAN);
-    table.add_column("VALUE", report_table_alignment::Left,
+    table.add_column("STATUS", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("REASON", report_table_alignment::Left,
                      colors::ansi::BOLD_CYAN);
     let cells = ArrayList<report_table_cell_view>{allocator};
-    cells.reserve(2);
+    cells.reserve(3);
     cells.push({"Sockets", colors::ansi::BOLD_CYAN});
     cells.push({"unavailable", colors::ansi::BOLD_YELLOW});
+    cells.push({"platform does not expose socket records", colors::ansi::RESET});
     table.add_row(cells);
-    append_titled_report_table(output, "Socket summary", table, should_color);
+    append_titled_report_table(output, "Socket status failures", table,
+                               should_color);
     return;
   }
 
