@@ -22,6 +22,12 @@ namespace koshka {
 
 class BumpArena;
 
+enum class heredoc_tab_policy : u8
+{
+  Preserve,
+  Strip,
+};
+
 class ParseSession
 {
 public:
@@ -130,7 +136,7 @@ struct heredoc_contents
 struct heredoc_pending
 {
   String delimiter;
-  bool should_strip_tabs;
+  heredoc_tab_policy tab_policy;
   heredoc_contents *contents;
 };
 
@@ -243,7 +249,8 @@ public:
   fn take_heredoc_terminator_misses() throws
       -> ArrayList<heredoc_terminator_miss>;
 
-  fn register_heredoc(StringView delimiter, bool should_strip_tabs) throws
+  fn register_heredoc(StringView delimiter, heredoc_tab_policy tab_policy)
+      throws
       -> const heredoc_contents *;
 
 protected:
@@ -289,7 +296,8 @@ protected:
 
   template <class Emit>
   fn walk_heredoc_body(usize start, StringView delimiter,
-                       bool should_strip_tabs, Emit emit_line) throws -> usize;
+                       heredoc_tab_policy tab_policy, Emit emit_line) throws
+      -> usize;
 
   fn lex_shell_token() throws -> Token *;
 

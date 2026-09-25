@@ -1023,7 +1023,7 @@ fn Parser::build_heredoc_redirection(
 
   let const delimiter_literal = delimiter_word.to_literal_string();
   let delimiter = delimiter_literal.view();
-  bool should_strip_tabs = false;
+  heredoc_tab_policy tab_policy = heredoc_tab_policy::Preserve;
   /* <<- strips leading tabs. The dash counts only when unquoted, so <<'-EOF'
      keeps the dash in the delimiter and terminates on -EOF. */
   let const has_unquoted_leading_dash =
@@ -1036,7 +1036,7 @@ fn Parser::build_heredoc_redirection(
       delimiter_token->source_location().position ==
           op_location.position + op_location.length)
   {
-    should_strip_tabs = true;
+    tab_policy = heredoc_tab_policy::Strip;
     delimiter = delimiter.substring(1);
   }
 
@@ -1058,9 +1058,9 @@ fn Parser::build_heredoc_redirection(
   redir.target = nullptr;
   redir.heredoc_delimiter = delimiter_token;
   redir.dup_fd = -1;
-  redir.heredoc = m_lexer.register_heredoc(delimiter, should_strip_tabs);
+  redir.heredoc = m_lexer.register_heredoc(delimiter, tab_policy);
   redir.should_expand_heredoc = should_expand;
-  redir.should_strip_heredoc_tabs = should_strip_tabs;
+  redir.should_strip_heredoc_tabs = tab_policy == heredoc_tab_policy::Strip;
   out.push(redir);
 }
 
