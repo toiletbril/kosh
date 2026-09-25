@@ -385,8 +385,9 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     case '-': return option_flags_string();
     case '#':
       return String::from(positional_params().count(), heap_allocator());
-    case '0': return String{heap_allocator(), m_shell_name};
-    case '_': return String{heap_allocator(), m_last_argument.view()};
+    case '0': return String{heap_allocator(), shell_name()};
+    case '_':
+      return String{heap_allocator(), execution_store().get_last_argument().view()};
 
     case '*':
     case '@': {
@@ -576,10 +577,10 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
                                               heap_allocator());
           break;
         case dynamic_var::BASH_ARGV0:
-          return String{heap_allocator(), m_shell_name.view()};
+          return String{heap_allocator(), shell_name()};
         case dynamic_var::BASH_EXECUTION_STRING:
-          if (m_has_execution_string)
-            return String{heap_allocator(), m_execution_string.view()};
+          if (execution_store().has_execution_string())
+            return String{heap_allocator(), execution_store().get_execution_string()};
           break;
         case dynamic_var::BASH_SUBSHELL:
           return String::from(
@@ -592,8 +593,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
             return String::from(funcname_line_at(0), heap_allocator());
           return koshka::None;
         case dynamic_var::BASH_COMMAND:
-          if (!m_current_command.is_empty())
-            return String{heap_allocator(), m_current_command.view()};
+          if (!execution_store().get_current_command().is_empty())
+            return String{heap_allocator(), execution_store().get_current_command()};
           break;
         case dynamic_var::PPID:
           return String::from(os::get_parent_process_id(), heap_allocator());

@@ -43,7 +43,7 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
                          bool should_error_exit, String shell_name,
                          ArrayList<String> positional_params)
     : m_variable_store(steal(positional_params)),
-      m_execution_store(shell_is_interactive), m_shell_name(steal(shell_name))
+      m_execution_store(shell_is_interactive, steal(shell_name))
 {
   set_no_glob(should_disable_path_expansion);
   set_echo(should_echo);
@@ -374,7 +374,7 @@ fn EvalContext::seed_shell_identity_variables(bool is_bash_identity) throws
     versinfo.push(String{"release"});
     versinfo.push(String{KOSH_OS_INFO});
     set_indexed_array("BASH_VERSINFO", steal(versinfo));
-    set_shell_variable("BASH", m_shell_executable_path.view());
+    set_shell_variable("BASH", shell_executable_path());
     /* A missing COMP_WORDBREAKS collapses every word into one and kills
        bash-completion. */
     if (!get_variable_value("COMP_WORDBREAKS").has_value())
@@ -396,7 +396,7 @@ fn EvalContext::seed_shell_identity_variables(bool is_bash_identity) throws
 
 fn EvalContext::materialize_kosh_identity() const throws -> Maybe<String>
 {
-  let const identity = utils::kosh_identity(m_shell_executable_path.view());
+  let const identity = utils::kosh_identity(shell_executable_path());
   if (identity.has_value()) return String{heap_allocator(), *identity};
   return None;
 }
@@ -1228,7 +1228,7 @@ pure fn EvalContext::script_source_frame_index() const wontthrow -> Maybe<usize>
     let const &path = source_store().m_source_frames[i].source_path;
     if (path.is_empty()) continue;
 
-    if (path.view() == m_shell_name.view()) return i;
+    if (path.view() == shell_name()) return i;
 
     return None;
   }
@@ -1381,7 +1381,7 @@ pure fn EvalContext::bash_source_frame_at(usize index) const wontthrow
       }
     }
 
-    return m_shell_name.view();
+    return shell_name();
   }
   case MergedFrame::Kind::Source:
     return source_store()
@@ -1390,7 +1390,7 @@ pure fn EvalContext::bash_source_frame_at(usize index) const wontthrow
   case MergedFrame::Kind::Main: break;
   }
 
-  return m_shell_name.view();
+  return shell_name();
 }
 
 pure fn EvalContext::bash_source_frame_count(

@@ -219,7 +219,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
   let const previous_runtime = m_runtime;
   let const was_restricted_shell = m_is_restricted_shell;
   let const previous_script_run = source_store().is_script_run();
-  let previous_shell_name = String{m_shell_name};
+  let previous_shell_name = String{execution_store().get_shell_name()};
   let const previous_source = source_store().m_current_source;
   let const previous_origin = source_store().m_current_origin;
   let const previous_location = source_store().m_current_location;
@@ -233,7 +233,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     previous_runtime.restore(*this);
     m_is_restricted_shell = was_restricted_shell;
     source_store().set_script_run(previous_script_run);
-    m_shell_name = steal(previous_shell_name);
+    execution_store().set_shell_name(steal(previous_shell_name));
   };
   defer
   {
@@ -375,9 +375,10 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
 
   /* The kernel hands a shebang interpreter the resolved script path, so $0 and
      BASH_SOURCE read that path rather than the word as typed. */
-  m_shell_name = String{heap_allocator(), ec.should_use_fallback_argv0
-                                              ? ec.args()[0].view()
-                                              : ec.program_path().view()};
+  execution_store().set_shell_name(
+      String{heap_allocator(), ec.should_use_fallback_argv0
+                                  ? ec.args()[0].view()
+                                  : ec.program_path().view()});
   set_current_source(&*contents, String{ec.program().view()});
   source_store().m_current_location = SourceLocation{};
   source_store().mimicry_depth()++;

@@ -350,7 +350,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
         let const param_count = positional_params().count();
         let const total = static_cast<i64>(param_count) + 1;
         let const do_positional_at = [&](i64 index) wontthrow -> StringView {
-          return index == 0 ? m_shell_name.view()
+          return index == 0 ? shell_name()
                             : positional_params()[static_cast<usize>(index - 1)]
                                   .view();
         };

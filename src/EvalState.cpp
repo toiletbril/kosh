@@ -783,7 +783,7 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
       bash_argument_frame_context() != nullptr
           ? bash_argument_frame_context()->flags
           : u8{0},
-      m_last_argument,
+      execution_store().get_last_argument(),
       directory_stack(),
       steal(working_directory),
       os::get_file_creation_mask(),
@@ -856,7 +856,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
   if (bash_argument_frame_context() != nullptr)
     bash_argument_frame_context()->flags =
         snapshot.bash_argument_frame_context_flags;
-  m_last_argument = steal(snapshot.last_argument);
+  execution_store().set_last_argument(steal(snapshot.last_argument));
   directory_stack() = steal(snapshot.directory_stack);
 
   snapshot.runtime.restore(*this);
@@ -1263,10 +1263,11 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
   bootstrap.source_length = static_cast<u32>(source.count());
 
   let body = String{heap_allocator()};
-  body.push(static_cast<char>(m_has_execution_string));
-  if (m_has_execution_string)
-    append_subshell_bootstrap_text(body, m_execution_string.view());
-  append_subshell_bootstrap_text(body, m_last_argument.view());
+  body.push(static_cast<char>(execution_store().has_execution_string()));
+  if (execution_store().has_execution_string())
+    append_subshell_bootstrap_text(body, execution_store().get_execution_string());
+  append_subshell_bootstrap_text(body,
+                                 execution_store().get_last_argument().view());
   body.push(static_cast<char>(m_job_table.m_last_background_pid.has_value()));
   if (m_job_table.m_last_background_pid.has_value())
     append_subshell_bootstrap_i64(body, *m_job_table.m_last_background_pid);
@@ -1679,9 +1680,9 @@ fn EvalContext::apply_subshell_bootstrap(
   if (is_restricted_shell_identity) request_restricted_shell();
   runtime.restore(*this);
 
-  m_has_execution_string = has_execution_string;
-  m_execution_string = steal(execution_string);
-  m_last_argument = steal(last_argument);
+  execution_store().restore_execution_string(has_execution_string,
+                                             steal(execution_string));
+  execution_store().set_last_argument(steal(last_argument));
   m_job_table.m_last_background_pid = last_background_pid;
   m_random_state = random_state;
   m_shell_start_time = shell_start_time;

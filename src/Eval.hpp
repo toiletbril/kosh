@@ -494,9 +494,70 @@ private:
 class ExecutionStore
 {
 public:
-  explicit ExecutionStore(bool shell_is_interactive = false) wontthrow
-      : m_shell_is_interactive(shell_is_interactive)
+  explicit ExecutionStore(bool shell_is_interactive, String shell_name) wontthrow
+      : m_shell_name(steal(shell_name)),
+        m_shell_is_interactive(shell_is_interactive)
   {}
+
+  pure fn get_shell_name() const wontthrow -> StringView
+  {
+    return m_shell_name.view();
+  }
+  fn set_shell_name(String shell_name) wontthrow -> void
+  {
+    m_shell_name = steal(shell_name);
+  }
+  pure fn get_shell_executable_path() const wontthrow -> StringView
+  {
+    return m_shell_executable_path.view();
+  }
+  fn set_shell_executable_path(String path) wontthrow -> void
+  {
+    m_shell_executable_path = steal(path);
+  }
+  pure fn get_last_argument() const wontthrow -> const String &
+  {
+    return m_last_argument;
+  }
+  fn set_last_argument(String argument) wontthrow -> void
+  {
+    m_last_argument = steal(argument);
+  }
+  pure fn has_execution_string() const wontthrow -> bool
+  {
+    return m_has_execution_string;
+  }
+  pure fn get_execution_string() const wontthrow -> StringView
+  {
+    return m_execution_string.view();
+  }
+  fn set_execution_string(String text) wontthrow -> void
+  {
+    m_execution_string = steal(text);
+    m_has_execution_string = true;
+  }
+  fn restore_execution_string(bool has_execution_string,
+                              String execution_string) wontthrow -> void
+  {
+    m_has_execution_string = has_execution_string;
+    m_execution_string = steal(execution_string);
+  }
+  fn set_current_command(String command) wontthrow -> void
+  {
+    m_current_command = steal(command);
+  }
+  pure fn get_current_command() const wontthrow -> StringView
+  {
+    return m_current_command.view();
+  }
+  fn set_make_shell_suppressed(bool suppressed) wontthrow -> void
+  {
+    m_make_shell_suppressed = suppressed;
+  }
+  pure fn make_shell_suppressed() const wontthrow -> bool
+  {
+    return m_make_shell_suppressed;
+  }
 
   fn last_exit_status() wontthrow -> i32 & { return m_last_exit_status; }
   pure fn last_exit_status() const wontthrow -> i32
@@ -562,6 +623,13 @@ public:
   }
 
 private:
+  String m_shell_name{heap_allocator()};
+  String m_shell_executable_path{heap_allocator()};
+  String m_last_argument{heap_allocator()};
+  String m_execution_string{heap_allocator()};
+  bool m_has_execution_string{false};
+  String m_current_command{heap_allocator()};
+  bool m_make_shell_suppressed{false};
   i32 m_last_exit_status{0};
   u64 m_last_command_duration_nanos{0};
   usize m_subshell_depth{0};
@@ -1475,11 +1543,11 @@ public:
 
   fn set_shell_executable_path(String path) wontthrow -> void
   {
-    m_shell_executable_path = steal(path);
+    execution_store().set_shell_executable_path(steal(path));
   }
   pure fn shell_executable_path() const wontthrow -> StringView
   {
-    return m_shell_executable_path.view();
+    return execution_store().get_shell_executable_path();
   }
   fn materialize_kosh_identity() const throws -> Maybe<String>;
   fn next_random_u32() const wontthrow -> u32;
@@ -1722,7 +1790,7 @@ public:
   fn set_positional_params(ArrayList<String> params) wontthrow -> void;
   pure fn shell_name() const wontthrow -> StringView
   {
-    return m_shell_name.view();
+    return execution_store().get_shell_name();
   }
 
   fn directory_stack() wontthrow -> ArrayList<String> &
@@ -1743,7 +1811,7 @@ public:
 
   fn set_last_argument(StringView value) throws -> void
   {
-    m_last_argument = String{value};
+    execution_store().set_last_argument(String{value});
   }
 
   fn set_last_command_duration_nanos(u64 nanos) wontthrow -> void;
@@ -2546,21 +2614,20 @@ public:
 
   fn set_execution_string(StringView text) throws -> void
   {
-    m_execution_string = String{heap_allocator(), text};
-    m_has_execution_string = true;
+    execution_store().set_execution_string(String{heap_allocator(), text});
   }
   pure fn has_execution_string() const wontthrow -> bool
   {
-    return m_has_execution_string;
+    return execution_store().has_execution_string();
   }
 
   fn set_current_command(String text) throws -> void
   {
-    m_current_command = steal(text);
+    execution_store().set_current_command(steal(text));
   }
   pure fn get_current_command() const wontthrow -> StringView
   {
-    return m_current_command.view();
+    return execution_store().get_current_command();
   }
 
   /* While listing makefile targets for completion, the bundled make parser
@@ -2568,11 +2635,11 @@ public:
      never blocks on a slow one. */
   fn set_make_shell_suppressed(bool suppressed) wontthrow -> void
   {
-    m_make_shell_suppressed = suppressed;
+    execution_store().set_make_shell_suppressed(suppressed);
   }
   pure fn make_shell_suppressed() const wontthrow -> bool
   {
-    return m_make_shell_suppressed;
+    return execution_store().make_shell_suppressed();
   }
 
   fn apply_strictness_for_mood() wontthrow -> void
@@ -3168,18 +3235,11 @@ protected:
      splitting does not look it up per word. */
   VariableStore m_variable_store{};
   pure fn is_field_separator(char c) const wontthrow -> bool;
-  ExecutionStore m_execution_store{};
+  ExecutionStore m_execution_store;
   /* The status the shell held when the return builtin last ran. The RETURN trap
      action reads this status, and the frame it leaves takes the status the
      return supplied only after the action has finished. */
 
-  String m_shell_name{heap_allocator()};
-  String m_shell_executable_path{heap_allocator()};
-  String m_last_argument{heap_allocator()};
-  String m_execution_string{heap_allocator()};
-  bool m_has_execution_string{false};
-  String m_current_command{heap_allocator()};
-  bool m_make_shell_suppressed{false};
   /* One pointer keeps unused Bash argument arrays out of every EvalContext.
      The lazily allocated object stores flattened values and one count per
      frame. */
