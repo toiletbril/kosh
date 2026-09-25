@@ -60,6 +60,18 @@ enum class evilio_color_mode : u8
   Colored,
 };
 
+enum class evilio_idle_mode : u8
+{
+  Omit,
+  Include,
+};
+
+enum class evilio_percent_mode : u8
+{
+  Omit,
+  Include,
+};
+
 namespace {
 
 enum class evilio_sort_key : u8
@@ -243,7 +255,7 @@ pure fn is_idle_process_io(const os::process_io_status &status) wontthrow
 }
 
 fn read_process_io_rows(Allocator allocator, Maybe<i64> selected_pid,
-                        bool should_include_idle) throws -> ArrayList<io_row>
+                        evilio_idle_mode idle_mode) throws -> ArrayList<io_row>
 {
   let rows = ArrayList<io_row>{allocator};
   let const processes = os::enumerate_processes();
@@ -272,7 +284,7 @@ fn read_process_io_rows(Allocator allocator, Maybe<i64> selected_pid,
 
     let const &process = processes[process_positions[query_position]];
     let const &status = statuses[query_position];
-    if (!should_include_idle && is_idle_process_io(status)) {
+    if (idle_mode == evilio_idle_mode::Omit && is_idle_process_io(status)) {
       continue;
     }
 
@@ -746,12 +758,12 @@ pure fn sort_key_needs_sample(evilio_sort_key key) wontthrow -> bool
 }
 
 fn tenths_text(u64 tenths, Allocator allocator,
-               bool should_append_percent) throws -> String
+               evilio_percent_mode percent_mode) throws -> String
 {
   let result = String::from(tenths / 10, allocator);
   result += ".";
   result += String::from(tenths % 10, allocator).view();
-  if (should_append_percent) result += "%";
+  if (percent_mode == evilio_percent_mode::Include) result += "%";
   return result;
 }
 
@@ -826,7 +838,8 @@ fn append_disk_io_report(String &output, const ArrayList<disk_io_row> &rows,
     let average_queue = String{allocator};
     if (sampling == report_sampling_mode::Rolling) {
       busy = row.busy_tenths.has_value()
-                 ? tenths_text(*row.busy_tenths, allocator, true)
+                 ? tenths_text(*row.busy_tenths, allocator,
+                               evilio_percent_mode::Include)
                  : String{allocator, "-"};
       read_latency = row.read_latency_nanoseconds.has_value()
                          ? utils::format_duration_nanoseconds(
@@ -838,7 +851,8 @@ fn append_disk_io_report(String &output, const ArrayList<disk_io_row> &rows,
                           : String{allocator, "-"};
       average_queue =
           row.average_queue_tenths.has_value()
-              ? tenths_text(*row.average_queue_tenths, allocator, false)
+              ? tenths_text(*row.average_queue_tenths, allocator,
+                            evilio_percent_mode::Omit)
               : String{allocator, "-"};
       cells.push({busy.view(), {}});
       cells.push({read_latency.view(), {}});
@@ -888,7 +902,8 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
   let const sample_label = format_live_duration(window_seconds, allocator);
   let const refresh_label =
       format_live_duration(refresh_interval_seconds, allocator);
-  let baseline_rows = read_process_io_rows(allocator, selected_pid, true);
+  let baseline_rows = read_process_io_rows(
+      allocator, selected_pid, evilio_idle_mode::Include);
   if (os::INTERRUPT_REQUESTED != 0) {
     os::INTERRUPT_REQUESTED = 0;
     return 130;
@@ -935,7 +950,8 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
     let const now = os::monotonic_nanos();
     if (now - last_sample_nanoseconds >= sample_interval_nanoseconds) {
       let after_rows =
-          read_process_io_rows(frame_allocator, selected_pid, true);
+          read_process_io_rows(frame_allocator, selected_pid,
+                               evilio_idle_mode::Include);
       if (os::INTERRUPT_REQUESTED != 0) {
         os::INTERRUPT_REQUESTED = 0;
         return 130;
@@ -1007,7 +1023,7 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
     let output = String{frame_allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_live_controls_bar(output, sample_label.view(), refresh_label.view(),
-                             should_color);
+                             color_mode == evilio_color_mode::Colored);
     append_process_io_rate_report(output, rows, row_limit, frame_allocator,
                                   sample_duration_label, nullptr,
                                   color_mode);
@@ -1194,7 +1210,7 @@ fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
     let output = String{frame_allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_live_controls_bar(output, sample_label.view(), refresh_label.view(),
-                             should_color);
+                             color_mode == evilio_color_mode::Colored);
     append_disk_io_report(
         output, rows, frame_allocator, sample_duration_label,
         report_sampling_mode::Rolling, color_mode);
@@ -1548,14 +1564,16 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (FLAG_EVILIO_CUMULATIVE.is_enabled() && should_show_processes) {
-    let const before_rows = read_process_io_rows(allocator, selected_pid, true);
+    let const before_rows = read_process_io_rows(
+        allocator, selected_pid, evilio_idle_mode::Include);
     let const started_at_nanoseconds = os::monotonic_nanos();
     os::sleep_for_seconds(cumulative_duration_seconds);
     if (os::INTERRUPT_REQUESTED != 0) {
       os::INTERRUPT_REQUESTED = 0;
       return 130;
     }
-    let const after_rows = read_process_io_rows(allocator, selected_pid, true);
+    let const after_rows = read_process_io_rows(
+        allocator, selected_pid, evilio_idle_mode::Include);
     let const elapsed_nanoseconds =
         os::monotonic_nanos() - started_at_nanoseconds;
     let const sampled_rows = sample_process_io_rows(
@@ -1570,7 +1588,8 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   if (should_show_processes) {
-    let rows = read_process_io_rows(allocator, selected_pid, false);
+    let rows = read_process_io_rows(allocator, selected_pid,
+                                    evilio_idle_mode::Omit);
     u64 total_read_bytes = 0;
     u64 total_written_bytes = 0;
     u64 total_read_operation_count = 0;
