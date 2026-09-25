@@ -1465,6 +1465,10 @@ cold fn list_directory_typed(StringView dir) throws
     -> Maybe<ArrayList<Path::directory_child>>;
 cold fn list_directory_typed(StringView dir, Allocator allocator) throws
     -> Maybe<ArrayList<Path::directory_child>>;
+#if defined __linux__
+cold fn list_directory_typed(descriptor directory, Allocator allocator) throws
+    -> Maybe<ArrayList<Path::directory_child>>;
+#endif
 cold fn list_directory_status(StringView dir, Allocator allocator) throws
     -> Maybe<ArrayList<directory_status_entry>>;
 

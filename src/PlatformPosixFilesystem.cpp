@@ -304,13 +304,9 @@ cold fn list_directory_typed(StringView dir) throws
   return list_directory_typed(dir, heap_allocator());
 }
 
-cold fn list_directory_typed(StringView dir, Allocator allocator) throws
+static fn list_directory_typed_handle(DIR *handle, Allocator allocator) throws
     -> Maybe<ArrayList<Path::directory_child>>
 {
-  const String dir_string{allocator, dir};
-  let const handle = ::opendir(dir_string.c_str());
-  if (handle == nullptr) return None;
-
   let entries = ArrayList<Path::directory_child>{allocator};
   loop
   {
@@ -347,6 +343,34 @@ cold fn list_directory_typed(StringView dir, Allocator allocator) throws
   ::closedir(handle);
   return entries;
 }
+
+cold fn list_directory_typed(StringView dir, Allocator allocator) throws
+    -> Maybe<ArrayList<Path::directory_child>>
+{
+  const String dir_string{allocator, dir};
+  let const handle = ::opendir(dir_string.c_str());
+  if (handle == nullptr) return None;
+
+  return list_directory_typed_handle(handle, allocator);
+}
+
+#if defined __linux__
+
+cold fn list_directory_typed(descriptor directory, Allocator allocator) throws
+    -> Maybe<ArrayList<Path::directory_child>>
+{
+  let const duplicate = ::dup(directory);
+  if (duplicate < 0) return None;
+  let const handle = ::fdopendir(duplicate);
+  if (handle == nullptr) {
+    ::close(duplicate);
+    return None;
+  }
+
+  return list_directory_typed_handle(handle, allocator);
+}
+
+#endif
 
 cold static fn list_directory_status_fallback(StringView dir,
                                               Allocator allocator) throws

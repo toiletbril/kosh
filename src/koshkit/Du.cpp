@@ -57,7 +57,6 @@ struct du_directory_frame
   Path path;
   usize parent_index{SIZE_MAX};
   u64 total_bytes{0};
-  usize pending_stat_count{0};
   usize pending_directory_count{0};
   bool is_enumerated{false};
   bool has_failure{false};
@@ -66,7 +65,7 @@ struct du_directory_frame
 
 struct du_stat_work
 {
-  Path path;
+  const char *name{nullptr};
   usize parent_index{SIZE_MAX};
   os::file_status status{};
 };
@@ -134,15 +133,20 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
   let stat_work = ArrayList<du_stat_work>{allocator};
   let stat_batch = os::Batch{allocator};
   let batch_results = ArrayList<os::batch_result>{allocator};
+  let fallback_paths = ArrayList<Path>{allocator};
+  let fallback_batch = os::Batch{allocator};
+  let fallback_results = ArrayList<os::batch_result>{allocator};
   frames.reserve(32);
   directory_queue.reserve(32);
   stat_work.reserve(512);
   stat_batch.reserve(512);
   batch_results.reserve(512);
+  fallback_paths.reserve(512);
+  fallback_batch.reserve(512);
+  fallback_results.reserve(512);
   frames.push(du_directory_frame{
-      Path{path.view(), allocator},
-      SIZE_MAX, allocated_size_bytes, 0, 0, false,
-      false, false
+      Path{path.view(), allocator}, SIZE_MAX, allocated_size_bytes, 0,
+      false, false, false
   });
   directory_queue.push(0);
   bool is_root_complete = false;
@@ -152,7 +156,7 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
     while (frame_index != SIZE_MAX) {
       let &frame = frames[frame_index];
       if (frame.is_complete || !frame.is_enumerated ||
-          frame.pending_stat_count != 0 || frame.pending_directory_count != 0)
+          frame.pending_directory_count != 0)
         return;
 
       frame.is_complete = true;
@@ -195,81 +199,113 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
     }
   };
 
-  let const do_flush_stat_work = [&]() throws -> void {
+  let const do_process_stat_work = [&](du_stat_work &work,
+                                       i32 error_number) throws -> void {
+    let const parent_index = work.parent_index;
+    let const make_child_path = [&]() throws -> Path {
+      let child_path = Path{frames[parent_index].path.view(), wave_allocator};
+      child_path.append(StringView{work.name});
+      return child_path;
+    };
+
+    if (error_number != 0) {
+      os::set_last_system_error(error_number);
+      let child_path = make_child_path();
+      report_soft_koshkit_util_error(
+          ec, cxt, "du",
+          "cannot read '" + child_path.text() +
+              "': " + os::last_system_error_message());
+      frames[parent_index].has_failure = true;
+      has_failure = true;
+      return;
+    }
+
+    let const &status = work.status;
+    let const type = os::file_type_letter(status.mode);
+    if (type != 'd' && status.has_file_identity && status.link_count > 1) {
+      const u64 identity[] = {status.device_id, status.file_id};
+      let const key = StringView{reinterpret_cast<const char *>(identity),
+                                 sizeof(identity)};
+      if (!seen_links.add(key)) return;
+    }
+    if (status.blocks > UINT64_MAX / 512) {
+      let child_path = make_child_path();
+      report_soft_koshkit_util_error(
+          ec, cxt, "du",
+          "cannot read '" + child_path.text() +
+              "': the total size is too large");
+      frames[parent_index].has_failure = true;
+      has_failure = true;
+      return;
+    }
+
+    let const allocated_size_bytes = status.blocks * 512;
+    if (type == 'd') {
+      let child_path = make_child_path();
+      frames[parent_index].pending_directory_count++;
+      frames.push(du_directory_frame{
+          Path{child_path.view(), allocator}, parent_index,
+          allocated_size_bytes, 0, false, false, false
+      });
+      directory_queue.push(frames.count() - 1);
+      return;
+    }
+
+    if (allocated_size_bytes >
+        UINT64_MAX - frames[parent_index].total_bytes)
+    {
+      let child_path = make_child_path();
+      report_soft_koshkit_util_error(
+          ec, cxt, "du",
+          "cannot read '" + child_path.text() +
+              "': the total size is too large");
+      frames[parent_index].has_failure = true;
+      has_failure = true;
+      return;
+    }
+
+    frames[parent_index].total_bytes += allocated_size_bytes;
+    if (output_rows != nullptr) {
+      let child_path = make_child_path();
+      append_output_row(*output_rows, allocated_size_bytes, child_path.view(),
+                        allocator);
+    }
+  };
+
+  let const do_flush_stat_work = [&](Maybe<os::descriptor> directory)
+      throws -> void {
     if (stat_work.is_empty()) return;
 
-    stat_batch.clear();
-    for (let &work : stat_work)
-      stat_batch.add(os::batch_operation::lstat(work.path, work.status));
-    stat_batch.execute(batch_results, os::batch_deduplication::Disabled);
+    if (directory.has_value()) {
+      stat_batch.clear();
+      for (let &work : stat_work)
+        stat_batch.add(os::batch_operation::lstat_at(
+            *directory, work.name, work.status));
+      stat_batch.execute(batch_results, os::batch_deduplication::Disabled);
+    } else {
+      fallback_paths.clear();
+      fallback_batch.clear();
+      for (let &work : stat_work) {
+        let path = Path{frames[work.parent_index].path.view(), wave_allocator};
+        path.append(StringView{work.name});
+        fallback_paths.push(steal(path));
+        fallback_batch.add(os::batch_operation::lstat(
+            fallback_paths[fallback_paths.count() - 1], work.status));
+      }
+      fallback_batch.execute(fallback_results,
+                             os::batch_deduplication::Disabled);
+    }
+
+    let const &results = directory.has_value() ? batch_results : fallback_results;
     for (usize index = 0; index < stat_work.count(); index++) {
       let &work = stat_work[index];
-      let const parent_index = work.parent_index;
-      if (batch_results[index].error_number != 0) {
-        os::set_last_system_error(batch_results[index].error_number);
-        report_soft_koshkit_util_error(
-            ec, cxt, "du",
-            "cannot read '" + work.path.text() +
-                "': " + os::last_system_error_message());
-        frames[parent_index].has_failure = true;
-        has_failure = true;
-        frames[parent_index].pending_stat_count--;
-        do_try_complete(parent_index);
-        continue;
-      }
-
-      let const &status = work.status;
-      let const type = os::file_type_letter(status.mode);
-      if (type != 'd' && status.has_file_identity && status.link_count > 1) {
-        const u64 identity[] = {status.device_id, status.file_id};
-        let const key = StringView{reinterpret_cast<const char *>(identity),
-                                   sizeof(identity)};
-        if (!seen_links.add(key)) {
-          frames[parent_index].pending_stat_count--;
-          do_try_complete(parent_index);
-          continue;
-        }
-      }
-      if (status.blocks > UINT64_MAX / 512) {
-        report_soft_koshkit_util_error(ec, cxt, "du",
-                                       "cannot read '" + work.path.text() +
-                                           "': the total size is too large");
-        frames[parent_index].has_failure = true;
-        has_failure = true;
-        frames[parent_index].pending_stat_count--;
-        do_try_complete(parent_index);
-        continue;
-      }
-
-      let const allocated_size_bytes = status.blocks * 512;
-      if (type == 'd') {
-        frames[parent_index].pending_directory_count++;
-        frames.push(du_directory_frame{
-            Path{work.path.view(), allocator},
-            work.parent_index,
-            allocated_size_bytes, 0, 0, false, false, false
-        });
-        directory_queue.push(frames.count() - 1);
-      } else {
-        if (allocated_size_bytes >
-            UINT64_MAX - frames[parent_index].total_bytes)
-        {
-          report_soft_koshkit_util_error(ec, cxt, "du",
-                                         "cannot read '" + work.path.text() +
-                                             "': the total size is too large");
-          frames[parent_index].has_failure = true;
-          has_failure = true;
-        } else {
-          frames[parent_index].total_bytes += allocated_size_bytes;
-          if (output_rows != nullptr)
-            append_output_row(*output_rows, allocated_size_bytes,
-                              work.path.view(), allocator);
-        }
-      }
-      frames[parent_index].pending_stat_count--;
-      do_try_complete(parent_index);
+      do_process_stat_work(work, results[index].error_number);
     }
     stat_batch.clear();
+    batch_results.clear();
+    fallback_batch.clear();
+    fallback_results.clear();
+    fallback_paths.clear();
     stat_work.clear();
     wave_arena.reset();
   };
@@ -284,8 +320,21 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
       let const list_mark = list_arena.mark();
       defer { list_arena.release(list_mark); };
       let const frame_index = directory_queue[directory_index];
+#if defined __linux__
+      let const directory = os::open_file_descriptor(
+          frames[frame_index].path.view(), os::file_open_mode::Read);
+      defer {
+        if (directory.has_value()) unused(os::close_fd(*directory));
+      };
+      let children = directory.has_value()
+                         ? os::list_directory_typed(*directory, list_allocator)
+                         : Path::read_directory_typed(frames[frame_index].path,
+                                                      list_allocator);
+#else
+      const Maybe<os::descriptor> directory = None;
       let children =
           Path::read_directory_typed(frames[frame_index].path, list_allocator);
+#endif
       if (!children.has_value()) {
         report_soft_koshkit_util_error(
             ec, cxt, "du",
@@ -297,20 +346,19 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
         do_try_complete(frame_index);
         continue;
       }
-      frames[frame_index].pending_stat_count += children->count();
       frames[frame_index].is_enumerated = true;
       for (let const &child : *children) {
-        let child_path = Path{frames[frame_index].path.view(), wave_allocator};
-        child_path.append(child.name.view());
-        stat_work.push(du_stat_work{steal(child_path), frame_index});
-        if (stat_work.count() == 512) do_flush_stat_work();
+        if (os::INTERRUPT_REQUESTED) return None;
+        stat_work.push(du_stat_work{child.name.c_str(), frame_index});
+        if (stat_work.count() == 512) {
+          do_flush_stat_work(directory);
+        }
       }
+      do_flush_stat_work(directory);
       do_try_complete(frame_index);
     }
-    do_flush_stat_work();
   }
 
-  if (!stat_work.is_empty()) do_flush_stat_work();
   if (os::INTERRUPT_REQUESTED) return None;
   if (!is_root_complete || !root_result.should_emit) return None;
   return root_result;

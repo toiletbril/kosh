@@ -74,6 +74,36 @@ fn batch_operation::exists(const Path &path) wontthrow -> batch_operation
   return operation;
 }
 
+fn batch_operation::lstat_at(descriptor directory, const char *name,
+                             file_status &status) wontthrow -> batch_operation
+{
+  batch_operation operation;
+  operation.syscall_id = Kind::LstatAt;
+  operation.m_primary.input_buffer = name;
+  operation.m_secondary.status = &status;
+#if KOSH_PLATFORM_IS KOSH_PLATFORM_WIN32
+  operation.byte_offset = static_cast<u64>(reinterpret_cast<uintptr_t>(directory));
+#else
+  operation.byte_offset = static_cast<u64>(directory);
+#endif
+  return operation;
+}
+
+fn batch_operation::stat_at(descriptor directory, const char *name,
+                            file_status &status) wontthrow -> batch_operation
+{
+  batch_operation operation;
+  operation.syscall_id = Kind::StatAt;
+  operation.m_primary.input_buffer = name;
+  operation.m_secondary.status = &status;
+#if KOSH_PLATFORM_IS KOSH_PLATFORM_WIN32
+  operation.byte_offset = static_cast<u64>(reinterpret_cast<uintptr_t>(directory));
+#else
+  operation.byte_offset = static_cast<u64>(directory);
+#endif
+  return operation;
+}
+
 Batch::Batch(Allocator allocator)
     : m_operations(allocator), m_canonical_positions(allocator),
       m_buckets(allocator), m_optimized_operations(allocator)
@@ -89,7 +119,9 @@ fn Batch::add(batch_operation operation) throws -> void
   switch (operation.syscall_id) {
   case batch_operation::Kind::Lstat:
   case batch_operation::Kind::Stat:
-  case batch_operation::Kind::Exists: m_has_metadata_operations = true; break;
+  case batch_operation::Kind::Exists:
+  case batch_operation::Kind::LstatAt:
+  case batch_operation::Kind::StatAt: m_has_metadata_operations = true; break;
   case batch_operation::Kind::Read:
   case batch_operation::Kind::Write:
   case batch_operation::Kind::WriteCurrent:
@@ -116,6 +148,20 @@ static pure fn is_same_metadata_request(
   case batch_operation::Kind::Lstat:
   case batch_operation::Kind::Stat:
   case batch_operation::Kind::Exists: break;
+  case batch_operation::Kind::LstatAt:
+  case batch_operation::Kind::StatAt: {
+    let const left_directory =
+        batch_internal::batch_operation_access::get_directory_descriptor(left);
+    let const right_directory =
+        batch_internal::batch_operation_access::get_directory_descriptor(right);
+    if (left_directory != right_directory) return false;
+    let const *left_name =
+        batch_internal::batch_operation_access::get_relative_name(left);
+    let const *right_name =
+        batch_internal::batch_operation_access::get_relative_name(right);
+    return left_name != nullptr && right_name != nullptr &&
+           std::strcmp(left_name, right_name) == 0;
+  }
   case batch_operation::Kind::Read:
   case batch_operation::Kind::Write:
   case batch_operation::Kind::WriteCurrent:
@@ -132,13 +178,14 @@ static pure fn is_same_metadata_request(
 static pure fn is_metadata_request(
     const batch_internal::batched_syscall &operation) wontthrow -> bool
 {
-  if (batch_internal::batch_operation_access::get_path(operation) == nullptr)
-    return false;
-
   switch (batch_internal::batch_operation_access::get_kind(operation)) {
   case batch_operation::Kind::Lstat:
   case batch_operation::Kind::Stat:
   case batch_operation::Kind::Exists: return true;
+  case batch_operation::Kind::LstatAt:
+  case batch_operation::Kind::StatAt:
+    return batch_internal::batch_operation_access::get_relative_name(
+               operation) != nullptr;
   case batch_operation::Kind::Read:
   case batch_operation::Kind::Write:
   case batch_operation::Kind::WriteCurrent:
@@ -205,15 +252,30 @@ static fn find_canonical_operation_positions(
     let const &operation = operations[index];
     if (!is_metadata_request(operation)) continue;
 
-    let const path = batch_internal::batch_operation_access::get_path(operation)
-                         ->text()
-                         .view();
     let const kind_hash =
         static_cast<u64>(
             batch_internal::batch_operation_access::get_kind(operation)) *
         0x9e3779b97f4a7c15ull;
+    let const *path = batch_internal::batch_operation_access::get_path(operation);
+    u64 request_hash = kind_hash;
+    if (path != nullptr) {
+      request_hash ^= hash_bytes(path->text().view());
+    } else {
+      let const *name =
+          batch_internal::batch_operation_access::get_relative_name(operation);
+      let const directory =
+          batch_internal::batch_operation_access::get_directory_descriptor(
+              operation);
+      if (name == nullptr) continue;
+      request_hash ^= hash_bytes(StringView{name});
+#if KOSH_PLATFORM_IS KOSH_PLATFORM_WIN32
+      request_hash ^= static_cast<u64>(reinterpret_cast<uintptr_t>(directory));
+#else
+      request_hash ^= static_cast<u64>(directory);
+#endif
+    }
     usize bucket =
-        static_cast<usize>(hash_bytes(path) ^ kind_hash) & (bucket_count - 1);
+        static_cast<usize>(request_hash) & (bucket_count - 1);
     loop
     {
       let const existing_position = buckets[bucket];
