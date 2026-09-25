@@ -80,7 +80,7 @@ static fn collect_recursive_sources(const ExecContext &ec, EvalContext &cxt,
                                     const Path &path,
                                     Path::entry_kind path_kind,
                                     Allocator allocator,
-                                    ArrayList<String> &storage,
+                                    ArrayList<Path> &storage,
                                     i32 &status) throws -> void
 {
   if (path_kind == Path::entry_kind::Unknown) {
@@ -102,7 +102,7 @@ static fn collect_recursive_sources(const ExecContext &ec, EvalContext &cxt,
 
   if (path_kind != Path::entry_kind::Directory) {
     if (path_kind == Path::entry_kind::Regular)
-      storage.push(path.text().clone());
+      storage.push(path.clone());
     return;
   }
 
@@ -187,7 +187,7 @@ static fn collect_recursive_sources(const ExecContext &ec, EvalContext &cxt,
       collect_recursive_sources(ec, cxt, child_paths[index], kind, allocator,
                                 storage, status);
     else if (kind == Path::entry_kind::Regular)
-      storage.push(child_paths[index].text().clone());
+      storage.push(steal(child_paths[index]));
   }
 }
 
@@ -248,7 +248,7 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const allocator = cxt.scratch_allocator();
   let const operand_sources = source_list_from_operands(operands, allocator, 1);
-  ArrayList<String> recursive_storage{allocator};
+  ArrayList<Path> recursive_storage{allocator};
   ArrayList<StringView> sources{allocator};
   i32 status = 0;
   if (recursion_mode == grep_recursion_mode::Recursive) {
