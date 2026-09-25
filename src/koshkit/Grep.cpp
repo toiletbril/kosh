@@ -36,6 +36,7 @@ namespace koshka {
 namespace koshkit {
 
 constexpr usize GREP_UNKNOWN_BATCH_COUNT = 512;
+constexpr usize GREP_READ_BYTE_COUNT = 256 * 1024;
 
 static pure fn is_literal_search_pattern(StringView pattern) wontthrow -> bool
 {
@@ -266,7 +267,7 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{allocator};
   let line = String{allocator};
   let reader = SourceBatchReader{ec,        sources, allocator,
-                                 64 * 1024, true,    should_recurse};
+                                 GREP_READ_BYTE_COUNT, true, should_recurse};
   let chunks = ArrayList<SourceBatchReader::Chunk>{allocator};
   ArrayList<usize> source_line_numbers{allocator};
   source_line_numbers.reserve(sources.count());
