@@ -73,12 +73,15 @@ static fn previous_settled_word(StringView line, usize token_start) wontthrow
   return word;
 }
 
+using sorted_target_list =
+    SortedArrayList<String, order_comparator<String>>;
+
 /* Keyed by the source file's absolute path and refreshed when the mtime moves.
- */
+   Cached targets stay sorted so prefix completion can skip non-matches. */
 struct cached_target_list
 {
-  i64 mtime;
-  ArrayList<String> targets;
+  i64 mtime{0};
+  sorted_target_list targets{heap_allocator(), sort_order::ascending};
 };
 static StringMap<cached_target_list> BUILD_TARGET_CACHE{heap_allocator()};
 
@@ -319,16 +322,20 @@ static fn collect_ssh_hosts() throws -> ArrayList<String>
 /* Null means the source file is missing. The result points into the cache. */
 template <typename Collector>
 static fn cached_targets_for(const Path &source_file, Collector collect) throws
-    -> const ArrayList<String> *
+    -> Maybe<const sorted_target_list *>
 {
   let const absolute_source_file = source_file.to_absolute();
   let const mtime = absolute_source_file.modification_time();
-  if (!mtime.has_value()) return nullptr;
+  if (!mtime.has_value()) return None;
   let const key = absolute_source_file.view();
   if (let const cached = BUILD_TARGET_CACHE.find(key);
       cached.has_value() && cached->mtime == *mtime)
     return &cached->targets;
-  return &BUILD_TARGET_CACHE.set(key, cached_target_list{*mtime, collect()})
+  let targets = collect();
+  return &BUILD_TARGET_CACHE
+              .set(key, cached_target_list{
+                              *mtime,
+                              steal(targets).make_sorted(sort_order::ascending)})
               ->targets;
 }
 
@@ -418,6 +425,7 @@ fn internal::complete_from_tools_with_targets(StringView line, StringView token,
 
   let owned_targets = ArrayList<String>{heap_allocator()};
   const ArrayList<String> *targets = &owned_targets;
+  Maybe<const sorted_target_list *> cached_targets;
 
   Maybe<tool_with_targets_kind> tool_kind = TOOLS_WITH_TARGETS.find(tool);
   if (!tool_kind.has_value()) return None;
@@ -445,7 +453,7 @@ fn internal::complete_from_tools_with_targets(StringView line, StringView token,
     makefile_path.push_component(makefile_name->view());
     if (!makefile_path.exists()) return None;
     let const make_directory = Path{directory.view()};
-    targets = cached_targets_for(makefile_path, [&]() throws {
+    cached_targets = cached_targets_for(makefile_path, [&]() throws {
       let probe = ArrayList<String>{heap_allocator()};
       probe.push(String{"make"});
       probe.push(String{"-C"});
@@ -478,7 +486,7 @@ fn internal::complete_from_tools_with_targets(StringView line, StringView token,
     build_file.push_component(settled_option_value(line, "-f")
                                   .value_or(String{"build.ninja"})
                                   .view());
-    targets = cached_targets_for(build_file, [&]() throws {
+    cached_targets = cached_targets_for(build_file, [&]() throws {
       let probe = ArrayList<String>{heap_allocator()};
       probe.push(String{"ninja"});
       probe.push(String{"-C"});
@@ -495,7 +503,7 @@ fn internal::complete_from_tools_with_targets(StringView line, StringView token,
     if (!build_directory.has_value()) return None;
     let cache_file = Path{build_directory->view()};
     cache_file.push_component("CMakeCache.txt");
-    targets = cached_targets_for(cache_file, [&]() throws {
+    cached_targets = cached_targets_for(cache_file, [&]() throws {
       let probe = ArrayList<String>{heap_allocator()};
       probe.push(String{"cmake"});
       probe.push(String{"--build"});
@@ -521,7 +529,7 @@ fn internal::complete_from_tools_with_targets(StringView line, StringView token,
   case tool_with_targets_kind::node_runner: {
     if (second_word_of(line) != "run") return None;
     let const package_path = Path{StringView{"package.json"}};
-    targets = cached_targets_for(package_path, [&]() throws {
+    cached_targets = cached_targets_for(package_path, [&]() throws {
       let const contents = package_path.read_entire_file();
       return contents.has_value() ? parse_package_json_scripts(contents->view())
                                   : ArrayList<String>{heap_allocator()};
@@ -547,11 +555,20 @@ fn internal::complete_from_tools_with_targets(StringView line, StringView token,
   }
   }
 
-  if (targets == nullptr) return None;
   let candidates = ArrayList<String>{heap_allocator()};
-  for (let const &target : *targets)
-    if (target.view().starts_with(token))
+  if (cached_targets.has_value()) {
+    let const &sorted_targets = *cached_targets.value();
+    let const first = sorted_targets.lower_bound(token);
+    for (usize i = first; i < sorted_targets.count(); i++) {
+      let const &target = sorted_targets[i];
+      if (!target.view().starts_with(token)) break;
       candidates.push(String{target.view()});
+    }
+  } else {
+    for (let const &target : *targets)
+      if (target.view().starts_with(token))
+        candidates.push(String{target.view()});
+  }
   if (candidates.is_empty()) return None;
   return candidates;
 }
