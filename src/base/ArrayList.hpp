@@ -36,6 +36,18 @@ struct order_comparator
   }
 };
 
+template <class T, bool IsEnum = std::is_enum_v<T>>
+struct array_list_find_scalar
+{
+  using type = T;
+};
+
+template <class T>
+struct array_list_find_scalar<T, true>
+{
+  using type = std::underlying_type_t<T>;
+};
+
 template <class T, class Compare>
 class SortedArrayList;
 
@@ -181,10 +193,13 @@ public:
 
 #if T__HAS_GCC_EXTENSIONS
     if constexpr (std::is_same_v<value_type, wanted_type> &&
-                  std::is_arithmetic_v<value_type> &&
+                  std::is_arithmetic_v<
+                      typename array_list_find_scalar<value_type>::type> &&
                   sizeof(value_type) == sizeof(u64)) {
-      using vector_type = value_type __attribute__((vector_size(16)));
-      vector_type needles = {wanted, wanted};
+      using scalar_type = typename array_list_find_scalar<value_type>::type;
+      using vector_type = scalar_type __attribute__((vector_size(16)));
+      let const scalar_wanted = static_cast<scalar_type>(wanted);
+      vector_type needles = {scalar_wanted, scalar_wanted};
       usize element_index = 0;
       for (; element_index + 2 <= m_length; element_index += 2) {
         vector_type values;
