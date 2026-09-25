@@ -398,21 +398,16 @@ pure fn directory_listing_generation(const Path &directory) wontthrow -> u64
 
 static fn sort_and_deduplicate_names(ArrayList<String> &names) throws -> void
 {
-  let positions = ArrayList<usize>{names.allocator()};
-  positions.reserve(names.count());
-  for (usize position = 0; position < names.count(); position++)
-    positions.push(position);
-  positions.sort([&](usize left, usize right) {
-    return names[left].view() < names[right].view();
-  });
-
-  let sorted_names = ArrayList<String>{names.allocator()};
-  sorted_names.reserve(names.count());
-  for (let const position : positions)
-    if (sorted_names.is_empty() ||
-        sorted_names.back().view() != names[position].view())
-      sorted_names.push(steal(names[position]));
-  names = steal(sorted_names);
+  let sorted_names = steal(names).make_sorted(
+      [](const String &left, const String &right) {
+        return left.view() < right.view();
+      });
+  let unique_names = ArrayList<String>{names.allocator()};
+  unique_names.reserve(sorted_names.count());
+  for (let &name : sorted_names)
+    if (unique_names.is_empty() || unique_names.back().view() != name.view())
+      unique_names.push(steal(name));
+  names = steal(unique_names);
 }
 
 static fn begin_directory_validation_epoch() wontthrow -> void
