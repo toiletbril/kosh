@@ -21,7 +21,7 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-NUMBER] [-pAncUhMw] [--sort key] [--live [seconds]] "
+HELP_SYNOPSIS_DECL("[-NUMBER] [-pAncUMcw] [--sort key] [--live [seconds]] "
                    "[--cumulative [seconds]] [pid]");
 
 HELP_DESCRIPTION_DECL("The evilps utility shows running processes as a tree.");
