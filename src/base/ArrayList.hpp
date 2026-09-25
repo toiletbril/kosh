@@ -615,6 +615,11 @@ public:
     return SortedArrayList{*this};
   }
 
+  mustuse cold fn into_array_list() && noexcept -> ArrayList<T>
+  {
+    return steal(static_cast<Base &>(*this));
+  }
+
   template <class Wanted>
   hot mustuse pure fn find(const Wanted &wanted) const throws -> Maybe<usize>
   {

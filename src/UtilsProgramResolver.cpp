@@ -402,12 +402,18 @@ static fn sort_and_deduplicate_names(ArrayList<String> &names) throws -> void
       [](const String &left, const String &right) {
         return left.view() < right.view();
       });
-  let unique_names = ArrayList<String>{names.allocator()};
-  unique_names.reserve(sorted_names.count());
-  for (let &name : sorted_names)
-    if (unique_names.is_empty() || unique_names.back().view() != name.view())
-      unique_names.push(steal(name));
-  names = steal(unique_names);
+  usize unique_count = 0;
+  for (usize index = 0; index < sorted_names.count(); index++) {
+    if (unique_count > 0 &&
+        sorted_names[unique_count - 1].view() == sorted_names[index].view())
+      continue;
+
+    if (unique_count != index)
+      sorted_names[unique_count] = steal(sorted_names[index]);
+    unique_count++;
+  }
+  sorted_names.truncate(unique_count);
+  names = steal(sorted_names).into_array_list();
 }
 
 static fn begin_directory_validation_epoch() wontthrow -> void
