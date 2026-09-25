@@ -52,6 +52,12 @@ namespace koshka::koshkit {
 
 namespace {
 
+enum class evilnet_color_mode : u8
+{
+  Plain,
+  Colored,
+};
+
 enum class evilnet_sort_key : u8
 {
   Name,
@@ -170,9 +176,10 @@ pure fn family_name(os::network_address_family family) wontthrow -> StringView
   unreachable("unknown network address family");
 }
 
-fn append_network_interface_report(String &output, bool should_color) throws
-    -> usize
+fn append_network_interface_report(String &output,
+                                   evilnet_color_mode color_mode) throws -> usize
 {
+  let const should_color = color_mode == evilnet_color_mode::Colored;
   let addresses = os::network_interface_addresses();
   addresses.sort([](const os::network_interface_address &left,
                     const os::network_interface_address &right) {
@@ -207,9 +214,10 @@ fn append_network_interface_report(String &output, bool should_color) throws
 fn append_network_traffic_statistics_report(
     String &output, ArrayList<String> &warnings, Allocator allocator,
     const ArrayList<os::network_interface_statistics_entry> &statistics,
-    bool should_color, StringView duration_suffix,
-    const Maybe<String> &default_interface) throws -> usize
+    StringView duration_suffix, const Maybe<String> &default_interface,
+    evilnet_color_mode color_mode) throws -> usize
 {
+  let const should_color = color_mode == evilnet_color_mode::Colored;
   let table = ReportTable{allocator};
   table.set_column_gap(3);
   table.add_column("NAME", report_table_alignment::Left,
@@ -343,21 +351,23 @@ fn append_network_traffic_statistics_report(
 }
 
 fn append_network_traffic_report(String &output, ArrayList<String> &warnings,
-                                 Allocator allocator, bool should_color,
-                                 Maybe<evilnet_sort_key> sort_key) throws
-    -> usize
+                                 Allocator allocator,
+                                 Maybe<evilnet_sort_key> sort_key,
+                                 evilnet_color_mode color_mode) throws -> usize
 {
   let statistics = os::read_network_interface_statistics();
   sort_network_statistics(statistics, sort_key);
   let const default_interface = os::default_network_interface(allocator);
   return append_network_traffic_statistics_report(output, warnings, allocator,
-                                                  statistics, should_color, {},
-                                                  default_interface);
+                                                  statistics, {},
+                                                  default_interface, color_mode);
 }
 
 fn append_tcp_report(String &output, ArrayList<String> &warnings,
-                     Allocator allocator, bool should_color) throws -> bool
+                     Allocator allocator, evilnet_color_mode color_mode) throws
+    -> bool
 {
+  let const should_color = color_mode == evilnet_color_mode::Colored;
   os::tcp_statistics statistics{};
   if (!os::read_tcp_statistics(statistics)) return false;
 
@@ -704,9 +714,11 @@ fn get_network_window_status(const live_network_row &row,
 
 fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
                             f64 window_seconds, f64 sample_interval_seconds,
-                            f64 refresh_interval_seconds, bool should_color,
-                            Maybe<evilnet_sort_key> sort_key) throws -> i32
+                            f64 refresh_interval_seconds,
+                            Maybe<evilnet_sort_key> sort_key,
+                            evilnet_color_mode color_mode) throws -> i32
 {
+  let const should_color = color_mode == evilnet_color_mode::Colored;
   let retained = ArrayList<live_network_row>{allocator};
   let const falloff_nanoseconds =
       static_cast<u64>(window_seconds * 1000000000.0);
@@ -834,8 +846,8 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
     append_live_controls_bar(output, sample_label.view(), refresh_label.view(),
                              should_color);
     append_network_traffic_statistics_report(
-        output, warnings, frame_allocator, statistics, should_color,
-        duration_suffix.view(), default_interface);
+        output, warnings, frame_allocator, statistics, duration_suffix.view(),
+        default_interface, color_mode);
     if (!warnings.is_empty()) output += "\n";
     for (let const &warning : warnings) {
       output += Warning{warning.view()}.to_string().view();
@@ -875,6 +887,8 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{allocator};
   let warnings = ArrayList<String>{allocator};
   let const should_color = koshkit_should_color();
+  let const color_mode = should_color ? evilnet_color_mode::Colored
+                                      : evilnet_color_mode::Plain;
   Maybe<evilnet_sort_key> sort_key{};
   if (FLAG_EVILNET_SORT.is_set()) {
     let const resolved =
@@ -930,7 +944,7 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   if (FLAG_EVILNET_LIVE.is_enabled()) {
     return run_live_network_traffic(
         ec, heap_allocator(), window_seconds, live_interval_seconds,
-        live_interval_seconds, should_color, sort_key);
+        live_interval_seconds, sort_key, color_mode);
   }
   let const should_show_all = FLAG_EVILNET_ALL.is_enabled();
   let const should_show_traffic =
@@ -941,7 +955,7 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
       !FLAG_EVILNET_TRAFFIC.is_enabled() && !should_show_failures;
   let const address_count =
       should_show_interfaces
-          ? append_network_interface_report(output, should_color)
+          ? append_network_interface_report(output, color_mode)
           : 0;
   usize traffic_count = 0;
   bool has_tcp_statistics = false;
@@ -960,16 +974,16 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
       let duration_suffix = String{allocator, "/"};
       duration_suffix += format_live_duration(window_seconds, allocator).view();
       traffic_count = append_network_traffic_statistics_report(
-          output, warnings, allocator, sampled, should_color,
-          duration_suffix.view(), default_interface);
+          output, warnings, allocator, sampled, duration_suffix.view(),
+          default_interface, color_mode);
     } else {
       traffic_count = append_network_traffic_report(output, warnings, allocator,
-                                                    should_color, sort_key);
+                                                    sort_key, color_mode);
     }
   }
   if (should_show_all || should_show_failures)
-    has_tcp_statistics =
-        append_tcp_report(output, warnings, allocator, should_color);
+    has_tcp_statistics = append_tcp_report(output, warnings, allocator,
+                                           color_mode);
 
   if (!warnings.is_empty()) output += "\n";
   ec.print_to_stdout(output);
