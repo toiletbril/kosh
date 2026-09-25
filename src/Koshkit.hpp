@@ -290,6 +290,7 @@ fn get_koshkit_color_mode() wontthrow -> cli_color_mode;
 fn koshkit_should_color() throws -> bool;
 
 fn util_names() throws -> const ArrayList<String> &;
+fn sorted_util_names() throws -> const ArrayList<String> &;
 
 fn resolve_util_program(EvalContext &cxt, StringView name) throws
     -> Maybe<Path>;

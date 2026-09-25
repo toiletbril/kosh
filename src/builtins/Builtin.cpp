@@ -37,12 +37,17 @@ pure fn BuiltinBuiltin::kind() const wontthrow -> Builtin::Kind
   return Kind::BuiltinBuiltin;
 }
 
-static fn sorted_builtin_names(Allocator allocator) throws -> ArrayList<String>
+using sorted_builtin_name_list =
+    SortedArrayList<String, order_comparator<String>>;
+
+static fn sorted_builtin_names() throws -> const sorted_builtin_name_list &
 {
-  let names = ArrayList<String>{allocator};
-  for (let const &builtin_name : builtin_names())
-    names.push_managed(builtin_name);
-  names.sort();
+  static sorted_builtin_name_list names = [] throws {
+    let collected = ArrayList<String>{heap_allocator()};
+    for (let const &builtin_name : builtin_names())
+      collected.push_managed(builtin_name);
+    return steal(collected).make_sorted(sort_order::ascending);
+  }();
   return names;
 }
 
@@ -107,7 +112,7 @@ static pure fn get_builtin_section(Builtin::Kind kind,
 static fn print_builtin_columns(ExecContext &ec, Allocator allocator) throws
     -> void
 {
-  let const sorted = sorted_builtin_names(allocator);
+  let const &sorted = sorted_builtin_names();
   let posix_names = ArrayList<StringView>{allocator};
   let bash_names = ArrayList<StringView>{allocator};
   let koshka_names = ArrayList<StringView>{allocator};
@@ -146,7 +151,7 @@ fn BuiltinBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
   if (name == "--help") SHOW_BUILTIN_HELP_AND_RETURN(ec);
 
   if (name == "--list") {
-    let const sorted = sorted_builtin_names(cxt.scratch_allocator());
+    let const &sorted = sorted_builtin_names();
     let out = String{cxt.scratch_allocator()};
     for (let const &builtin_name : sorted) {
       out += builtin_name.view();

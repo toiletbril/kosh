@@ -74,6 +74,20 @@ fn util_names() throws -> const ArrayList<String> &
   return names;
 }
 
+using sorted_utility_name_list =
+    SortedArrayList<String, order_comparator<String>>;
+
+fn sorted_util_names() throws -> const ArrayList<String> &
+{
+  static sorted_utility_name_list names = [] throws {
+    let collected = ArrayList<String>{heap_allocator()};
+    for (let const &utility_name : util_names())
+      collected.push_managed(utility_name);
+    return steal(collected).make_sorted(sort_order::ascending);
+  }();
+  return names;
+}
+
 fn resolve_util_program(EvalContext &cxt, StringView name) throws -> Maybe<Path>
 {
   let const matches = cxt.get_program_resolver().search(

@@ -102,10 +102,7 @@ fn Koshkit::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       return koshkit::dispatch(ec, cxt, utility_index, chosen);
   }
 
-  let sorted_names = ArrayList<String>{cxt.scratch_allocator()};
-  for (let const &name : koshkit::util_names())
-    sorted_names.push(name.clone());
-  sorted_names.sort();
+  let const &sorted_names = koshkit::sorted_util_names();
 
   if (FLAG_KOSHKIT_LIST.is_enabled()) {
     let names_output = String{cxt.scratch_allocator()};
