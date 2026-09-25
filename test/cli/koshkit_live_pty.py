@@ -133,7 +133,7 @@ def main():
         ("evilio-pty", "koshkit --color never evilio --ps --live=0.05 "
          "--cumulative=0.1", None),
         ("evilps-pty", "koshkit --color never evilps --cpu --live=0.05 "
-         "--cumulative=0.1 -1", b"s\n" * 5 + b"/1\n/\x7f"),
+         "--cumulative=0.1 -1", b"s\n" * 5 + b"/1\n/\n"),
     ):
         result = run_pty(binary, command, key if name == "evilps-pty" else None)
         requirements = {"status": 130, "resized": True,

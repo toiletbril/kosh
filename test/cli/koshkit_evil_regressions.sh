@@ -148,7 +148,10 @@ printf 'evilps-completion-controls=%s\n' "$evilps_completion_controls"
 evil_manpage=$(< ../docs/kosh.1)
 if printf '%s\n' "$evil_manpage" | grep -Fq '\-\-sort' &&
   printf '%s\n' "$evil_manpage" | grep -Fq 'sets the refresh cadence' &&
-  printf '%s\n' "$evil_manpage" | grep -Fq 'defaults to one second unless an explicit cumulative value is given'
+  printf '%s\n' "$evil_manpage" | grep -Fq 'defaults to 0.5 seconds' &&
+  printf '%s\n' "$evil_manpage" | grep -Fq 'window defaults to the live interval unless' &&
+  printf '%s\n' "$evil_manpage" | grep -Fq 'explicit cumulative value' &&
+  printf '%s\n' "$evil_manpage" | grep -Fq 'is given'
 then
   evil_manpage_controls=matched
 else
@@ -306,9 +309,9 @@ else
 fi
 printf 'evilps-live-window=%s\n' "$evilps_live_window"
 
-fs_report=$($BIN -c 'koshkit --color never evilfs --all')
+fs_report=$($BIN -c 'koshkit --color never evilfs --all' 2> "$TEST_NULL_DEVICE")
 case $fs_report in
-  *'Source:'*'Volume:'*'UUID:'*'Filesystem ID:'*) fs_detail=matched ;;
+  *'Filesystems'*'SOURCE'*'VOLUME'*'UUID'*'FILESYSTEM ID'*) fs_detail=matched ;;
   *) fs_detail=wrong ;;
 esac
 printf 'evilfs-detail=%s\n' "$fs_detail"
@@ -322,14 +325,15 @@ printf 'evilnet-addresses=%s\n' "$net_addresses"
 
 net_all=$($BIN -c 'koshkit --color never evilnet --all' 2>/dev/null)
 case $net_all in
-  *'NAME'*'RX'*'TX'*'Opens:'*'Failures:'*) net_all_sections=matched ;;
+  *'Network interfaces'*'NAME'*'Network traffic'*'RX'*'TCP'*'GROUP'*)
+    net_all_sections=matched ;;
   *) net_all_sections=wrong ;;
 esac
 printf 'evilnet-all-sections=%s\n' "$net_all_sections"
 
 net_failures=$($BIN -c 'koshkit --color never evilnet --failures' 2>/dev/null)
 case $net_failures in
-  *'Opens:'*'Connections:'*'Failures:'*) net_failure_section=matched ;;
+  *'TCP'*'GROUP'*'Failures'*) net_failure_section=matched ;;
   *) net_failure_section=wrong ;;
 esac
 printf 'evilnet-failures=%s\n' "$net_failure_section"
