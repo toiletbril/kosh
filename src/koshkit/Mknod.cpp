@@ -23,7 +23,8 @@ HELP_SYNOPSIS_DECL(
 HELP_DESCRIPTION_DECL(
     "The mknod utility creates FIFO, character, and block special files.\n"
     "Examples: mknod pipe p; mknod --fifo pipe; "
-    "mknod --character --major 1 --minor 3 device.");
+    "mknod --character --major 1 --minor 3 device; "
+    "mknod --block 1 2 device.");
 
 FLAG(MKNOD_MODE, String, 'm', "mode", "Set the node permission mode.");
 FLAG(MKNOD_TYPE, String, '\0', "type",
@@ -147,6 +148,7 @@ fn Mknod::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const has_named_type = named_type_count != 0;
   usize next_operand_index = has_named_type ? 1 : 2;
+  usize name_operand_index = 0;
   StringView major_text{};
   StringView minor_text{};
   SourceLocation major_location = type_location;
@@ -164,6 +166,26 @@ fn Mknod::execute(const ExecContext &ec, EvalContext &cxt,
     minor_text = FLAG_MKNOD_MINOR.value();
     minor_location = FLAG_MKNOD_MINOR.value_location();
     has_minor_text = true;
+  }
+  if (has_named_type && !is_fifo && !operands.is_empty() &&
+      parse_device_number(operands[0].view()).has_value())
+  {
+    name_operand_index = SIZE_MAX;
+    next_operand_index = 0;
+    if (!has_major_text) {
+      major_text = operands[next_operand_index].view();
+      major_location = operand_locations[next_operand_index++];
+      has_major_text = true;
+    }
+    if (!has_minor_text && next_operand_index < operands.count() &&
+        parse_device_number(operands[next_operand_index].view()).has_value())
+    {
+      minor_text = operands[next_operand_index].view();
+      minor_location = operand_locations[next_operand_index++];
+      has_minor_text = true;
+    }
+    if (next_operand_index < operands.count())
+      name_operand_index = next_operand_index++;
   }
   if (!is_fifo) {
     if (!has_major_text && operands.count() > next_operand_index) {
@@ -226,6 +248,11 @@ fn Mknod::execute(const ExecContext &ec, EvalContext &cxt,
                             "provide one name and one node specification");
     return 1;
   }
+  if (name_operand_index == SIZE_MAX) {
+    KOSHKIT_REPORT_ERROR_AT(type_location, "Missing node name",
+                            "provide the path to create");
+    return 1;
+  }
   u32 mode = 0666;
   if (FLAG_MKNOD_MODE.is_set()) {
     let const parsed = parse_file_mode(FLAG_MKNOD_MODE.value(), mode, 0, false);
@@ -238,7 +265,7 @@ fn Mknod::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   i32 status = 0;
-  let const &name = operands[0];
+  let const &name = operands[name_operand_index];
   let const did_create =
       is_fifo ? os::make_fifo(name.view(), mode)
               : os::make_device_node(name.view(), mode | *type,
