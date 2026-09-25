@@ -1172,6 +1172,8 @@ static fn append_report_grid(
     StringView indentation, bool should_show_header,
     usize column_gap_space_count) throws -> void
 {
+  if (columns.is_empty()) return;
+
   let widths = ArrayList<usize>{columns.allocator()};
   widths.reserve(columns.count());
   for (let const &column : columns)
@@ -1246,6 +1248,7 @@ fn append_titled_report_table(String &output, StringView title,
       output.truncate(output.length() - 1);
     output += "\n\n";
   }
+  output += "  ";
   append_report_text(output, title, colors::ansi::BOLD_BLUE, should_color);
   output += '\n';
   output += table.to_string(should_color, "  ").view();
