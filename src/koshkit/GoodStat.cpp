@@ -51,6 +51,12 @@ enum class goodstat_checksum_report : u8
   Include,
 };
 
+enum class goodstat_color_mode : u8
+{
+  Plain,
+  Colored,
+};
+
 fn id_name(u32 id, Allocator allocator, goodstat_identity_kind kind) throws
     -> String
 {
@@ -135,18 +141,19 @@ fn percent_used(const os::filesystem_status &filesystem) wontthrow -> u64
 }
 
 fn append_subject(String &output, StringView operand,
-                  const os::file_status &status, bool should_color,
+                  const os::file_status &status,
                   const ExecContext &ec, Allocator allocator,
                   goodstat_filesystem_report filesystem_report,
-                  goodstat_checksum_report checksum_report) throws -> void
+                  goodstat_checksum_report checksum_report,
+                  goodstat_color_mode color_mode) throws -> void
 {
+  let const should_color = color_mode == goodstat_color_mode::Colored;
   let table = ReportTable{allocator};
   table.add_column("FIELD", report_table_alignment::Left,
                    colors::ansi::BOLD_CYAN);
   table.add_column("VALUE");
   let const do_append_field = [&](StringView name, StringView value,
-                                  StringView style, bool unused_color) throws {
-    unused(unused_color);
+                                  StringView style) throws {
     let cells = ArrayList<report_table_cell_view>{allocator};
     cells.push({name, style});
     cells.push({value, {}});
@@ -156,38 +163,36 @@ fn append_subject(String &output, StringView operand,
   do_append_field("Type",
                   described_type.has_value() ? described_type->view()
                                              : file_type_name(status),
-                  colors::ansi::BOLD_CYAN, should_color);
+                  colors::ansi::BOLD_CYAN);
 
   if (os::file_type_letter(status.mode) == 'l') {
     let const target = os::read_symlink(operand, allocator);
     if (target.has_value()) {
-      do_append_field("Target", target->view(), colors::ansi::BOLD_CYAN,
-                      should_color);
+      do_append_field("Target", target->view(), colors::ansi::BOLD_CYAN);
     }
   }
 
   do_append_field("Size", size_text(status.size, allocator).view(),
-                  colors::ansi::BOLD_CYAN, should_color);
+                  colors::ansi::BOLD_CYAN);
   do_append_field("Permissions", permission_text(status.mode, allocator).view(),
-                  colors::ansi::BOLD_CYAN, should_color);
+                  colors::ansi::BOLD_CYAN);
   do_append_field(
       "Owner",
       id_name(status.owner_id, allocator, goodstat_identity_kind::User).view(),
-      colors::ansi::BOLD_CYAN, should_color);
+      colors::ansi::BOLD_CYAN);
   do_append_field(
       "Group",
       id_name(status.group_id, allocator, goodstat_identity_kind::Group).view(),
-      colors::ansi::BOLD_CYAN, should_color);
+      colors::ansi::BOLD_CYAN);
   do_append_field("Inode", String::from(status.file_id, allocator).view(),
-                  colors::ansi::BOLD_CYAN, should_color);
+                  colors::ansi::BOLD_CYAN);
   do_append_field("Links", String::from(status.link_count, allocator).view(),
-                  colors::ansi::BOLD_CYAN, should_color);
+                  colors::ansi::BOLD_CYAN);
 
   let device = String::from(os::device_major(status.device_id), allocator);
   device += ",";
   device += String::from(os::device_minor(status.device_id), allocator).view();
-  do_append_field("Device", device.view(), colors::ansi::BOLD_CYAN,
-                  should_color);
+  do_append_field("Device", device.view(), colors::ansi::BOLD_CYAN);
 
   let const type_letter = os::file_type_letter(status.mode);
   if (type_letter == 'b' || type_letter == 'c') {
@@ -197,59 +202,56 @@ fn append_subject(String &output, StringView operand,
     special +=
         String::from(os::device_minor(status.special_device_id), allocator)
             .view();
-    do_append_field("Device type", special.view(), colors::ansi::BOLD_CYAN,
-                    should_color);
+    do_append_field("Device type", special.view(), colors::ansi::BOLD_CYAN);
   }
 
   let blocks = String::from(status.blocks, allocator);
   blocks += " of 512 bytes";
-  do_append_field("Blocks", blocks.view(), colors::ansi::BOLD_CYAN,
-                  should_color);
+  do_append_field("Blocks", blocks.view(), colors::ansi::BOLD_CYAN);
   do_append_field("Accessed",
                   format_file_timestamp(status.access_time,
                                         status.access_nanoseconds, allocator)
                       .view(),
-                  colors::ansi::BOLD_CYAN, should_color);
+                  colors::ansi::BOLD_CYAN);
   do_append_field("Modified",
                   format_file_timestamp(status.modification_time,
                                         status.modification_nanoseconds,
                                         allocator)
                       .view(),
-                  colors::ansi::BOLD_CYAN, should_color);
+                  colors::ansi::BOLD_CYAN);
   do_append_field("Changed",
                   format_file_timestamp(status.change_time,
                                         status.change_nanoseconds, allocator)
                       .view(),
-                  colors::ansi::BOLD_CYAN, should_color);
+                  colors::ansi::BOLD_CYAN);
 
   if (filesystem_report == goodstat_filesystem_report::Include) {
     let filesystem = os::filesystem_status{};
     if (os::stat_filesystem(operand, filesystem)) {
       do_append_field("Filesystem", StringView{filesystem.type_name},
-                      colors::ansi::BOLD_CYAN, should_color);
+                      colors::ansi::BOLD_CYAN);
       do_append_field("Filesystem block size",
                       String::from(filesystem.block_size, allocator).view(),
-                      colors::ansi::BOLD_CYAN, should_color);
+                      colors::ansi::BOLD_CYAN);
       do_append_field("Filesystem capacity",
                       String::from(percent_used(filesystem), allocator).view() +
                           "%",
-                      colors::ansi::BOLD_CYAN, should_color);
+                      colors::ansi::BOLD_CYAN);
       do_append_field("Filesystem blocks",
                       String::from(filesystem.total_blocks, allocator).view(),
-                      colors::ansi::BOLD_CYAN, should_color);
+                      colors::ansi::BOLD_CYAN);
       do_append_field("Filesystem free blocks",
                       String::from(filesystem.free_blocks, allocator).view(),
-                      colors::ansi::BOLD_CYAN, should_color);
+                      colors::ansi::BOLD_CYAN);
       do_append_field(
           "Filesystem available blocks",
           String::from(filesystem.available_blocks, allocator).view(),
-          colors::ansi::BOLD_CYAN, should_color);
+          colors::ansi::BOLD_CYAN);
       do_append_field("Filesystem id",
                       String::from(filesystem.filesystem_id, allocator).view(),
-                      colors::ansi::BOLD_CYAN, should_color);
+                      colors::ansi::BOLD_CYAN);
     } else {
-      do_append_field("Filesystem", "unavailable", colors::ansi::BOLD_CYAN,
-                      should_color);
+      do_append_field("Filesystem", "unavailable", colors::ansi::BOLD_CYAN);
     }
   }
 
@@ -257,8 +259,7 @@ fn append_subject(String &output, StringView operand,
       os::file_type_letter(status.mode) == '-')
   {
     if (let const checksum = file_crc32c(ec, operand, allocator))
-      do_append_field("CRC32C", checksum->view(), colors::ansi::BOLD_CYAN,
-                      should_color);
+      do_append_field("CRC32C", checksum->view(), colors::ansi::BOLD_CYAN);
   }
 
   append_titled_report_table(output, operand, table, should_color);
@@ -287,7 +288,9 @@ fn GoodStat::execute(
     return report_usage_error(ec, cxt, args[0].view());
   }
 
-  let const should_color = koshkit_should_color();
+  let const color_mode = koshkit_should_color()
+                             ? goodstat_color_mode::Colored
+                             : goodstat_color_mode::Plain;
   let const filesystem_report = FLAG_GOODSTAT_FILESYSTEM.is_enabled()
                                     ? goodstat_filesystem_report::Include
                                     : goodstat_filesystem_report::Omit;
@@ -331,8 +334,8 @@ fn GoodStat::execute(
     }
 
     if (!output.is_empty()) output += "\n";
-    append_subject(output, operand.view(), file_statuses[index], should_color,
-                   ec, allocator, filesystem_report, checksum_report);
+    append_subject(output, operand.view(), file_statuses[index], ec, allocator,
+                   filesystem_report, checksum_report, color_mode);
   }
 
   ec.print_to_stdout(output);
