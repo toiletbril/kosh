@@ -1000,16 +1000,28 @@ fn ProgramResolver::get_status(StringView name, StatusLookup lookup) throws
 
   let const runnable_position =
       command_name_lower_bound_in(m_command_names, normalized_name.view());
-  if (runnable_position < m_command_names.count() &&
-      m_command_names[runnable_position].view() == normalized_name.view())
-    return Status::Runnable;
+  let const is_cached_runnable =
+      runnable_position < m_command_names.count() &&
+      m_command_names[runnable_position].view() == normalized_name.view();
   let const regular_position =
       command_name_lower_bound_in(m_regular_names, normalized_name.view());
-  if (regular_position < m_regular_names.count() &&
-      m_regular_names[regular_position].view() == normalized_name.view())
-    return Status::Blocked;
+  let const is_cached_regular =
+      regular_position < m_regular_names.count() &&
+      m_regular_names[regular_position].view() == normalized_name.view();
+  if (!is_cached_runnable && !is_cached_regular) return Status::Missing;
 
-  return Status::Missing;
+  let const cached_status = is_cached_runnable ? Status::Runnable
+                                               : Status::Blocked;
+  let const paths = search(normalized_name.view(), SearchMode::First,
+                           Requirement::Regular, CachePolicy::Bypass);
+  let const current_status = paths.is_empty()
+                                 ? Status::Missing
+                                 : (paths[0].is_executable() ? Status::Runnable
+                                                             : Status::Blocked);
+  if (current_status != cached_status)
+    mark_command_name_indexes_stale();
+
+  return current_status;
 }
 
 fn ProgramResolver::resolve_along_path(StringView program_name,
