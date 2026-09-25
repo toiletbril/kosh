@@ -19,6 +19,8 @@ namespace koshka::language_server {
 
 namespace {
 
+using sorted_uri_list = SortedArrayList<String, order_comparator<String>>;
+
 struct positioned_document
 {
   Document *document;
@@ -166,8 +168,10 @@ private:
   ArrayList<Document> m_documents;
   ArrayList<source_diagnostic> m_current_auxiliary_diagnostics{
       heap_allocator()};
-  ArrayList<String> m_published_auxiliary_uris{heap_allocator()};
-  ArrayList<String> m_current_auxiliary_uris{heap_allocator()};
+  sorted_uri_list m_published_auxiliary_uris{heap_allocator(),
+                                             sort_order::ascending};
+  sorted_uri_list m_current_auxiliary_uris{heap_allocator(),
+                                           sort_order::ascending};
   StringMap<String> m_builtin_information_cache{heap_allocator()};
   completion::shell_highlight_cache m_highlight_cache;
   Path m_workspace_root;
