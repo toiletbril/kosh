@@ -1823,11 +1823,11 @@ static fn io_uring_batch_supports_operations(const io_uring_batch &ring,
       break;
     case batched_syscall_id::Lstat:
     case batched_syscall_id::Stat:
-    case batched_syscall_id::LstatAt:
-    case batched_syscall_id::StatAt:
     case batched_syscall_id::Exists:
       if (!ring.has_stat) return false;
       break;
+    case batched_syscall_id::LstatAt:
+    case batched_syscall_id::StatAt: return false;
     case batched_syscall_id::Invalid: return false;
     }
   }
