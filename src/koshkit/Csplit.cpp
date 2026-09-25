@@ -30,6 +30,26 @@ REGISTER_KOSHKIT_UTIL_FLAGS(Csplit);
 
 namespace koshka::koshkit {
 
+enum class csplit_write_policy : u8
+{
+  None = 0,
+  Silent = 1,
+  KeepFiles = 2,
+};
+
+constexpr fn operator|(csplit_write_policy left, csplit_write_policy right)
+    wontthrow -> csplit_write_policy
+{
+  return static_cast<csplit_write_policy>(static_cast<u8>(left) |
+                                          static_cast<u8>(right));
+}
+
+constexpr fn has_csplit_policy(csplit_write_policy policy,
+                               csplit_write_policy value) wontthrow -> bool
+{
+  return (static_cast<u8>(policy) & static_cast<u8>(value)) != 0;
+}
+
 static fn csplit_output_name(StringView prefix, usize width, u64 index,
                              SourceLocation width_location,
                              Allocator allocator) throws -> String
@@ -52,10 +72,10 @@ static fn write_csplit_part(const ExecContext &ec, EvalContext &cxt,
                             StringView prefix, usize digit_count,
                             u64 output_index,
                             const ArrayList<StringView> &lines, usize first,
-                            usize last, bool should_be_silent,
-                            bool should_keep_files,
+                            usize last,
                             SourceLocation width_location,
-                            ArrayList<String> &output_paths) throws -> bool
+                            ArrayList<String> &output_paths,
+                            csplit_write_policy policy) throws -> bool
 {
   let const name = csplit_output_name(prefix, digit_count, output_index,
                                       width_location, cxt.scratch_allocator());
@@ -71,7 +91,8 @@ static fn write_csplit_part(const ExecContext &ec, EvalContext &cxt,
   defer
   {
     os::close_fd(*descriptor);
-    if (!is_output_tracked && !should_keep_files)
+    if (!is_output_tracked &&
+        !has_csplit_policy(policy, csplit_write_policy::KeepFiles))
       unused(os::remove_file(name.view()));
   };
   output_paths.push(name.clone());
@@ -90,7 +111,7 @@ static fn write_csplit_part(const ExecContext &ec, EvalContext &cxt,
     byte_count += lines[line_index].length;
   }
 
-  if (!should_be_silent)
+  if (!has_csplit_policy(policy, csplit_write_policy::Silent))
     ec.print_to_stdout(String::from(byte_count, cxt.scratch_allocator()) +
                        "\n");
   return true;
@@ -168,9 +189,14 @@ fn Csplit::execute(const ExecContext &ec, EvalContext &cxt,
   usize current_line = 0;
   u64 output_index = 0;
   let output_paths = ArrayList<String>{cxt.scratch_allocator()};
+  let const write_policy =
+      (FLAG_CSPLIT_SILENT.is_enabled() ? csplit_write_policy::Silent
+                                       : csplit_write_policy::None) |
+      (FLAG_CSPLIT_KEEP.is_enabled() ? csplit_write_policy::KeepFiles
+                                     : csplit_write_policy::None);
   defer
   {
-    if (!FLAG_CSPLIT_KEEP.is_enabled())
+    if (!has_csplit_policy(write_policy, csplit_write_policy::KeepFiles))
       for (let const &path : output_paths)
         unused(os::remove_file(path.view()));
   };
@@ -319,8 +345,7 @@ fn Csplit::execute(const ExecContext &ec, EvalContext &cxt,
                                      : pattern_location;
       if (!write_csplit_part(
               ec, cxt, prefix, digit_count, output_index++, lines, current_line,
-              target_line, FLAG_CSPLIT_SILENT.is_enabled(),
-              FLAG_CSPLIT_KEEP.is_enabled(), width_location, output_paths))
+              target_line, width_location, output_paths, write_policy))
         throw Error{"cannot write output"};
     }
     current_line = target_line;
@@ -377,8 +402,7 @@ fn Csplit::execute(const ExecContext &ec, EvalContext &cxt,
           : operand_locations[operand_locations.count() - 1];
   if (!write_csplit_part(
           ec, cxt, prefix, digit_count, output_index, lines, current_line,
-          lines.count(), FLAG_CSPLIT_SILENT.is_enabled(),
-          FLAG_CSPLIT_KEEP.is_enabled(), width_location, output_paths))
+          lines.count(), width_location, output_paths, write_policy))
     return 1;
   output_paths.clear();
   return 0;
