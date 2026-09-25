@@ -16,6 +16,29 @@
 
 namespace koshka {
 
+enum class sort_order
+{
+  ascending,
+  descending,
+};
+
+template <class T>
+struct order_comparator
+{
+  sort_order order;
+
+  explicit order_comparator(sort_order order) : order(order) {}
+
+  mustuse pure fn operator()(const T &left, const T &right) const wontthrow
+      -> bool
+  {
+    return order == sort_order::ascending ? left < right : right < left;
+  }
+};
+
+template <class T, class Compare>
+class SortedArrayList;
+
 template <class T>
 class ArrayList
 {
@@ -380,15 +403,54 @@ public:
     sort([](const T &a, const T &b) { return a < b; });
   }
 
+  template <class Compare>
+  mustuse cold fn make_sorted(Compare compare) && throws
+      -> SortedArrayList<T, std::decay_t<Compare>>;
+
+  template <class Compare>
+  mustuse cold fn make_sorted(Compare compare) const & throws
+      -> SortedArrayList<T, std::decay_t<Compare>>;
+
+  mustuse cold fn make_sorted(sort_order order) && throws
+      -> SortedArrayList<T, order_comparator<T>>;
+
+  mustuse cold fn make_sorted(sort_order order) const & throws
+      -> SortedArrayList<T, order_comparator<T>>;
+
 private:
   /* A default list is heap-backed and empty, so it can serve as the value a
      StringMap slot holds before a real list is placed into it. The friend keeps
      it reachable to the table while every call site must name its lifetime. */
   template <class Value>
   friend class StringMap;
+  template <class Value, class Compare>
+  friend class SortedArrayList;
   ArrayList() : m_allocator(fake_allocator()) {}
 
   static constexpr usize INSERTION_SORT_THRESHOLD = 16;
+
+  fn insert_at(usize index, T value) throws -> void
+  {
+    ASSERT(index <= m_length, "array insertion is past the end");
+    if (index == m_length) {
+      push(steal(value));
+      return;
+    }
+
+    reserve(m_length + 1);
+    if constexpr (std::is_trivially_copyable_v<T>) {
+      __builtin_memmove(m_data + index + 1, m_data + index,
+                        (m_length - index) * sizeof(T));
+      m_data[index] = steal(value);
+    } else {
+      new (&m_data[m_length]) T(steal(m_data[m_length - 1]));
+      for (usize element_index = m_length - 1; element_index > index;
+           element_index--)
+        m_data[element_index] = steal(m_data[element_index - 1]);
+      m_data[index] = steal(value);
+    }
+    m_length++;
+  }
 
   /* A trivially copyable type relocates as one memcpy, skipping the per-element
      move constructor and destructor the compiler would otherwise emit. */
@@ -492,6 +554,142 @@ private:
 };
 
 static_assert(sizeof(usize) != 8 || sizeof(ArrayList<int>) == 24);
+
+template <class T, class Compare>
+class SortedArrayList : public ArrayList<T>
+{
+  using Base = ArrayList<T>;
+
+public:
+  static_assert(std::is_nothrow_destructible_v<Compare>);
+
+  explicit SortedArrayList(Allocator allocator, Compare compare)
+      : Base(allocator), m_compare(steal(compare))
+  {}
+
+  explicit SortedArrayList(Allocator allocator, sort_order order)
+      : SortedArrayList(allocator, Compare{order})
+  {}
+
+  SortedArrayList(ArrayList<T> &&list, Compare compare)
+      : Base(steal(list)), m_compare(steal(compare))
+  {
+    Base::sort(m_compare);
+  }
+
+  SortedArrayList(ArrayList<T> &&list, sort_order order)
+      : SortedArrayList(steal(list), Compare{order})
+  {}
+
+  SortedArrayList(const SortedArrayList &other)
+      : Base(static_cast<const Base &>(other)), m_compare(other.m_compare)
+  {}
+
+  SortedArrayList(SortedArrayList &&other) noexcept(
+      std::is_nothrow_move_constructible_v<Compare>)
+      : Base(steal(static_cast<Base &>(other))),
+        m_compare(steal(other.m_compare))
+  {}
+
+  fn operator=(const SortedArrayList &other) throws -> SortedArrayList &
+  {
+    if (this != &other) {
+      Base::operator=(static_cast<const Base &>(other));
+      m_compare = other.m_compare;
+    }
+    return *this;
+  }
+
+  fn operator=(SortedArrayList &&other) noexcept(
+      std::is_nothrow_move_assignable_v<Compare>) -> SortedArrayList &
+  {
+    if (this != &other) {
+      Base::operator=(steal(static_cast<Base &>(other)));
+      m_compare = steal(other.m_compare);
+    }
+    return *this;
+  }
+
+  mustuse cold fn clone() const throws -> SortedArrayList
+  {
+    return SortedArrayList{*this};
+  }
+
+  template <class Wanted>
+  hot mustuse pure fn find(const Wanted &wanted) const throws -> Maybe<usize>
+  {
+    let const index = lower_bound(wanted);
+    if (index < Base::count() &&
+        !m_compare(wanted, Base::operator[](index)))
+      return index;
+    return None;
+  }
+
+  hot fn push(T value) throws -> void
+  {
+    Base::insert_at(lower_bound(value), steal(value));
+  }
+
+  template <typename... Args>
+  hot fn push_managed(Args &&...args) throws -> void
+  {
+    push(T{Base::allocator(), static_cast<Args &&>(args)...});
+  }
+
+  hot fn sort() throws -> void { Base::sort(m_compare); }
+
+  pure fn comparator() const wontthrow -> const Compare & { return m_compare; }
+
+private:
+  template <class Wanted>
+  pure fn lower_bound(const Wanted &wanted) const throws -> usize
+  {
+    usize low = 0;
+    usize high = Base::count();
+    while (low < high) {
+      let const middle = low + ((high - low) / 2);
+      if (m_compare(Base::operator[](middle), wanted))
+        low = middle + 1;
+      else
+        high = middle;
+    }
+    return low;
+  }
+
+  Compare m_compare;
+};
+
+template <class T>
+mustuse cold auto ArrayList<T>::make_sorted(sort_order order) && throws
+    -> SortedArrayList<T, order_comparator<T>>
+{
+  return SortedArrayList<T, order_comparator<T>>{steal(*this), order};
+}
+
+template <class T>
+mustuse cold auto ArrayList<T>::make_sorted(sort_order order) const & throws
+    -> SortedArrayList<T, order_comparator<T>>
+{
+  return SortedArrayList<T, order_comparator<T>>{clone(), order};
+}
+
+template <class T>
+template <class Compare>
+mustuse cold auto ArrayList<T>::make_sorted(Compare compare) && throws
+    -> SortedArrayList<T, std::decay_t<Compare>>
+{
+  using sorted_type = SortedArrayList<T, std::decay_t<Compare>>;
+  return sorted_type{steal(*this), steal(compare)};
+}
+
+template <class T>
+template <class Compare>
+mustuse cold auto ArrayList<T>::make_sorted(Compare compare) const & throws
+    -> SortedArrayList<T, std::decay_t<Compare>>
+{
+  using sorted_type = SortedArrayList<T, std::decay_t<Compare>>;
+  return sorted_type{clone(), steal(compare)};
+}
 
 /* A list that is empty on almost every instance it is a member of. An empty one
    is one pointer, and the list itself is allocated only when a fill carries
