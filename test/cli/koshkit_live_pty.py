@@ -14,7 +14,7 @@ import termios
 import time
 
 
-def run_pty(binary, command, key=None):
+def run_pty(binary, command, keys=()):
     pid, fd = pty.fork()
     if pid == 0:
         os.execv(binary, [binary, "-Q", "-c", command])
@@ -26,7 +26,8 @@ def run_pty(binary, command, key=None):
     resize(100, 30)
     output = bytearray()
     resized = False
-    sent_key = False
+    key_index = 0
+    key_frame_count = 0
     deadline = time.monotonic() + 2.0
     while time.monotonic() < deadline:
         ready, _, _ = select.select([fd], [], [], 0.05)
@@ -42,13 +43,13 @@ def run_pty(binary, command, key=None):
         if not resized and len(output) > 1000:
             resize(45, 10)
             resized = True
-            if key is not None and not sent_key:
-                os.write(fd, key)
-                sent_key = True
             time.sleep(0.15)
-        if key is not None and not sent_key and len(output) > 1500:
-            os.write(fd, key)
-            sent_key = True
+        frame_count = bytes(output).count(b"ctrl+c to exit")
+        if (resized and key_index < len(keys)
+                and frame_count > key_frame_count):
+            os.write(fd, keys[key_index])
+            key_index += 1
+            key_frame_count = frame_count
 
     if resized:
         os.kill(pid, signal.SIGINT)
@@ -129,13 +130,14 @@ def main():
         return 2
 
     ok = True
-    for name, command, key in (
+    for name, command, keys in (
         ("evilio-pty", "koshkit --color never evilio --ps --live=0.05 "
-         "--cumulative=0.1", None),
+         "--cumulative=0.1", ()),
         ("evilps-pty", "koshkit --color never evilps --cpu --live=0.05 "
-         "--cumulative=0.1 -1", b"s\n" * 5 + b"/1\n/\n"),
+         "--cumulative=0.1 -1",
+         (b"s\n", b"s\n", b"s\n", b"s\n", b"s\n", b"/1\n", b"/\n")),
     ):
-        result = run_pty(binary, command, key if name == "evilps-pty" else None)
+        result = run_pty(binary, command, keys)
         requirements = {"status": 130, "resized": True,
                         "controls": True, "ansi": True,
                         "alternate_enter": True,
@@ -143,7 +145,7 @@ def main():
                         "cursor_hide": True,
                         "cursor_show": True,
                         "blank_separator": True}
-        if key is not None:
+        if keys:
             requirements["sort_cycle"] = True
             requirements["search_query"] = True
             requirements["search_cleared"] = True
