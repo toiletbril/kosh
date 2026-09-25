@@ -472,6 +472,22 @@ pure fn interpolate_rolling_counter(u64 before, u64 after,
                                     u64 target_timestamp) wontthrow
     -> Maybe<u64>;
 
+pure fn rolling_window_start(u64 now_nanoseconds,
+                             u64 window_nanoseconds) wontthrow -> u64;
+
+template <class T>
+fn trim_rolling_history(ArrayList<T> &values, ArrayList<u64> &timestamps,
+                        u64 window_start_nanoseconds) throws -> void
+{
+  ASSERT(values.count() == timestamps.count());
+  while (timestamps.count() > 2 &&
+         timestamps[1] <= window_start_nanoseconds)
+  {
+    values.remove(0);
+    timestamps.remove(0);
+  }
+}
+
 fn show_message(StringView err) throws -> void;
 fn show_warning(StringView warning) throws -> void;
 

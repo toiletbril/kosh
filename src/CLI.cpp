@@ -1497,6 +1497,14 @@ pure fn interpolate_rolling_counter(u64 before, u64 after,
                                    elapsed);
 }
 
+pure fn rolling_window_start(u64 now_nanoseconds,
+                             u64 window_nanoseconds) wontthrow -> u64
+{
+  return now_nanoseconds > window_nanoseconds
+             ? now_nanoseconds - window_nanoseconds
+             : 0;
+}
+
 cold fn make_flag_help(const FlagList &flags, bool should_color) throws
     -> String
 {

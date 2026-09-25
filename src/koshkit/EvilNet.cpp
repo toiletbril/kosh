@@ -807,14 +807,10 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
           retained.remove(position);
           continue;
         }
-        let const window_start =
-            now > falloff_nanoseconds ? now - falloff_nanoseconds : 0;
-        while (retained[position].history_nanoseconds.count() > 2 &&
-               retained[position].history_nanoseconds[1] <= window_start)
-        {
-          retained[position].history.remove(0);
-          retained[position].history_nanoseconds.remove(0);
-        }
+        trim_rolling_history(
+            retained[position].history,
+            retained[position].history_nanoseconds,
+            rolling_window_start(now, falloff_nanoseconds));
       }
       last_sample_nanoseconds = now;
     }
@@ -825,9 +821,8 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
     let statistics =
         ArrayList<os::network_interface_statistics_entry>{frame_allocator};
     statistics.reserve(retained.count());
-    let const window_start = last_sample_nanoseconds > falloff_nanoseconds
-                                 ? last_sample_nanoseconds - falloff_nanoseconds
-                                 : 0;
+    let const window_start =
+        rolling_window_start(last_sample_nanoseconds, falloff_nanoseconds);
     for (let const &row : retained) {
       statistics.push(
           get_network_window_status(row, window_start, frame_allocator));

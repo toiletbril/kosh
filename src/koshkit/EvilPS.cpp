@@ -205,12 +205,8 @@ fn update_cpu_history(ArrayList<tree_node> &nodes,
     row.history_milliseconds.push(node.cpu_milliseconds);
     row.history_nanoseconds.push(now_nanoseconds);
     row.last_seen_nanoseconds = now_nanoseconds;
-    while (row.history_nanoseconds.count() > 2 &&
-           row.history_nanoseconds[1] <= window_start_nanoseconds)
-    {
-      row.history_milliseconds.remove(0);
-      row.history_nanoseconds.remove(0);
-    }
+    trim_rolling_history(row.history_milliseconds, row.history_nanoseconds,
+                         window_start_nanoseconds);
     set_cpu_percentage(node, row, window_start_nanoseconds, now_nanoseconds);
   }
 
