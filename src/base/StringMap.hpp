@@ -131,6 +131,15 @@ public:
     return set_value(key, steal(value));
   }
 
+  hot fn insert(StringView key, Value value) throws -> bool
+  {
+    let const hash = hash_bytes(key);
+    let const result = prepare_insertion(key, hash);
+    if (result.found != NO_INDEX) return false;
+    place(result.insertion, key, hash, steal(value));
+    return true;
+  }
+
   hot fn get_or_create(StringView key, Value default_value) throws -> Value &
   {
     let const hash = hash_bytes(key);
@@ -208,10 +217,10 @@ private:
       Occupied,
       Tombstone,
     };
-    State state{Empty};
     u64 hash{0};
     String key{};
     notunique Value value{};
+    State state{Empty};
   };
 
   static constexpr usize NO_INDEX = static_cast<usize>(-1);

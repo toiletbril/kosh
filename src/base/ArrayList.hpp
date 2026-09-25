@@ -132,6 +132,7 @@ public:
   template <class Wanted>
   hot mustuse pure fn find(const Wanted &wanted) const throws -> Maybe<usize>
   {
+#pragma clang loop unroll_count(4)
     for (usize element_index = 0; element_index < m_length; element_index++)
       if (m_data[element_index] == wanted) return element_index;
     return None;
@@ -158,12 +159,17 @@ public:
   {
     ASSERT(m_length > 0, "pop_back on an empty list");
     m_length--;
-    m_data[m_length].~T();
+    if constexpr (!std::is_trivially_destructible_v<T>)
+      m_data[m_length].~T();
   }
 
   fn truncate(usize kept_count) wontthrow -> void
   {
     ASSERT(kept_count <= m_length, "truncate past the end of the list");
+    if constexpr (std::is_trivially_destructible_v<T>) {
+      m_length = kept_count;
+      return;
+    }
     while (m_length > kept_count) {
       m_length--;
       m_data[m_length].~T();
@@ -174,16 +180,24 @@ public:
   fn remove(usize index) throws -> void
   {
     ASSERT(index < m_length, "remove past the end of the list");
-    for (usize i = index; i + 1 < m_length; i++)
-      m_data[i] = steal(m_data[i + 1]);
+    if constexpr (std::is_trivially_copyable_v<T>) {
+      let const moved_count = m_length - index - 1;
+      if (moved_count > 0)
+        __builtin_memmove(m_data + index, m_data + index + 1,
+                          moved_count * sizeof(T));
+    } else {
+      for (usize i = index; i + 1 < m_length; i++)
+        m_data[i] = steal(m_data[i + 1]);
+    }
     m_length--;
-    m_data[m_length].~T();
+    if constexpr (!std::is_trivially_destructible_v<T>)
+      m_data[m_length].~T();
   }
 
   fn clear() wontthrow -> void
   {
-    for (usize i = 0; i < m_length; i++)
-      m_data[i].~T();
+    if constexpr (!std::is_trivially_destructible_v<T>)
+      for (usize i = 0; i < m_length; i++) m_data[i].~T();
     m_length = 0;
   }
 
@@ -417,8 +431,8 @@ private:
 
   fn destroy_all() wontthrow -> void
   {
-    for (usize i = 0; i < m_length; i++)
-      m_data[i].~T();
+    if constexpr (!std::is_trivially_destructible_v<T>)
+      for (usize i = 0; i < m_length; i++) m_data[i].~T();
     if (m_data != nullptr) m_allocator.free_array(m_data, m_capacity);
     m_data = nullptr;
     m_length = 0;

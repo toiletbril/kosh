@@ -78,6 +78,7 @@ public:
     m_length = 0;
     let const word_count =
         bit_count / BITS_PER_WORD + (bit_count % BITS_PER_WORD != 0 ? 1 : 0);
+    m_words.reserve(word_count);
     for (usize i = 0; i < word_count; i++)
       m_words.push(0);
     m_length = bit_count;

@@ -27,9 +27,7 @@ public:
 
   hot fn add(StringView key) throws -> bool
   {
-    let const previous_count = m_map.count();
-    m_map.set(key, Nothing{});
-    return m_map.count() != previous_count;
+    return m_map.insert(key, Nothing{});
   }
 
   cold fn remove(StringView key) throws -> void { m_map.erase(key); }
