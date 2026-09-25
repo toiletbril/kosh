@@ -645,7 +645,6 @@ public:
 
   pure fn comparator() const wontthrow -> const Compare & { return m_compare; }
 
-private:
   template <class Wanted>
   pure fn lower_bound(const Wanted &wanted) const throws -> usize
   {
@@ -661,6 +660,7 @@ private:
     return low;
   }
 
+private:
   Compare m_compare;
 };
 

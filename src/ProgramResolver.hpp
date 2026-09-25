@@ -25,6 +25,27 @@ namespace koshka {
 
 namespace utils {
 
+struct program_name_comparator
+{
+  pure fn operator()(const String &left, const String &right) const wontthrow
+      -> bool
+  {
+    return left.view() < right.view();
+  }
+
+  pure fn operator()(const String &left, StringView right) const wontthrow
+      -> bool
+  {
+    return left.view() < right;
+  }
+
+  pure fn operator()(StringView left, const String &right) const wontthrow
+      -> bool
+  {
+    return left < right.view();
+  }
+};
+
 class ProgramResolver
 {
 public:
@@ -151,12 +172,11 @@ private:
   pure fn find_cached_program_path(
       const CacheEntry &entry,
       os::program_extension wanted_extension) const wontthrow -> const Path *;
-  pure fn command_name_lower_bound_in(const ArrayList<String> &names,
-                                      StringView name) const wontthrow -> usize;
-
   StringMap<CacheEntry> m_execution_cache{heap_allocator()};
-  ArrayList<String> m_command_names{heap_allocator()};
-  ArrayList<String> m_regular_names{heap_allocator()};
+  SortedArrayList<String, program_name_comparator> m_command_names{
+      heap_allocator(), program_name_comparator{}};
+  SortedArrayList<String, program_name_comparator> m_regular_names{
+      heap_allocator(), program_name_comparator{}};
   Maybe<String> m_path;
   ArrayList<String> m_path_dirs{heap_allocator()};
   ArrayList<String> m_index_path_dirs{heap_allocator()};

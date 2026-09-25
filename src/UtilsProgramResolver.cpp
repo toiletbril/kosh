@@ -396,12 +396,11 @@ pure fn directory_listing_generation(const Path &directory) wontthrow -> u64
   return DIR_LISTINGS[alias->listing_position].generation;
 }
 
-static fn sort_and_deduplicate_names(ArrayList<String> &names) throws -> void
+static fn sort_and_deduplicate_names(ArrayList<String> names) throws
+    -> SortedArrayList<String, program_name_comparator>
 {
-  let sorted_names = steal(names).make_sorted(
-      [](const String &left, const String &right) {
-        return left.view() < right.view();
-      });
+  let sorted_names =
+      steal(names).make_sorted(program_name_comparator{});
   usize unique_count = 0;
   for (usize index = 0; index < sorted_names.count(); index++) {
     if (unique_count > 0 &&
@@ -413,7 +412,7 @@ static fn sort_and_deduplicate_names(ArrayList<String> &names) throws -> void
     unique_count++;
   }
   sorted_names.truncate(unique_count);
-  names = steal(sorted_names).into_array_list();
+  return sorted_names;
 }
 
 static fn begin_directory_validation_epoch() wontthrow -> void
@@ -633,6 +632,9 @@ fn ProgramResolver::rebuild_path_command_index(CompletionRefresh refresh) throws
 
   if (refresh == CompletionRefresh::Fresh) refresh_path_directory_generations();
 
+  let command_names = ArrayList<String>{heap_allocator()};
+  let regular_names = ArrayList<String>{heap_allocator()};
+
   for (let const &directory_text : get_index_path_dirs()) {
     let const directory = Path{directory_text.view()};
     let const entries =
@@ -685,22 +687,22 @@ fn ProgramResolver::rebuild_path_command_index(CompletionRefresh refresh) throws
       let const name_info = os::normalize_program_name(normalized_name);
       let const stem =
           normalized_name.substring_of_length(0, name_info.stem_length);
-      m_regular_names.push(String{normalized_name.view()});
+      regular_names.push(String{normalized_name.view()});
       if (stem.length != normalized_name.length())
-        m_regular_names.push(String{stem});
+        regular_names.push(String{stem});
 
 #if !defined NDEBUG
       DEBUG_EXECUTABLE_PROBE_COUNT++;
 #endif
       if (!full_path->is_executable()) continue;
       if (stem.length != entry.name.length())
-        m_command_names.push(String{stem});
-      m_command_names.push(steal(normalized_name));
+        command_names.push(String{stem});
+      command_names.push(steal(normalized_name));
     }
   }
 
-  sort_and_deduplicate_names(m_command_names);
-  sort_and_deduplicate_names(m_regular_names);
+  m_command_names = sort_and_deduplicate_names(steal(command_names));
+  m_regular_names = sort_and_deduplicate_names(steal(regular_names));
   m_command_names_are_valid = true;
   m_command_names_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
   m_path_directories_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
@@ -796,6 +798,9 @@ fn ProgramResolver::revalidate_command_prefix(StringView prefix) throws -> void
 {
   clear_command_name_indexes();
 
+  let command_names = ArrayList<String>{heap_allocator()};
+  let regular_names = ArrayList<String>{heap_allocator()};
+
   for (let const &directory_text : get_index_path_dirs()) {
     let const directory = Path{directory_text.view()};
     let const entries =
@@ -858,21 +863,21 @@ fn ProgramResolver::revalidate_command_prefix(StringView prefix) throws -> void
         full_path->push_component(entry.name.view());
       }
 
-      if (stem_matches) m_regular_names.push(String{stem});
+      if (stem_matches) regular_names.push(String{stem});
       if (full_name_matches)
-        m_regular_names.push(String{normalized_name.view()});
+        regular_names.push(String{normalized_name.view()});
 
 #if !defined NDEBUG
       DEBUG_EXECUTABLE_PROBE_COUNT++;
 #endif
       if (!full_path->is_executable()) continue;
-      if (stem_matches) m_command_names.push(String{stem});
-      if (full_name_matches) m_command_names.push(steal(normalized_name));
+      if (stem_matches) command_names.push(String{stem});
+      if (full_name_matches) command_names.push(steal(normalized_name));
     }
   }
 
-  sort_and_deduplicate_names(m_command_names);
-  sort_and_deduplicate_names(m_regular_names);
+  m_command_names = sort_and_deduplicate_names(steal(command_names));
+  m_regular_names = sort_and_deduplicate_names(steal(regular_names));
   m_validated_prefix = String{prefix};
   m_prefix_validation_epoch = DIRECTORY_VALIDATION_EPOCH;
 }
@@ -940,26 +945,10 @@ fn ProgramResolver::get_command_names(StringView validation_prefix,
   return m_command_names;
 }
 
-pure fn ProgramResolver::command_name_lower_bound_in(
-    const ArrayList<String> &names, StringView name) const wontthrow -> usize
-{
-  usize lower = 0;
-  usize upper = names.count();
-  while (lower < upper) {
-    let const middle = lower + (upper - lower) / 2;
-    if (names[middle].view() < name)
-      lower = middle + 1;
-    else
-      upper = middle;
-  }
-
-  return lower;
-}
-
 pure fn ProgramResolver::get_command_name_lower_bound(
     StringView name) const wontthrow -> usize
 {
-  return command_name_lower_bound_in(m_command_names, name);
+  return m_command_names.lower_bound(name);
 }
 
 fn ProgramResolver::command_name_has_prefix(StringView prefix) throws -> bool
@@ -998,16 +987,10 @@ fn ProgramResolver::get_status(StringView name, StatusLookup lookup) throws
                                 ValidationScope::Prefix);
   }
 
-  let const runnable_position =
-      command_name_lower_bound_in(m_command_names, normalized_name.view());
   let const is_cached_runnable =
-      runnable_position < m_command_names.count() &&
-      m_command_names[runnable_position].view() == normalized_name.view();
-  let const regular_position =
-      command_name_lower_bound_in(m_regular_names, normalized_name.view());
+      m_command_names.find(normalized_name.view()).has_value();
   let const is_cached_regular =
-      regular_position < m_regular_names.count() &&
-      m_regular_names[regular_position].view() == normalized_name.view();
+      m_regular_names.find(normalized_name.view()).has_value();
   if (!is_cached_runnable && !is_cached_regular) return Status::Missing;
 
   let const cached_status = is_cached_runnable ? Status::Runnable
