@@ -37,6 +37,12 @@ enum class diff_edit : u8
   Insert,
 };
 
+enum class diff_whitespace_mode : u8
+{
+  Preserve,
+  Ignore,
+};
+
 struct diff_edit_result
 {
   ArrayList<diff_edit> edits;
@@ -81,9 +87,10 @@ static fn split_diff_lines(StringView contents, Allocator allocator) throws
 }
 
 static fn diff_lines_equal(StringView left, StringView right,
-                           bool should_ignore_space) wontthrow -> bool
+                           diff_whitespace_mode whitespace_mode) wontthrow
+    -> bool
 {
-  if (!should_ignore_space) return left == right;
+  if (whitespace_mode == diff_whitespace_mode::Preserve) return left == right;
 
   usize left_position = 0;
   usize right_position = 0;
@@ -127,7 +134,8 @@ static fn append_replacement_edits(ArrayList<diff_edit> &edits,
 
 static fn make_diff_edits(const diff_lines &left_lines,
                           const diff_lines &right_lines,
-                          bool should_ignore_space, Allocator allocator) throws
+                          Allocator allocator,
+                          diff_whitespace_mode whitespace_mode) throws
     -> diff_edit_result
 {
   let edits = ArrayList<diff_edit>{allocator};
@@ -136,7 +144,7 @@ static fn make_diff_edits(const diff_lines &left_lines,
          equal_prefix_count < right_lines.count() &&
          diff_lines_equal(left_lines.get(equal_prefix_count),
                           right_lines.get(equal_prefix_count),
-                          should_ignore_space))
+                          whitespace_mode))
   {
     if (os::INTERRUPT_REQUESTED) return {steal(edits), true};
     equal_prefix_count++;
@@ -195,7 +203,7 @@ static fn make_diff_edits(const diff_lines &left_lines,
           right_position < right_middle_count &&
           diff_lines_equal(left_lines.get(equal_prefix_count + left_position),
                            right_lines.get(equal_prefix_count + right_position),
-                           should_ignore_space))
+                           whitespace_mode))
       {
         if (os::INTERRUPT_REQUESTED) return {steal(edits), true};
         left_position++;
@@ -582,9 +590,10 @@ fn Diff::execute(const ExecContext &ec, EvalContext &cxt,
   let const right_lines =
       split_diff_lines(right_contents.view(), cxt.scratch_allocator());
   if (os::INTERRUPT_REQUESTED) return 130;
-  let const result = make_diff_edits(left_lines, right_lines,
-                                     FLAG_DIFF_IGNORE_SPACE.is_enabled(),
-                                     cxt.scratch_allocator());
+  let const result = make_diff_edits(
+      left_lines, right_lines, cxt.scratch_allocator(),
+      FLAG_DIFF_IGNORE_SPACE.is_enabled() ? diff_whitespace_mode::Ignore
+                                           : diff_whitespace_mode::Preserve);
   if (result.was_interrupted) return 130;
 
   bool has_difference = false;
