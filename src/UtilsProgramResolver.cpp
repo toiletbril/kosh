@@ -137,14 +137,14 @@ static fn release_directory_listing_alias(usize position) throws -> void
 static fn set_directory_listing_alias(StringView key, usize position) throws
     -> void
 {
-  let *existing = DIR_LISTING_ALIASES.find(key);
-  if (existing != nullptr && existing->listing_position == position) {
+  let existing = DIR_LISTING_ALIASES.find(key);
+  if (existing.has_value() && existing->listing_position == position) {
     existing->validation_epoch = DIRECTORY_VALIDATION_EPOCH;
     existing->observed_generation = DIR_LISTINGS[position].generation;
     return;
   }
 
-  if (existing != nullptr)
+  if (existing.has_value())
     release_directory_listing_alias(existing->listing_position);
   DIR_LISTINGS[position].alias_count++;
   DIR_LISTING_ALIASES.set(
@@ -248,9 +248,9 @@ static fn read_directory_cached_after_status(
   if (has_status && status.has_file_identity) {
     let const identity_key =
         directory_identity_key(status.device_id, status.file_id);
-    if (let const *position = DIR_LISTING_IDENTITIES.find(identity_key.view());
-        position != nullptr)
-      physical_position = *position;
+    if (let const position = DIR_LISTING_IDENTITIES.find(identity_key.view());
+        position.has_value())
+      physical_position = *position.value();
   }
 
   if (physical_position.has_value()) {
@@ -350,8 +350,8 @@ fn read_directory_cached(const Path &directory, directory_validation validation,
     -> const ArrayList<Path::directory_child> *
 {
   let const key = directory.view();
-  let *alias = DIR_LISTING_ALIASES.find(key);
-  if (validation == directory_validation::Cached && alias != nullptr &&
+  let alias = DIR_LISTING_ALIASES.find(key);
+  if (validation == directory_validation::Cached && alias.has_value() &&
       alias->validation_epoch == DIRECTORY_VALIDATION_EPOCH &&
       alias->observed_generation ==
           DIR_LISTINGS[alias->listing_position].generation)
@@ -391,8 +391,8 @@ fn warm_directory_index(const Path &directory) throws -> void
 
 pure fn directory_listing_generation(const Path &directory) wontthrow -> u64
 {
-  let const *alias = DIR_LISTING_ALIASES.find(directory.view());
-  if (alias == nullptr) return 0;
+  let const alias = DIR_LISTING_ALIASES.find(directory.view());
+  if (!alias.has_value()) return 0;
   return DIR_LISTINGS[alias->listing_position].generation;
 }
 
@@ -1198,11 +1198,10 @@ hot fn ProgramResolver::search(StringView program_name, SearchMode search_mode,
   let const stem =
       normalized_name.substring_of_length(0, name_info.stem_length);
 
-  if (const CacheEntry *const cached = m_execution_cache.find(stem);
-      cached != nullptr)
+  if (let const cached = m_execution_cache.find(stem); cached.has_value())
   {
     let result = ArrayList<Path>{heap_allocator()};
-    let const path = find_cached_program_path(*cached, name_info.extension);
+    let const path = find_cached_program_path(*cached.value(), name_info.extension);
     if (path != nullptr) {
       if (cache_policy != CachePolicy::RememberUnchecked &&
           (!path->is_regular_file() || !path->is_executable()))

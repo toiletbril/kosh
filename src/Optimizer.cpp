@@ -230,8 +230,8 @@ fn propagated_literal_word_value(const Token *token,
 
   let const name = plain_variable_reference_name(token);
   if (!name.has_value()) return None;
-  if (const String *recorded = actx.constant_variables.find(*name);
-      recorded != nullptr)
+  if (let const recorded = actx.constant_variables.find(*name);
+      recorded.has_value())
   {
     LOG(All, "reading the recorded constant '%.*s' = '%s'",
         static_cast<int>(name->length), name->data, recorded->c_str());
@@ -304,7 +304,7 @@ fn try_fold_arithmetic_with_constants(StringView expression,
           StringView{&expression.data[start_position], i - start_position};
 
       let const recorded = actx.constant_variables.find(name);
-      if (recorded == nullptr) {
+      if (!recorded.has_value()) {
         LOG(All,
             "skipping the arithmetic fold, '%.*s' is not a recorded constant",
             static_cast<int>(name.length), name.data);

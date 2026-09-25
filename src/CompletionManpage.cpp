@@ -295,7 +295,7 @@ static fn build_man_subcommand_index(EvalContext &context) throws -> void
     for (let const &entry : *entries) {
       let const stripped = strip_man1_suffix(entry.view());
       if (!stripped.has_value() || stripped->is_empty()) continue;
-      if (MAN_PAGE_FILE_PATHS.find(*stripped) != nullptr) continue;
+      if (MAN_PAGE_FILE_PATHS.find(*stripped).has_value()) continue;
       let file_path = directory.clone();
       file_path.push_component(entry.view());
       MAN_PAGE_FILE_PATHS.set(*stripped, String{file_path.view()});
@@ -307,7 +307,7 @@ static fn build_man_subcommand_index(EvalContext &context) throws -> void
     let const head = name.substring_of_length(0, *dash);
     let const tail = name.substring(*dash + 1);
     if (tail.is_empty() || (tail[0] >= '0' && tail[0] <= '9')) return;
-    if (MAN_PAGE_FILE_PATHS.find(head) == nullptr) return;
+    if (!MAN_PAGE_FILE_PATHS.find(head).has_value()) return;
     MAN_SUBCOMMAND_INDEX
         .get_or_create(head, ArrayList<String>{heap_allocator()})
         .push(String{tail});
@@ -378,12 +378,12 @@ static fn man_subcommand_page_is_valid(StringView command,
   page_name.push('-');
   page_name.append(subcommand);
   if (let const cached = MAN_SUBCOMMAND_PAGE_VALID.find(page_name.view());
-      cached != nullptr)
-    return *cached;
+      cached.has_value())
+    return *cached.value();
   if (!is_read_allowed) return false;
 
   let const file_path = MAN_PAGE_FILE_PATHS.find(page_name.view());
-  if (file_path == nullptr) {
+  if (!file_path.has_value()) {
     MAN_SUBCOMMAND_PAGE_VALID.set(page_name.view(), false);
     return false;
   }
@@ -483,11 +483,11 @@ fn internal::complete_from_man_subcommands(StringView line, StringView token,
   }
 
   let const subcommands = MAN_SUBCOMMAND_INDEX.find(command);
-  if (subcommands == nullptr || subcommands->is_empty()) return None;
+  if (!subcommands.has_value() || subcommands->is_empty()) return None;
 
   /* Only the token matches are validated, so a typo reads no page. */
   let matches = ArrayList<String>{heap_allocator()};
-  for (let const &subcommand : *subcommands)
+  for (let const &subcommand : *subcommands.value())
     if (subcommand.view().starts_with(token) &&
         man_subcommand_page_is_valid(command, subcommand.view(), for_listing))
     {
@@ -547,7 +547,8 @@ static fn parse_manpage_option_entries(StringView text) throws
     if (pending_flags.is_empty()) return;
     let const desc = pending_description.view().trim_blanks();
     for (let const &flag : pending_flags)
-      if (!desc.is_empty() && descriptions.find(flag.view()) == nullptr) {
+      if (!desc.is_empty() &&
+          !descriptions.find(flag.view()).has_value()) {
         descriptions.set(flag.view(), String{desc});
       }
     pending_flags.clear();
@@ -612,7 +613,7 @@ static fn parse_manpage_option_entries(StringView text) throws
       }
     if (flag.length >= 2 && has_letter && seen.add(flag)) {
       let const description = descriptions.find(flag);
-      entries.push(help_entry{String{flag}, description != nullptr
+      entries.push(help_entry{String{flag}, description.has_value()
                                                 ? String{description->view()}
                                                 : String{heap_allocator()}});
     }
@@ -638,8 +639,8 @@ static fn manpage_options_for(StringView page_name, EvalContext &context) throws
     -> const ArrayList<help_entry> &
 {
   if (let const cached = MANPAGE_OPTION_CACHE.find(page_name);
-      cached != nullptr)
-    return *cached;
+      cached.has_value())
+    return *cached.value();
   let parsed_options = ArrayList<help_entry>{heap_allocator()};
   /* man forks only when it resolves into a trusted directory, so an alias or a
      planted man is never run. The resolved absolute path runs in place of the
@@ -683,7 +684,8 @@ static StringMap<String> MANPAGE_TEXT_CACHE{heap_allocator()};
 fn internal::manpage_text_for(StringView page_name, EvalContext &context) throws
     -> StringView
 {
-  if (let const cached = MANPAGE_TEXT_CACHE.find(page_name); cached != nullptr)
+  if (let const cached = MANPAGE_TEXT_CACHE.find(page_name);
+      cached.has_value())
     return cached->view();
 
   let text = String{heap_allocator()};
@@ -782,7 +784,7 @@ fn internal::complete_from_manpage(StringView line, StringView token,
     let combined = String{command};
     combined.push('-');
     combined.append(*subcommand_word);
-    if (MAN_PAGE_FILE_PATHS.find(combined.view()) != nullptr)
+    if (MAN_PAGE_FILE_PATHS.find(combined.view()).has_value())
       page_name = steal(combined);
   }
 
@@ -876,7 +878,7 @@ static StringMap<String> HELP_TEXT_CACHE{heap_allocator()};
 fn internal::help_text_of(StringView command, EvalContext &context) throws
     -> StringView
 {
-  if (let const cached = HELP_TEXT_CACHE.find(command); cached != nullptr)
+  if (let const cached = HELP_TEXT_CACHE.find(command); cached.has_value())
     return cached->view();
 
   let text = help_text_for(context, command);
@@ -950,7 +952,7 @@ static fn help_entries_for(StringMap<ArrayList<help_entry>> &cache,
     -> const ArrayList<help_entry> &
 {
   ensure_help_parsed(context, command, subcommand);
-  return *cache.find(help_cache_key(command, subcommand).view());
+  return *cache.find(help_cache_key(command, subcommand).view()).value();
 }
 
 static fn help_options_for(EvalContext &context, StringView command,

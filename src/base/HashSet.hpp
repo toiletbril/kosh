@@ -34,7 +34,7 @@ public:
 
   hot mustuse pure fn contains(StringView key) const wontthrow -> bool
   {
-    return m_map.find(key) != nullptr;
+    return m_map.find(key).has_value();
   }
 
   mustuse pure fn count() const wontthrow -> usize { return m_map.count(); }

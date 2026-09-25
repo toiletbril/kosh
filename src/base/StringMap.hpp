@@ -112,16 +112,19 @@ public:
     if (new_capacity > m_capacity) rehash(new_capacity);
   }
 
-  hot mustuse pure fn find(StringView key) const wontthrow -> const Value *
+  hot mustuse pure fn find(StringView key) const wontthrow
+      -> Maybe<const Value *>
   {
-    if (m_capacity == 0) return nullptr;
+    if (m_capacity == 0) return None;
     let const found = probe(key, hash_bytes(key)).found;
-    return found == NO_INDEX ? nullptr : &m_slots[found].value;
+    return found == NO_INDEX ? None : Maybe<const Value *>{&m_slots[found].value};
   }
 
-  hot flatten mustuse fn find(StringView key) wontthrow -> Value *
+  hot flatten mustuse fn find(StringView key) wontthrow -> Maybe<Value *>
   {
-    return const_cast<Value *>(static_cast<const StringMap *>(this)->find(key));
+    if (m_capacity == 0) return None;
+    let const found = probe(key, hash_bytes(key)).found;
+    return found == NO_INDEX ? None : Maybe<Value *>{&m_slots[found].value};
   }
 
   pure fn allocator() const wontthrow -> Allocator { return m_allocator; }

@@ -434,14 +434,14 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
     }
   }
 
-  if (let const *stored = m_variable_store.shell_variables().find(name);
-      stored != nullptr)
-    return *stored;
+  if (let const stored = m_variable_store.shell_variables().find(name);
+      stored.has_value())
+    return *stored.value();
 
   /* A read of an array name with no scalar yields element zero, the way bash
      treats $a as ${a[0]}. */
   if (indexed_arrays().count() != 0)
-    if (let const *array = indexed_arrays().find(name); array != nullptr) {
+    if (let const array = indexed_arrays().find(name); array.has_value()) {
       if (array->is_empty()) return koshka::None;
       return array->front();
     }

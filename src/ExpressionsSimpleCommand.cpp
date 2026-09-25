@@ -206,8 +206,8 @@ fn AssignCommand::analyze(AnalysisContext &actx,
 
   if (actx.function_scope_depth > 0 &&
       m_assignment->get_update_mode() != assignment_update_mode::Append &&
-      actx.function_local_names.find(name.view()) == nullptr &&
-      actx.global_assigned_names.find(name.view()) == nullptr &&
+      !actx.function_local_names.find(name.view()).has_value() &&
+      !actx.global_assigned_names.find(name.view()).has_value() &&
       !actx.inherited_global_assigned_names.contains(name.view()) &&
       !(actx.eval_context != nullptr &&
         actx.eval_context->get_variable_value(name.view()).has_value()))

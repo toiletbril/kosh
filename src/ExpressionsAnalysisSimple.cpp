@@ -1032,7 +1032,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
     StringView lost_pipeline_name{};
     StringView bare_array_name{};
     StringView quoted_value_name{};
-    const SourceLocation *quoted_value_assignment = nullptr;
+    Maybe<SourceLocation *> quoted_value_assignment{};
     SourceLocation split_eligible_location = arg_location;
 
     if (word != nullptr) {
@@ -1171,7 +1171,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
           {
             quoted_value_assignment =
                 actx.quoted_literal_assignments.find(referenced);
-            if (quoted_value_assignment != nullptr)
+            if (quoted_value_assignment.has_value())
               quoted_value_name = referenced;
           }
           break;
@@ -1251,7 +1251,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       /* The pair is reported once for each assignment, so the name is dropped
          after the first split-eligible read reaches it. */
       if (!quoted_value_name.is_empty()) {
-        let const assignment_location = *quoted_value_assignment;
+            let const assignment_location = *quoted_value_assignment.value();
         actx.report_diagnostic(diagnostic_id::sc2089, assignment_location,
                                {quoted_value_name});
         actx.report_diagnostic(diagnostic_id::sc2090, arg_location,

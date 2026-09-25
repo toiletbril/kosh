@@ -342,28 +342,28 @@ struct makefile
 
   fn find_variable(StringView name) const throws -> const String *
   {
-    if (let const *index = variable_index.find(name); index != nullptr)
-      return &variables[*index].value;
+    if (let const index = variable_index.find(name); index.has_value())
+      return &variables[*index.value()].value;
     return nullptr;
   }
 
   fn find_variable_record(StringView name) const throws -> const make_variable *
   {
-    if (let const *index = variable_index.find(name); index != nullptr)
-      return &variables[*index];
+    if (let const index = variable_index.find(name); index.has_value())
+      return &variables[*index.value()];
     return nullptr;
   }
 
   fn find_rule(StringView target) const throws -> const make_rule *
   {
-    let const *index = rule_index.find(target);
-    return index == nullptr ? nullptr : &rules[*index];
+    let const index = rule_index.find(target);
+    return index.has_value() ? &rules[*index.value()] : nullptr;
   }
 
   fn find_mutable_rule(StringView target) throws -> make_rule *
   {
-    let const *index = rule_index.find(target);
-    return index == nullptr ? nullptr : &rules[*index];
+    let const index = rule_index.find(target);
+    return index.has_value() ? &rules[*index.value()] : nullptr;
   }
 
   fn add_rule(make_rule &&rule) throws -> usize
@@ -376,9 +376,9 @@ struct makefile
 
   fn remove_variable(StringView name) throws -> void
   {
-    let const *stored_index = variable_index.find(name);
-    if (stored_index == nullptr) return;
-    let const index = *stored_index;
+    let const stored_index = variable_index.find(name);
+    if (!stored_index.has_value()) return;
+    let const index = *stored_index.value();
     let const last_index = variables.count() - 1;
     variable_index.erase(name);
     if (index != last_index) {
@@ -749,7 +749,7 @@ static fn lookup_make_variable(EvalContext &cxt, const makefile &mk,
     lookup.flavor = variable.flavor;
   };
 
-  if (mk.command_variable_names.find(name) != nullptr)
+  if (mk.command_variable_names.find(name).has_value())
     if (const make_variable *variable = mk.find_variable_record(name);
         variable != nullptr)
     {
@@ -1065,8 +1065,8 @@ static fn set_scoped_make_variable(makefile &mk, StringView name,
                                    StringView value, Allocator allocator) throws
     -> void
 {
-  if (let const *index = mk.variable_index.find(name); index != nullptr) {
-    make_variable &variable = mk.variables[*index];
+  if (let const index = mk.variable_index.find(name); index.has_value()) {
+    make_variable &variable = mk.variables[*index.value()];
     variable.value = String{allocator, value};
     variable.origin = make_variable_origin::Automatic;
     variable.flavor = make_variable_flavor::Simple;
@@ -1090,9 +1090,9 @@ static fn restore_make_variable(makefile &mk,
     return;
   }
 
-  let const *index = mk.variable_index.find(snapshot.name.view());
-  ASSERT(index != nullptr);
-  make_variable &variable = mk.variables[*index];
+  let const index = mk.variable_index.find(snapshot.name.view());
+  ASSERT(index.has_value());
+  make_variable &variable = mk.variables[*index.value()];
   variable.value = String{allocator, snapshot.value.view()};
   variable.origin = snapshot.origin;
   variable.flavor = snapshot.flavor;
@@ -1332,7 +1332,7 @@ evaluate_make_function(EvalContext &cxt, makefile &mk, StringView function_name,
     let result = String{allocator};
     bool has_word = false;
     for (StringView word : split_word_views(source.view(), allocator)) {
-      bool is_matched = literal_patterns.find(word) != nullptr;
+      bool is_matched = literal_patterns.find(word).has_value();
       if (!is_matched)
         for (let const &pattern : wildcard_patterns)
           if (match_make_pattern(pattern, word).has_value()) {
@@ -1761,7 +1761,7 @@ static fn apply_assignment(EvalContext &cxt, makefile &mk, StringView name_part,
 
   let const name = trim(name_part);
   let const trimmed_value = trim(value);
-  if (!is_command_line && mk.command_variable_names.find(name) != nullptr)
+  if (!is_command_line && mk.command_variable_names.find(name).has_value())
     return;
   if (is_command_line) mk.command_variable_names.set(name, true);
 
@@ -1773,8 +1773,8 @@ static fn apply_assignment(EvalContext &cxt, makefile &mk, StringView name_part,
      to the make program name before the variable is stored rather than
      recursing on itself to the expansion-depth cap. A plain = stays lazy and
      keeps its raw text. */
-  if (let const *index = mk.variable_index.find(name); index != nullptr) {
-    make_variable &variable = mk.variables[*index];
+  if (let const index = mk.variable_index.find(name); index.has_value()) {
+    make_variable &variable = mk.variables[*index.value()];
     if (operator_character == '?') return;
     if (operator_character == '+') {
       let const appended_value =
@@ -2218,7 +2218,7 @@ static fn parse_makefile_into(EvalContext &cxt, makefile &mk,
             cxt, mk, trim(statement.substring(statement_word.length)), 0);
         for (let const &name :
              split_words(names.view(), cxt.scratch_allocator()))
-          if (mk.command_variable_names.find(name.view()) == nullptr)
+          if (!mk.command_variable_names.find(name.view()).has_value())
             mk.remove_variable(name.view());
         current_rule_indices.clear();
         current_pattern_indices.clear();
@@ -2564,9 +2564,9 @@ static fn is_make_target_supplyable(EvalContext &cxt, makefile &mk,
                                     StringMap<bool> &supplyability_cache) throws
     -> bool
 {
-  if (active_targets.find(goal) != nullptr) return false;
-  if (let const *cached = supplyability_cache.find(goal); cached != nullptr)
-    return *cached;
+  if (active_targets.find(goal).has_value()) return false;
+  if (let const cached = supplyability_cache.find(goal); cached.has_value())
+    return *cached.value();
   if (Path{goal}.exists() || mk.find_rule(goal) != nullptr) {
     supplyability_cache.set(goal, true);
     return true;
@@ -2636,11 +2636,11 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
                        StringMap<bool> &completed_target_results,
                        const make_build_options &options) throws -> bool
 {
-  if (let const *result = completed_target_results.find(goal);
-      result != nullptr)
-    return *result;
+  if (let const result = completed_target_results.find(goal);
+      result.has_value())
+    return *result.value();
 
-  if (active_targets.find(goal) != nullptr)
+  if (active_targets.find(goal).has_value())
     throw Error{
         "The target '" + String{cxt.scratch_allocator(), goal}
           +
@@ -2916,7 +2916,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
                                       ? target_path.exists()
                                       : archive_member_time.has_value();
   let is_out_of_date = options.should_always_make ||
-                       mk.phony_targets.find(goal) != nullptr ||
+                       mk.phony_targets.find(goal).has_value() ||
                        !was_target_existing || has_outdated_prerequisite;
   if (!is_out_of_date)
     for (let const &prerequisite : normal_prerequisites) {
@@ -2974,7 +2974,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     if (!repeated_prereqs.is_empty()) repeated_prereqs += ' ';
     repeated_prereqs += prerequisite.view();
 
-    if (seen_prerequisites.find(prerequisite.view()) != nullptr) continue;
+    if (seen_prerequisites.find(prerequisite.view()).has_value()) continue;
 
     seen_prerequisites.set(prerequisite.view(), true);
     if (!all_prereqs.is_empty()) all_prereqs += ' ';
@@ -3028,9 +3028,9 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
   };
 
   let const is_target_silent =
-      options.is_silent || mk.silent_targets.find(goal) != nullptr;
+      options.is_silent || mk.silent_targets.find(goal).has_value();
   let const should_ignore_target_errors =
-      options.should_ignore_errors || mk.ignored_targets.find(goal) != nullptr;
+      options.should_ignore_errors || mk.ignored_targets.find(goal).has_value();
 
   for (let const &recipe : recipe_lines) {
     let body = recipe.view();
@@ -3112,7 +3112,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
       if (!options.is_dry_run && !options.is_print_database &&
           !options.is_query && target_path.exists() &&
           !target_path.is_directory() && !mk.is_every_target_precious &&
-          mk.precious_targets.find(goal) == nullptr)
+          !mk.precious_targets.find(goal).has_value())
         unused(os::remove_file(automatic_target.view()));
       interrupt_error.set_command_status(130);
       throw;
@@ -3120,7 +3120,7 @@ static fn build_target(const ExecContext &ec, EvalContext &cxt, makefile &mk,
     if (status != 0 && !should_ignore_errors && !should_ignore_target_errors) {
       if (!was_target_existing && target_path.exists() &&
           !mk.is_every_target_precious &&
-          mk.precious_targets.find(goal) == nullptr)
+          !mk.precious_targets.find(goal).has_value())
         unused(os::remove_file(automatic_target.view()));
 
       throw Error{
@@ -3639,19 +3639,19 @@ fn Make::execute(const ExecContext &ec, EvalContext &cxt,
   for (let const &variable : mk.variables) {
     if (variable.name.view() == StringView{"MAKEFLAGS"}) continue;
     if (variable.name.view() == StringView{"SHELL"} &&
-        mk.exported_variable_names.find(variable.name.view()) == nullptr)
+        !mk.exported_variable_names.find(variable.name.view()).has_value())
     {
       continue;
     }
-    if (mk.unexported_variable_names.find(variable.name.view()) != nullptr)
+    if (mk.unexported_variable_names.find(variable.name.view()).has_value())
       continue;
     let old_value = os::get_environment_variable(variable.name.view());
     let const is_command_variable =
-        mk.command_variable_names.find(variable.name.view()) != nullptr;
+        mk.command_variable_names.find(variable.name.view()).has_value();
     let const is_command_line_variable =
-        command_line_variable_names.find(variable.name.view()) != nullptr;
+        command_line_variable_names.find(variable.name.view()).has_value();
     let const is_exported_variable =
-        mk.exported_variable_names.find(variable.name.view()) != nullptr;
+        mk.exported_variable_names.find(variable.name.view()).has_value();
     if (!is_command_line_variable && !is_exported_variable &&
         !old_value.has_value())
       continue;

@@ -1006,7 +1006,7 @@ public:
   pure fn lookup_spec(StringView command) const wontthrow
       -> const completion_spec *
   {
-    return m_specs.find(command);
+    return m_specs.find(command).value_or(nullptr);
   }
   pure fn default_spec_ptr() const wontthrow -> const completion_spec *
   {
@@ -1138,7 +1138,7 @@ public:
   }
   fn find_cached_regex(StringView key) wontthrow -> CompiledRegex *
   {
-    return m_regex_cache.find(key);
+    return m_regex_cache.find(key).value_or(nullptr);
   }
   fn clear_regex_cache() wontthrow -> void { m_regex_cache.clear(); }
   fn store_regex(StringView key, CompiledRegex regex) throws -> CompiledRegex *
@@ -1570,7 +1570,7 @@ public:
   pure fn lookup_indexed_array(StringView name) const wontthrow
       -> const ArrayList<String> *
   {
-    return indexed_arrays().find(name);
+    return indexed_arrays().find(name).value_or(nullptr);
   }
 
   /* The bash associative arrays. The values live in one flat map under a
@@ -1696,7 +1696,7 @@ public:
   hot fn lookup_shell_variable(StringView name) const wontthrow
       -> const String *
   {
-    return m_variable_store.shell_variables().find(name);
+    return m_variable_store.shell_variables().find(name).value_or(nullptr);
   }
   fn get_history_limit(StringView name, usize fallback) const wontthrow -> usize
   {
@@ -1709,8 +1709,8 @@ public:
 
   hot fn has_variable_name(StringView name) const throws -> bool
   {
-    return m_variable_store.shell_variables().find(name) != nullptr ||
-           indexed_arrays().find(name) != nullptr ||
+    return m_variable_store.shell_variables().find(name).has_value() ||
+           indexed_arrays().find(name).has_value() ||
            associative_names().contains(name) || is_exported(name) ||
            variable_requires_dynamic_lookup(name);
   }
@@ -1940,13 +1940,13 @@ public:
   fn refresh_trap_flags() wontthrow -> void
   {
     trap_store().m_has_debug_trap =
-        trap_store().actions().find(StringView{"DEBUG", 5}) != nullptr;
+        trap_store().actions().find(StringView{"DEBUG", 5}).has_value();
     trap_store().m_has_err_trap =
-        trap_store().actions().find(StringView{"ERR", 3}) != nullptr;
+        trap_store().actions().find(StringView{"ERR", 3}).has_value();
 
-    let const *child_action =
+    let const child_action =
         trap_store().actions().find(StringView{"CHLD", 4});
-    os::set_child_trap_armed(child_action != nullptr &&
+    os::set_child_trap_armed(child_action.has_value() &&
                              child_action->count() > 0);
   }
   /* A trap a frame installs for itself traces that frame without errtrace. An

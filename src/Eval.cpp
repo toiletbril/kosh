@@ -535,8 +535,9 @@ fn EvalContext::set_indexed_array(StringView name,
 fn EvalContext::publish_pipe_statuses(ArrayList<String> values) throws -> void
 {
   if (is_readonly("PIPESTATUS")) {
-    if (let *current = indexed_arrays().find("PIPESTATUS"); current != nullptr)
-      *current = steal(values);
+    if (let current = indexed_arrays().find("PIPESTATUS");
+        current.has_value())
+      *current.value() = steal(values);
 
     return;
   }
@@ -546,18 +547,18 @@ fn EvalContext::publish_pipe_statuses(ArrayList<String> values) throws -> void
 
 fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
 {
-  let *existing = indexed_arrays().find("PIPESTATUS");
-  if (existing == nullptr && is_readonly("PIPESTATUS")) return;
+  let existing = indexed_arrays().find("PIPESTATUS");
+  if (!existing.has_value() && is_readonly("PIPESTATUS")) return;
 
-  if (existing != nullptr && existing->count() == 1 &&
+  if (existing.has_value() && existing->count() == 1 &&
       !sparse_array_names().contains("PIPESTATUS"))
   {
     m_variable_store.shell_variables().erase("PIPESTATUS");
     char status_text_buffer[32];
     let const status_text = utils::int_to_text_into(status, status_text_buffer,
                                                     sizeof(status_text_buffer));
-    if ((*existing)[0] != status_text)
-      (*existing)[0] = String{existing->allocator(), status_text};
+    if ((*existing.value())[0] != status_text)
+      (*existing.value())[0] = String{existing->allocator(), status_text};
     return;
   }
 
@@ -574,7 +575,7 @@ fn EvalContext::append_indexed_array(StringView name,
 {
   if (is_write_discarded_dynamic_variable(name)) return;
 
-  if (let *existing = indexed_arrays().find(name); existing != nullptr) {
+  if (let existing = indexed_arrays().find(name); existing.has_value()) {
     LOG(All, "appending %zu elements to the existing array '%.*s'",
         values.count(), static_cast<int>(name.length), name.data);
     if (is_readonly(name))
@@ -839,10 +840,10 @@ fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
 pure fn EvalContext::special_variable_definition_location(
     StringView name) const wontthrow -> Maybe<SourceLocation>
 {
-  let const *location =
+  let const location =
       m_variable_store.special_variable_definition_locations().find(name);
-  if (location == nullptr) return None;
-  return *location;
+  if (!location.has_value()) return None;
+  return *location.value();
 }
 
 fn EvalContext::record_environment_change(StringView name) throws -> void
@@ -924,8 +925,8 @@ fn EvalContext::unmark_exported(StringView name) throws -> void
 fn EvalContext::unexport_shell_variable(StringView name) throws -> void
 {
   let const has_shell_binding =
-      m_variable_store.shell_variables().find(name) != nullptr ||
-      indexed_arrays().find(name) != nullptr ||
+      m_variable_store.shell_variables().find(name).has_value() ||
+      indexed_arrays().find(name).has_value() ||
       associative_names().contains(name) || is_local_in_current_scope(name) ||
       variable_requires_dynamic_lookup(name);
   let const environment_value =
@@ -940,12 +941,12 @@ fn EvalContext::unexport_shell_variable(StringView name) throws -> void
 fn EvalContext::is_exported(StringView name) const throws -> bool
 {
   if constexpr (os::ENVIRONMENT_IS_CASE_SENSITIVE)
-    return exported_names().find(name) != nullptr;
+    return exported_names().find(name).has_value();
 
   char folded[EXPORTED_NAME_FOLD_BYTES];
   let spill = String{heap_allocator()};
-  return exported_names().find(fold_exported_name(name, folded, spill)) !=
-         nullptr;
+  return exported_names().find(fold_exported_name(name, folded, spill))
+      .has_value();
 }
 
 fn EvalContext::sync_exported_after_restore(StringView name,
@@ -1502,7 +1503,7 @@ fn EvalContext::set_alias(StringView name, StringView value) throws -> void
 
 fn EvalContext::remove_alias(StringView name) throws -> bool
 {
-  if (scope_store().aliases().find(name) == nullptr) return false;
+  if (!scope_store().aliases().find(name).has_value()) return false;
   LOG(All, "removing alias '%.*s'", static_cast<int>(name.length), name.data);
   scope_store().aliases().erase(name);
   return true;
@@ -1515,7 +1516,7 @@ pure fn EvalContext::has_aliases() const wontthrow -> bool
 
 fn EvalContext::get_alias(StringView name) const throws -> Maybe<String>
 {
-  if (let const *value = scope_store().aliases().find(name); value != nullptr)
+  if (let const value = scope_store().aliases().find(name); value.has_value())
     return String{heap_allocator(), value->view()};
   return None;
 }

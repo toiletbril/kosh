@@ -1290,7 +1290,7 @@ fn build_function_name_summaries(const AnalysisContext &actx) throws
 
   for (let const &call : actx.function_calls) {
     let const summary = summaries.find(call.name.view());
-    if (summary == nullptr) continue;
+    if (!summary.has_value()) continue;
 
     if (call.has_arguments) {
       summary->has_call_with_arguments = true;
@@ -1339,7 +1339,7 @@ fn check_call_before_definition(
     if (search_builtin(call.name.view()).has_value()) continue;
 
     let const summary = summaries.find(call.name.view());
-    if (summary == nullptr) continue;
+    if (!summary.has_value()) continue;
     if (call.location.position >= summary->first_definition_position) continue;
 
     actx.report_diagnostic(
@@ -1375,10 +1375,10 @@ fn check_function_argument_dataflow(AnalysisContext &actx) throws -> void
 
       /* A redefinition is judged by the first body the file gives the name. */
       let const summary = summaries.find(definition.name.view());
-      if (summary == nullptr || summary->first_definition_index != index)
+      if (!summary.has_value() || summary->first_definition_index != index)
         continue;
 
-      check_function_argument_use(actx, definition, *summary);
+      check_function_argument_use(actx, definition, *summary.value());
     }
   }
 

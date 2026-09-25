@@ -233,9 +233,8 @@ fn build_selector_input(const koshka::completion::completion_result &result)
   for (let const &candidate : result.candidates) {
     input.append(candidate.view());
     if (has_descriptions) {
-      if (const koshka::String *description =
-              result.descriptions.find(candidate.view());
-          description != nullptr && !description->is_empty())
+      if (let const description = result.descriptions.find(candidate.view());
+          description.has_value() && !description->is_empty())
       {
         input.push('\t');
         input.append(description->view());
@@ -615,9 +614,9 @@ fn kosh_completion_callback(const char *buffer, size_t cursor,
     if (for_listing != 0 && result.descriptions.count() > 0) {
       COMPLETION_DESCRIPTION_POINTERS.reserve(result.candidates.count());
       for (let const &candidate : result.candidates) {
-        if (const koshka::String *found_description =
+        if (let const found_description =
                 result.descriptions.find(candidate.view());
-            found_description != nullptr)
+            found_description.has_value())
           COMPLETION_DESCRIPTION_POINTERS.push(found_description->c_str());
         else
           COMPLETION_DESCRIPTION_POINTERS.push("");

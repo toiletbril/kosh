@@ -892,7 +892,7 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
         [&](StringView condition, const String &action) {
           unused(action);
           if (condition == "EXIT") return;
-          if (snapshot.traps.find(condition) != nullptr) return;
+          if (snapshot.traps.find(condition).has_value()) return;
           if (let const number = os::signal_number_from_name(condition))
             os::clear_trap_handler(*number);
         });
@@ -925,9 +925,9 @@ fn EvalContext::restore_state(eval_state_snapshot snapshot) throws -> void
     m_environment_undo_log.pop_back();
   }
 
-  if (let const *ifs =
+  if (let const ifs =
           m_variable_store.shell_variables().find(StringView{"IFS", 3});
-      ifs != nullptr)
+      ifs.has_value())
     set_field_separators(ifs->view());
   else
     set_field_separators(" \t\n");
@@ -1323,10 +1323,10 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
   };
 
   for (let const &command : completion_names) {
-    let const *spec = completion_store().specs().find(command.view());
-    ASSERT(spec != nullptr);
+    let const spec = completion_store().specs().find(command.view());
+    ASSERT(spec.has_value());
     append_subshell_bootstrap_text(body, command.view());
-    do_append_completion_spec(*spec);
+    do_append_completion_spec(*spec.value());
   }
 
   body.push(static_cast<char>(completion_store().default_spec().has_value()));
@@ -1518,7 +1518,7 @@ fn EvalContext::apply_subshell_bootstrap(
     let const command = reader.read_text();
     let spec = completion_spec{};
     if (!reader.is_valid || !do_read_completion_spec(spec) ||
-        completion_specs.find(command) != nullptr)
+        completion_specs.find(command).has_value())
     {
       invalid_subshell_bootstrap();
     }

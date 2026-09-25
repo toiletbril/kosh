@@ -145,6 +145,65 @@ private:
   alignas(T) unsigned char m_storage[sizeof(T)];
 };
 
+template <class T>
+class mustuse Maybe<T *>
+{
+public:
+  Maybe() noexcept = default;
+  Maybe(Nothing) noexcept {}
+  Maybe(T *value) noexcept : m_value(value) {}
+
+  hot mustuse pure fn has_value() const wontthrow -> bool
+  {
+    return m_value != nullptr;
+  }
+  hot mustuse pure explicit operator bool() const wontthrow
+  {
+    return has_value();
+  }
+
+  hot mustuse pure fn value() wontthrow -> T *
+  {
+    ASSERT(m_value != nullptr);
+    return m_value;
+  }
+  hot mustuse pure fn value() const wontthrow -> T *
+  {
+    ASSERT(m_value != nullptr);
+    return m_value;
+  }
+  hot flatten mustuse pure fn operator*() wontthrow -> T *&
+  {
+    return m_value;
+  }
+  hot flatten mustuse pure fn operator*() const wontthrow -> T *const &
+  {
+    return m_value;
+  }
+  hot flatten mustuse pure fn operator->() wontthrow -> T * { return value(); }
+  hot flatten mustuse pure fn operator->() const wontthrow -> T *
+  {
+    return value();
+  }
+
+  mustuse fn take() wontthrow -> T *
+  {
+    let const taken_value = m_value;
+    m_value = nullptr;
+    return taken_value;
+  }
+
+  mustuse fn value_or(T *fallback) const wontthrow -> T *
+  {
+    return has_value() ? m_value : fallback;
+  }
+
+  fn reset() wontthrow -> void { m_value = nullptr; }
+
+private:
+  T *m_value{nullptr};
+};
+
 /* Evaluate a Maybe expression, return None from the enclosing function when
    it is empty, otherwise yield the value. The enclosing function must itself
    return a Maybe. */

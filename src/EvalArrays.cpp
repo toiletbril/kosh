@@ -239,21 +239,21 @@ fn EvalContext::set_array_element(StringView name, usize index,
   /* The dense run holds the contiguous prefix from index zero, and any element
      past its end lives in the sparse map keyed by index, so a gap is not
      padded. A first write promotes an existing scalar to element zero. */
-  ArrayList<String> *dense = indexed_arrays().find(name);
-  if (dense == nullptr) {
+  let dense = indexed_arrays().find(name);
+  if (!dense.has_value()) {
     let elements = ArrayList<String>{heap_allocator()};
-    if (let const *scalar = m_variable_store.shell_variables().find(name);
-        scalar != nullptr)
+    if (let const scalar = m_variable_store.shell_variables().find(name);
+        scalar.has_value())
       elements.push(String{heap_allocator(), scalar->view()});
     set_indexed_array(name, steal(elements));
     dense = indexed_arrays().find(name);
   }
   m_variable_store.shell_variables().erase(name);
-  ASSERT(dense != nullptr);
+  ASSERT(dense.has_value());
 
   let const dense_count = dense->count();
   if (index < dense_count) {
-    (*dense)[index] = String{heap_allocator(), value};
+    (*dense.value())[index] = String{heap_allocator(), value};
     return;
   }
   if (index == dense_count) {
@@ -264,8 +264,8 @@ fn EvalContext::set_array_element(StringView name, usize index,
     {
       let const key =
           sparse_array_key(name, dense->count(), scratch_allocator());
-      let const *migrated = sparse_array_values().find(key.view());
-      if (migrated == nullptr) break;
+      let const migrated = sparse_array_values().find(key.view());
+      if (!migrated.has_value()) break;
       dense->push(String{heap_allocator(), migrated->view()});
       sparse_array_values().erase(key.view());
     }
@@ -382,14 +382,14 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
     if (sparse_array_names().contains(name)) {
       let const key =
           sparse_array_key(name, resolved_index, scratch_allocator());
-      if (let const *sparse = sparse_array_values().find(key.view());
-          sparse != nullptr)
+      if (let const sparse = sparse_array_values().find(key.view());
+          sparse.has_value())
         return String{sparse->view()};
     }
 
     if (resolved_index == 0)
-      if (let const *scalar = m_variable_store.shell_variables().find(name);
-          scalar != nullptr)
+      if (let const scalar = m_variable_store.shell_variables().find(name);
+          scalar.has_value())
         return String{scalar->view()};
 
     return None;
@@ -424,9 +424,9 @@ fn EvalContext::declare_associative_array(StringView name) throws -> void
   LOG(Debug, "declaring '%.*s' as an associative array",
       static_cast<int>(name.length), name.data);
   let scalar = Maybe<String>{};
-  if (let const *stored = m_variable_store.shell_variables().find(name);
-      stored != nullptr)
-    scalar = *stored;
+  if (let const stored = m_variable_store.shell_variables().find(name);
+      stored.has_value())
+    scalar = *stored.value();
   associative_names().add(name);
   m_variable_store.shell_variables().erase(name);
   if (scalar.has_value()) set_associative_element(name, "0", scalar->view());
@@ -463,10 +463,10 @@ fn EvalContext::lookup_associative_element(StringView name,
 {
   if (is_bash_aliases_special(name)) return get_alias(key);
 
-  if (let const *value = associative_values().find(
+  if (let const value = associative_values().find(
           associative_composite_key(name, key, scratch_allocator()).view());
-      value != nullptr)
-    return *value;
+      value.has_value())
+    return *value.value();
   return None;
 }
 
@@ -558,7 +558,7 @@ fn EvalContext::unset_array_element(StringView name,
     return;
   }
 
-  if (ArrayList<String> *array = indexed_arrays().find(name); array != nullptr)
+  if (let array = indexed_arrays().find(name); array.has_value())
   {
     let const index = evaluate_arithmetic(subscript);
     let const array_count = static_cast<i64>(array->count());
@@ -575,7 +575,7 @@ fn EvalContext::unset_array_element(StringView name,
            i < static_cast<usize>(array_count); i++)
         sparse_array_values().set(
             sparse_array_key(name, i, scratch_allocator()).view(),
-            (*array)[i].view());
+            (*array.value())[i].view());
       while (array->count() > static_cast<usize>(resolved))
         array->remove(array->count() - 1);
     } else {
@@ -655,10 +655,10 @@ fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
   let const previous_was_exported = is_exported(name);
 
   let previous_value = Maybe<String>{};
-  if (let const *scalar = m_variable_store.shell_variables().find(name);
-      scalar != nullptr)
+  if (let const scalar = m_variable_store.shell_variables().find(name);
+      scalar.has_value())
   {
-    previous_value = *scalar;
+    previous_value = *scalar.value();
   } else if (previous_array.has_value() && !previous_array->is_empty()) {
     previous_value = previous_array->front();
   } else if (!is_dynamic_write_owner(name) &&
@@ -713,7 +713,7 @@ fn EvalContext::array_negative_index_base(StringView name) const throws -> i64
     return static_cast<i64>(bash_directory_stack_element_count());
 
   i64 base = 0;
-  if (let const *array = indexed_arrays().find(name); array != nullptr)
+  if (let const array = indexed_arrays().find(name); array.has_value())
     base = static_cast<i64>(array->count());
 
   if (sparse_array_names().contains(name)) {
@@ -917,8 +917,8 @@ fn EvalContext::apply_array_subscript(
     if (index >= 0) {
       let const probe = sparse_array_key(name, static_cast<usize>(index),
                                          scratch_allocator());
-      if (let const *sparse = sparse_array_values().find(probe.view());
-          sparse != nullptr)
+      if (let const sparse = sparse_array_values().find(probe.view());
+          sparse.has_value())
       {
         return String{scratch_allocator(), sparse->view()};
       }
@@ -1020,7 +1020,8 @@ fn EvalContext::array_element_is_set(StringView name,
            sparse_array_values().find(
                sparse_array_key(name, static_cast<usize>(resolved),
                                 scratch_allocator())
-                   .view()) != nullptr;
+                   .view())
+               .has_value();
   }
   return index == 0 && get_variable_value(name).has_value();
 }

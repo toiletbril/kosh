@@ -881,16 +881,17 @@ fn ForLoop::analyze(AnalysisContext &actx, bool is_unconditional) const throws
 
   let const outer_loop_location =
       actx.active_loop_variables.find(m_variable_name);
-  if (outer_loop_location != nullptr) {
+  if (outer_loop_location.has_value()) {
     actx.report_diagnostic(diagnostic_id::sc2165, m_variable_location,
-                           {m_variable_name}, *outer_loop_location);
-    actx.report_diagnostic(diagnostic_id::sc2167, *outer_loop_location,
+                           {m_variable_name}, *outer_loop_location.value());
+    actx.report_diagnostic(diagnostic_id::sc2167, *outer_loop_location.value(),
                            {m_variable_name}, m_variable_location);
   }
 
-  let const had_outer_loop_variable = outer_loop_location != nullptr;
+  let const had_outer_loop_variable = outer_loop_location.has_value();
   let saved_outer_loop_location = SourceLocation{};
-  if (had_outer_loop_variable) saved_outer_loop_location = *outer_loop_location;
+  if (had_outer_loop_variable)
+    saved_outer_loop_location = *outer_loop_location.value();
   actx.active_loop_variables.set(m_variable_name, m_variable_location);
   defer
   {
@@ -1337,13 +1338,13 @@ fn CaseClause::analyze(AnalysisContext &actx,
       let const literal = pattern_word.to_literal_string();
       let const raw_pattern = pattern->raw_string();
       let is_duplicate = false;
-      if (let const *earlier_location =
+      if (let const earlier_location =
               earlier_patterns.find(raw_pattern.view());
-          earlier_location != nullptr)
+          earlier_location.has_value())
       {
         actx.report_diagnostic(diagnostic_id::sc2221,
                                pattern->source_location(), {},
-                               *earlier_location);
+                               *earlier_location.value());
         is_duplicate = true;
       }
       if (!is_duplicate) {

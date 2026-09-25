@@ -84,8 +84,8 @@ fn Tsort::execute(const ExecContext &ec, EvalContext &cxt,
   let vertex_indices = StringMap<usize>{cxt.scratch_allocator()};
   let vertices = ArrayList<tsort_vertex>{cxt.scratch_allocator()};
   let const do_vertex_index = [&](StringView name) throws -> usize {
-    if (let const *found = vertex_indices.find(name); found != nullptr)
-      return *found;
+    if (let const found = vertex_indices.find(name); found.has_value())
+      return *found.value();
 
     let const index = vertices.count();
     vertices.push(tsort_vertex{name, ArrayList<usize>{cxt.scratch_allocator()},

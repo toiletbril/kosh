@@ -325,8 +325,8 @@ static fn cached_targets_for(const Path &source_file, Collector collect) throws
   let const mtime = absolute_source_file.modification_time();
   if (!mtime.has_value()) return nullptr;
   let const key = absolute_source_file.view();
-  if (const cached_target_list *cached = BUILD_TARGET_CACHE.find(key);
-      cached != nullptr && cached->mtime == *mtime)
+  if (let const cached = BUILD_TARGET_CACHE.find(key);
+      cached.has_value() && cached->mtime == *mtime)
     return &cached->targets;
   return &BUILD_TARGET_CACHE.set(key, cached_target_list{*mtime, collect()})
               ->targets;

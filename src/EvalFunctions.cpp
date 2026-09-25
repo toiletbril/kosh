@@ -115,8 +115,8 @@ fn EvalContext::register_function(StringView name,
 fn EvalContext::function_definition_info_of(StringView name) const wontthrow
     -> const function_definition_info *
 {
-  let const *storage = function_store().definitions().find(name);
-  return storage != nullptr ? storage->get_definition_info() : nullptr;
+  let const storage = function_store().definitions().find(name);
+  return storage.has_value() ? storage->get_definition_info() : nullptr;
 }
 
 pure fn EvalContext::resolve_render_source(
@@ -185,8 +185,8 @@ pure fn EvalContext::source_text_in_span(const SourceLocation &location,
 fn EvalContext::find_function_source(StringView name) const wontthrow
     -> const String *
 {
-  let const *storage = function_store().definitions().find(name);
-  return storage != nullptr ? storage->get_source() : nullptr;
+  let const storage = function_store().definitions().find(name);
+  return storage.has_value() ? storage->get_source() : nullptr;
 }
 
 fn EvalContext::sorted_function_names() const throws -> ArrayList<String>
@@ -204,14 +204,14 @@ fn EvalContext::sorted_function_names() const throws -> ArrayList<String>
 fn EvalContext::find_function(StringView name) const wontthrow
     -> const Expression *
 {
-  let const *storage = function_store().definitions().find(name);
-  return storage != nullptr ? storage->get_body() : nullptr;
+  let const storage = function_store().definitions().find(name);
+  return storage.has_value() ? storage->get_body() : nullptr;
 }
 
 pure fn EvalContext::find_function_storage(StringView name) const wontthrow
     -> const FunctionBodyHandle *
 {
-  return function_store().definitions().find(name);
+  return function_store().definitions().find(name).value_or(nullptr);
 }
 
 pure fn EvalContext::has_functions() const wontthrow -> bool
@@ -308,14 +308,14 @@ fn EvalContext::variable_names(Allocator result_allocator) const throws
 fn EvalContext::cached_trap_body(StringView condition, StringView action) throws
     -> FunctionBodyHandle
 {
-  if (let const *cached = trap_store().cached_bodies().find(condition);
-      cached != nullptr)
+  if (let const cached = trap_store().cached_bodies().find(condition);
+      cached.has_value())
   {
     let const *cached_source = cached->get_source();
     if (cached->get_body() != nullptr && cached_source != nullptr &&
         cached_source->view() == action)
     {
-      return *cached;
+      return *cached.value();
     }
   }
 
@@ -351,8 +351,8 @@ fn EvalContext::run_named_trap(StringView condition,
 
   let const condition_bit = running_trap_bit(condition);
   if ((trap_store().m_running_trap_conditions & condition_bit) != 0) return;
-  const String *action = trap_store().actions().find(condition);
-  if (action == nullptr || action->count() == 0) {
+  let const action = trap_store().actions().find(condition);
+  if (!action.has_value() || action->count() == 0) {
     return;
   }
 
@@ -395,8 +395,8 @@ fn EvalContext::run_named_trap(StringView condition,
   };
 
   let const saved_exit_status = execution_store().last_exit_status();
-  let const *current_pipe_statuses = indexed_arrays().find("PIPESTATUS");
-  let const has_saved_pipe_statuses = current_pipe_statuses != nullptr;
+  let const current_pipe_statuses = indexed_arrays().find("PIPESTATUS");
+  let const has_saved_pipe_statuses = current_pipe_statuses.has_value();
   ArrayList<String> saved_pipe_statuses{heap_allocator()};
   if (has_saved_pipe_statuses)
     saved_pipe_statuses = current_pipe_statuses->clone();
@@ -447,9 +447,10 @@ fn EvalContext::restore_trap_pipe_statuses(
       return;
     }
 
-    if (let *current = indexed_arrays().find("PIPESTATUS"); current != nullptr)
+    if (let current = indexed_arrays().find("PIPESTATUS");
+        current.has_value())
     {
-      *current = steal(saved_pipe_statuses);
+      *current.value() = steal(saved_pipe_statuses);
       return;
     }
 
@@ -603,8 +604,8 @@ fn EvalContext::save_untraced_trap(StringView condition,
 
   if (m_runtime.option_is_enabled(trace_option)) return saved;
 
-  let const *action = trap_store().actions().find(condition);
-  if (action == nullptr) return saved;
+  let const action = trap_store().actions().find(condition);
+  if (!action.has_value()) return saved;
 
   LOG(Info, "taking a %zu byte '%.*s' action away from an untraced body",
       action->length(), static_cast<int>(condition.length), condition.data);
@@ -622,7 +623,7 @@ fn EvalContext::restore_untraced_trap(StringView condition,
   if (!saved.action.has_value()) return;
   /* A trap the body installed for itself stands, the way bash keeps the one it
      finds on the return. */
-  if (trap_store().actions().find(condition) != nullptr) return;
+  if (trap_store().actions().find(condition).has_value()) return;
 
   LOG(Info, "restoring the '%.*s' action an untraced body ran without",
       static_cast<int>(condition.length), condition.data);
@@ -675,8 +676,8 @@ fn EvalContext::run_pending_traps() throws -> void
   let const reaped_child_count = os::take_reaped_child_count();
   if (trap_store().m_did_reset_inherited_signal_traps) {
     os::clear_reaped_child_arrival();
-  } else if (let const *queued = trap_store().actions().find(child_condition);
-             queued != nullptr && queued->count() > 0)
+  } else if (let const queued = trap_store().actions().find(child_condition);
+             queued.has_value() && queued->count() > 0)
   {
     trap_store().m_pending_child_trap_count += reaped_child_count;
   } else {
@@ -684,8 +685,8 @@ fn EvalContext::run_pending_traps() throws -> void
   }
 
   let const saved_exit_status = execution_store().last_exit_status();
-  let const *current_pipe_statuses = indexed_arrays().find("PIPESTATUS");
-  let const has_saved_pipe_statuses = current_pipe_statuses != nullptr;
+  let const current_pipe_statuses = indexed_arrays().find("PIPESTATUS");
+  let const has_saved_pipe_statuses = current_pipe_statuses.has_value();
   ArrayList<String> saved_pipe_statuses{heap_allocator()};
   if (has_saved_pipe_statuses)
     saved_pipe_statuses = current_pipe_statuses->clone();
@@ -713,8 +714,8 @@ fn EvalContext::run_pending_traps() throws -> void
     if (name->view() == "CHLD") continue;
     if (trap_store().m_did_reset_inherited_signal_traps) continue;
 
-    if (let const *action = trap_store().actions().find(name->view());
-        action != nullptr)
+    if (let const action = trap_store().actions().find(name->view());
+        action.has_value())
       if (action->count() > 0) {
         LOG(Info, "running the trap action for signal '%s'", name->c_str());
         /* A return in the action belongs to the function the signal
@@ -739,8 +740,8 @@ fn EvalContext::run_pending_traps() throws -> void
       (trap_store().m_running_trap_conditions & child_bit) == 0 &&
       os::has_reaped_child_arrival())
   {
-    if (let const *installed = trap_store().actions().find(child_condition);
-        installed != nullptr && installed->count() > 0)
+    if (let const installed = trap_store().actions().find(child_condition);
+        installed.has_value() && installed->count() > 0)
     {
       let const action = String{heap_allocator(), installed->view()};
       let const fire_count = trap_store().m_pending_child_trap_count;
@@ -803,8 +804,8 @@ cold fn EvalContext::run_exit_trap(Maybe<i32> final_status) throws -> void
   defer { trap_store().m_trap_action_depth -= 1; };
 
   let const saved_exit_status = execution_store().last_exit_status();
-  let const *current_pipe_statuses = indexed_arrays().find("PIPESTATUS");
-  let const has_saved_pipe_statuses = current_pipe_statuses != nullptr;
+  let const current_pipe_statuses = indexed_arrays().find("PIPESTATUS");
+  let const has_saved_pipe_statuses = current_pipe_statuses.has_value();
   ArrayList<String> saved_pipe_statuses{heap_allocator()};
   if (has_saved_pipe_statuses)
     saved_pipe_statuses = current_pipe_statuses->clone();
@@ -826,8 +827,8 @@ cold fn EvalContext::run_exit_trap(Maybe<i32> final_status) throws -> void
     }
   };
 
-  if (let const *action = trap_store().actions().find(StringView{"EXIT", 4});
-      action != nullptr)
+  if (let const action = trap_store().actions().find(StringView{"EXIT", 4});
+      action.has_value())
     if (action->count() > 0) {
       LOG(Info, "running the EXIT trap action at shell exit");
       run_source(action->view(), "the EXIT trap", None, None, nullptr, nullptr,
@@ -841,8 +842,8 @@ cold fn EvalContext::run_exit_trap(Maybe<i32> final_status) throws -> void
 
 fn EvalContext::has_exit_trap() const wontthrow -> bool
 {
-  if (let const *action = trap_store().actions().find(StringView{"EXIT", 4});
-      action != nullptr)
+  if (let const action = trap_store().actions().find(StringView{"EXIT", 4});
+      action.has_value())
     return action->count() > 0;
   return false;
 }
@@ -860,8 +861,8 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> Maybe<i32>
   defer { trap_store().m_trap_action_depth -= 1; };
 
   let const saved_exit_status = execution_store().last_exit_status();
-  let const *current_pipe_statuses = indexed_arrays().find("PIPESTATUS");
-  let const has_saved_pipe_statuses = current_pipe_statuses != nullptr;
+  let const current_pipe_statuses = indexed_arrays().find("PIPESTATUS");
+  let const has_saved_pipe_statuses = current_pipe_statuses.has_value();
   ArrayList<String> saved_pipe_statuses{heap_allocator()};
   if (has_saved_pipe_statuses)
     saved_pipe_statuses = current_pipe_statuses->clone();
@@ -887,8 +888,8 @@ cold fn EvalContext::run_subshell_exit_trap() throws -> Maybe<i32>
   /* Only an EXIT action the subshell itself set is present, since the boundary
      cleared the inherited one on entry. It runs before restore_state returns
      the parent's traps. */
-  if (let const *action = trap_store().actions().find(StringView{"EXIT", 4});
-      action != nullptr)
+  if (let const action = trap_store().actions().find(StringView{"EXIT", 4});
+      action.has_value())
     if (action->count() > 0) {
       LOG(Info, "running the EXIT trap action the subshell set at its end");
       run_source(action->view(), "the EXIT trap", None, None, nullptr, nullptr,
@@ -1040,8 +1041,8 @@ fn EvalContext::is_uppercase_variable(StringView name) const wontthrow -> bool
 
 pure fn EvalContext::variable_attributes(StringView name) const wontthrow -> u8
 {
-  let const *attributes = variable_attributes().find(name);
-  return attributes != nullptr ? *attributes : 0;
+  let const attributes = variable_attributes().find(name);
+  return attributes.has_value() ? *attributes.value() : 0;
 }
 
 fn EvalContext::set_variable_attribute(StringView name,
@@ -1055,11 +1056,11 @@ fn EvalContext::set_variable_attribute(StringView name,
     return;
   }
 
-  let *attributes = variable_attributes().find(name);
-  if (attributes == nullptr) return;
+  let attributes = variable_attributes().find(name);
+  if (!attributes.has_value()) return;
 
-  *attributes &= static_cast<u8>(~mask);
-  if (*attributes == 0) variable_attributes().erase(name);
+  *attributes.value() &= static_cast<u8>(~mask);
+  if (*attributes.value() == 0) variable_attributes().erase(name);
 }
 
 fn EvalContext::apply_variable_case(StringView name,

@@ -300,9 +300,11 @@ fn VariableOccurrenceStateMap::snapshot() throws -> VariableOccurrenceStateMap
 pure fn VariableOccurrenceStateMap::find(StringView name) const wontthrow
     -> const variable_occurrence_state *
 {
-  let const *change = m_changes.find(name);
-  if (change != nullptr) return change->is_present ? &change->state : nullptr;
-  return m_base != nullptr ? m_base->states.find(name) : nullptr;
+  let const change = m_changes.find(name);
+  if (change.has_value())
+    return change->is_present ? &change->state : nullptr;
+  return m_base != nullptr ? m_base->states.find(name).value_or(nullptr)
+                           : nullptr;
 }
 
 fn VariableOccurrenceStateMap::set(StringView name,
@@ -387,7 +389,7 @@ fn VariableOccurrenceStateMap::merge(
         });
     other.m_changes.for_each(
         [&](StringView name, const variable_occurrence_map_entry &) {
-          if (m_changes.find(name) == nullptr) do_merge_name(result, name);
+          if (!m_changes.find(name).has_value()) do_merge_name(result, name);
         });
     *this = steal(result);
     return;
@@ -398,8 +400,8 @@ fn VariableOccurrenceStateMap::merge(
     if (map.m_base != nullptr) {
       map.m_base->states.for_each(
           [&](StringView name, const variable_occurrence_state &base_state) {
-            let const *change = map.m_changes.find(name);
-            if (change == nullptr)
+            let const change = map.m_changes.find(name);
+            if (!change.has_value())
               callback(name, base_state);
             else if (change->is_present)
               callback(name, change->state);
@@ -408,7 +410,7 @@ fn VariableOccurrenceStateMap::merge(
     map.m_changes.for_each([&](StringView name,
                                const variable_occurrence_map_entry &change) {
       if (!change.is_present) return;
-      if (map.m_base != nullptr && map.m_base->states.find(name) != nullptr) {
+      if (map.m_base != nullptr && map.m_base->states.find(name).has_value()) {
         return;
       }
       callback(name, change.state);
@@ -951,10 +953,11 @@ fn AnalysisContext::note_variable_assignment(
     current_source_effects->assigned_names.add(name);
   if (!is_proven_unconditional) return;
 
-  if (const SourceLocation *read_location = reads_before_assignment.find(name);
-      read_location != nullptr)
+  if (let const read_location = reads_before_assignment.find(name);
+      read_location.has_value())
   {
-    report_diagnostic(diagnostic_id::use_before_assign, *read_location, {name},
+    report_diagnostic(diagnostic_id::use_before_assign, *read_location.value(),
+                      {name},
                       location);
     reads_before_assignment.erase(name);
   }
@@ -1116,19 +1119,19 @@ fn AnalysisContext::apply_called_function(
     return;
   }
 
-  let const *selected_definition_index =
+  let const selected_definition_index =
       latest_function_definition_indices.find(name);
-  if (selected_definition_index == nullptr) return;
+  if (!selected_definition_index.has_value()) return;
 
   let const &selected_definition =
-      function_definitions[*selected_definition_index];
+      function_definitions[*selected_definition_index.value()];
   if (!selected_definition.is_analysis_complete ||
       selected_definition.location.position > call_location.position)
   {
     return;
   }
 
-  let &definition = function_definitions[*selected_definition_index];
+  let &definition = function_definitions[*selected_definition_index.value()];
   definition.has_been_called = true;
   if (active_function_definition_index != NO_ACTIVE_FUNCTION_DEFINITION) {
     let &active_definition =
@@ -1145,7 +1148,7 @@ fn AnalysisContext::apply_called_function(
     {
       let &occurrence = symbol_records->variable_occurrences[occurrence_index];
       if (occurrence.kind != variable_occurrence_kind::Reference ||
-          occurrence.function_definition_index != *selected_definition_index ||
+          occurrence.function_definition_index != *selected_definition_index.value() ||
           !occurrence.has_inherited_function_path)
       {
         continue;
@@ -1281,9 +1284,9 @@ fn AnalysisContext::note_variable_read(StringView name,
   if (assignment_state != nullptr && assignment_state->is_definitely_set)
     return;
   if (inherited_assigned_names.contains(name)) return;
-  if (function_local_names.find(name) != nullptr) return;
-  if (global_assigned_names.find(name) != nullptr) return;
-  if (reads_before_assignment.find(name) != nullptr) return;
+  if (function_local_names.find(name).has_value()) return;
+  if (global_assigned_names.find(name).has_value()) return;
+  if (reads_before_assignment.find(name).has_value()) return;
   if (expressions::internal::is_shell_maintained_variable(name)) return;
 
   if (eval_context != nullptr &&
@@ -1629,11 +1632,12 @@ fn expressions::internal::analyze_followed_source(
   let canonical_path = os::canonical_path(*resolved_path);
   if (!canonical_path.has_value()) return do_give_up_on_source();
 
-  if (let const *effects = actx.followed_source_effects_cache->find(
+  if (let const effects = actx.followed_source_effects_cache->find(
           canonical_path->text().view());
-      effects != nullptr)
+      effects.has_value())
   {
-    apply_followed_source_effects(actx, *effects, should_merge_parent_state,
+    apply_followed_source_effects(actx, *effects.value(),
+                                  should_merge_parent_state,
                                   should_merge_parent_uncertainty);
     return should_merge_parent_state;
   }

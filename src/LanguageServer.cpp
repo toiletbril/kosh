@@ -712,8 +712,8 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
     let const &candidate = result.candidates[index];
     response.append("{\"label\":");
     append_json_string(response, candidate.view());
-    if (let const *description = result.descriptions.find(candidate.view());
-        description != nullptr)
+    if (let const description = result.descriptions.find(candidate.view());
+        description.has_value())
     {
       response.append(",\"detail\":");
       append_json_string(response, description->view());
@@ -1510,8 +1510,8 @@ fn Server::command_information(StringView command) throws -> Maybe<String>
   };
 
   if (search_builtin(command).has_value()) {
-    if (let const *cached = m_builtin_information_cache.find(command);
-        cached != nullptr)
+    if (let const cached = m_builtin_information_cache.find(command);
+        cached.has_value())
       return String{cached->view()};
 
     let source = String{"help "};

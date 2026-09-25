@@ -181,10 +181,10 @@ fn EvalContext::run_completion_function(StringView function_name,
   if (has_pending_control_flow()) clear_control_flow();
 
   let result = ArrayList<String>{heap_allocator()};
-  if (ArrayList<String> *reply = indexed_arrays().find("COMPREPLY");
-      !was_interrupted && reply != nullptr)
+  if (let reply = indexed_arrays().find("COMPREPLY");
+      !was_interrupted && reply.has_value())
   {
-    result = steal(*reply);
+    result = steal(*reply.value());
   }
   LOG(Info, "completion function '%.*s' returned %zu candidates with status %d",
       static_cast<int>(function_name.length), function_name.data,

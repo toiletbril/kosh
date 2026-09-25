@@ -1437,7 +1437,7 @@ fn complete(StringView line, usize cursor, EvalContext &context,
         let const description = descriptions.find(candidate.view());
         let rebuilt = rebuild_shell_syntax_candidate(token, decoded_token,
                                                      candidate.view());
-        if (description != nullptr)
+        if (description.has_value())
           rebuilt_descriptions.set(rebuilt.view(), description->view());
         candidate = steal(rebuilt);
       }
