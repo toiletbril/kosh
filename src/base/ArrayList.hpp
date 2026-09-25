@@ -676,7 +676,7 @@ public:
   }
 
 private:
-  Compare m_compare;
+  notunique Compare m_compare;
 };
 
 template <class T>
