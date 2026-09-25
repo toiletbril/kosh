@@ -67,7 +67,7 @@ static fn first_word_resolves(StringView word, EvalContext &context) throws
   }
 
   if (search_builtin(word).has_value()) return true;
-  if (context.find_function(word) != nullptr) return true;
+  if (context.find_function(word).has_value()) return true;
   if (context.get_alias(word).has_value()) return true;
 
   let const path_status = context.get_program_resolver().get_status(word);

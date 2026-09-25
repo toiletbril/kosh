@@ -184,7 +184,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     }
     for (; i < args.count(); i++) {
       let const name = args[i].view();
-      if (cxt.find_function(name) == nullptr) {
+      if (!cxt.find_function(name).has_value()) {
         if (!should_print_function_names_only)
           report_soft_builtin_error(ec, cxt, ec.arg_location_at(i),
                                     StringView{"'"} + name +

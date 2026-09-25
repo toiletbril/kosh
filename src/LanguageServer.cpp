@@ -724,7 +724,7 @@ fn Server::complete(const JsonValue *id, const JsonValue *params) throws -> bool
       if (KEYWORDS.find(candidate.view()).has_value()) {
         response.append(",\"kind\":14,\"data\":{\"command\":");
       } else if (search_builtin(candidate.view()).has_value() ||
-                 m_context.find_function(candidate.view()) != nullptr ||
+                 m_context.find_function(candidate.view()).has_value() ||
                  document_function_names.find(candidate.view()).has_value() ||
                  (m_context.koshkit_utilities_are_reachable() &&
                   koshkit::find_util(candidate.view()).has_value() &&

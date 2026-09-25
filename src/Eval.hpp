@@ -1838,7 +1838,8 @@ public:
   pure fn source_text_in_span(const SourceLocation &location,
                               usize end_position) const wontthrow -> StringView;
   mustuse fn sorted_function_names() const throws -> ArrayList<String>;
-  fn find_function(StringView name) const wontthrow -> const Expression *;
+  fn find_function(StringView name) const wontthrow
+      -> Maybe<const Expression *>;
   pure fn find_function_storage(StringView name) const wontthrow
       -> const FunctionBodyHandle *;
   pure fn has_functions() const wontthrow -> bool;

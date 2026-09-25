@@ -202,10 +202,11 @@ fn EvalContext::sorted_function_names() const throws -> ArrayList<String>
 }
 
 fn EvalContext::find_function(StringView name) const wontthrow
-    -> const Expression *
+    -> Maybe<const Expression *>
 {
   let const storage = function_store().definitions().find(name);
-  return storage.has_value() ? storage->get_body() : nullptr;
+  return storage.has_value() ? Maybe<const Expression *>{storage->get_body()}
+                             : None;
 }
 
 pure fn EvalContext::find_function_storage(StringView name) const wontthrow
@@ -256,7 +257,7 @@ fn EvalContext::sorted_readonly_function_names() const throws
   let out = ArrayList<String>{heap_allocator()};
   out.reserve(function_store().readonly().count());
   function_store().readonly().for_each([&](StringView name) {
-    if (find_function(name) != nullptr) out.push_managed(name);
+    if (find_function(name).has_value()) out.push_managed(name);
   });
   out.sort();
 

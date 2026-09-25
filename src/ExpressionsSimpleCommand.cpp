@@ -433,7 +433,7 @@ fn SimpleCommand::can_evaluate_in_process_substitution(
   if (!command_name.has_value()) return false;
 
   if (let const function_body = cxt.find_function(*command_name);
-      function_body != nullptr)
+      function_body.has_value())
   {
     if (!active_functions.add(*command_name)) return true;
     defer { active_functions.remove(*command_name); };
