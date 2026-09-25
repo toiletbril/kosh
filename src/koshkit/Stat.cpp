@@ -44,6 +44,12 @@ enum class stat_target : u8
   Filesystem,
 };
 
+enum class octal_prefix_mode : u8
+{
+  Bare,
+  Alternate,
+};
+
 constexpr StringView DEFAULT_FILE_FORMAT =
     "  File: %N\n"
     "  Size: %-10s\tBlocks: %-10b IO Block: %-6o %F\n"
@@ -148,10 +154,11 @@ fn hex_of(u64 value, Allocator allocator) throws -> String
   return String::from_in_base(value, false, int_base::hex, allocator);
 }
 
-fn octal_of(u64 value, bool is_alternate, Allocator allocator) throws -> String
+fn octal_of(u64 value, Allocator allocator,
+            octal_prefix_mode prefix_mode) throws -> String
 {
   let text = String::from_in_base(value, false, int_base::octal, allocator);
-  if (!is_alternate) return text;
+  if (prefix_mode == octal_prefix_mode::Bare) return text;
 
   let prefixed = String{allocator, "0"};
   prefixed += text.view();
@@ -223,7 +230,10 @@ fn render_file_directive(String &output, const directive_spec &spec,
   case 'a':
     append_padded(
         output,
-        octal_of(status.mode & 07777u, spec.is_alternate, allocator).view(),
+        octal_of(status.mode & 07777u, allocator,
+                 spec.is_alternate ? octal_prefix_mode::Alternate
+                                   : octal_prefix_mode::Bare)
+            .view(),
         spec, true);
     return;
 
