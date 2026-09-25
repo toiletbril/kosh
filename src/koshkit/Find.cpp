@@ -11,6 +11,7 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Utils.hpp"
+#include "../base/Arena.hpp"
 #include "../base/Path.hpp"
 #include "../base/StaticStringMap.hpp"
 #include "../base/Trace.hpp"
@@ -255,10 +256,20 @@ static fn find_walk(const ExecContext &ec, EvalContext &cxt,
     defer { cxt.scratch_release(child_scratch); };
     let const &child_entry = (*children)[index];
     String child_display{allocator, display};
-    if (!child_display.is_empty() && child_display.back() != '/') {
+    let const child_name = child_entry.name.view();
+    let const has_separator =
+        !child_display.is_empty() && child_display.back() != '/';
+    let const separator_length = has_separator ? usize{1} : usize{0};
+    if (display.length <= SIZE_MAX - separator_length &&
+        display.length + separator_length <= SIZE_MAX - child_name.length)
+    {
+      child_display.reserve(display.length + separator_length +
+                            child_name.length);
+    }
+    if (has_separator) {
       child_display += '/';
     }
-    child_display += child_entry.name.view();
+    child_display += child_name;
     let child_path = Path{path_text, allocator};
     child_path.append(child_entry.name.view());
     char child_type_letter = '?';
@@ -443,7 +454,9 @@ fn Find::execute(const ExecContext &ec, EvalContext &cxt,
   }
   let const results = batch.execute();
 
-  let output = String{allocator};
+  let output_arena = BumpArena{};
+  let const output_allocator = bump_allocator(output_arena);
+  let output = String{output_allocator};
   i32 status = 0;
   for (usize root_index = 0; root_index < roots.count(); root_index++) {
     let const root = roots[root_index];
