@@ -15,7 +15,7 @@
 #include "../Eval.hpp"
 #include "../Lexer.hpp"
 #include "../Platform.hpp"
-#include "../StaticStringMap.hpp"
+#include "../base/StaticStringMap.hpp"
 #include "../Tokens.hpp"
 #include "../Utils.hpp"
 #include "../base/Path.hpp"

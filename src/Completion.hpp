@@ -11,7 +11,7 @@
 #pragma once
 
 #include "Highlight.hpp"
-#include "StaticStringMap.hpp"
+#include "base/StaticStringMap.hpp"
 #include "base/Arena.hpp"
 #include "base/Common.hpp"
 #include "base/HashSet.hpp"

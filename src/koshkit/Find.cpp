@@ -10,7 +10,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
-#include "../StaticStringMap.hpp"
+#include "../base/StaticStringMap.hpp"
 #include "../Utils.hpp"
 #include "../base/Path.hpp"
 #include "../base/Trace.hpp"

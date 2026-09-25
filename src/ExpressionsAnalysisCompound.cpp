@@ -21,7 +21,7 @@
 #include "Optimizer.hpp"
 #include "Parser.hpp"
 #include "Platform.hpp"
-#include "StaticStringMap.hpp"
+#include "base/StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
 #include "Utils.hpp"

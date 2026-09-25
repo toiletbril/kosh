@@ -12,7 +12,7 @@
 #include "../Errors.hpp"
 #include "../Eval.hpp"
 #include "../Platform.hpp"
-#include "../StaticStringMap.hpp"
+#include "../base/StaticStringMap.hpp"
 #include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();

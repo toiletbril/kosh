@@ -12,7 +12,7 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
-#include "../StaticStringMap.hpp"
+#include "../base/StaticStringMap.hpp"
 #include "../Toiletline.hpp"
 #include "../Utils.hpp"
 

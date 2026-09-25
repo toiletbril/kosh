@@ -22,7 +22,7 @@
 #include "Parser.hpp"
 #include "ParserFormats.hpp"
 #include "Platform.hpp"
-#include "StaticStringMap.hpp"
+#include "base/StaticStringMap.hpp"
 #include "Utils.hpp"
 #include "base/Path.hpp"
 

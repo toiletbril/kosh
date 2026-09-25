@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "../StaticStringMap.hpp"
+#include "StaticStringMap.hpp"
 #include "ArrayList.hpp"
 #include "HashSet.hpp"
 #include "PackedStringKey.hpp"

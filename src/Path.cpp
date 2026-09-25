@@ -11,7 +11,7 @@
 
 #include "MimicMood.hpp"
 #include "Platform.hpp"
-#include "StaticStringMap.hpp"
+#include "base/StaticStringMap.hpp"
 #include "base/PackedStringKey.hpp"
 #include "base/Trace.hpp"
 

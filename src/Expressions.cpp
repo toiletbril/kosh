@@ -24,7 +24,7 @@
 #include "Parser.hpp"
 #include "ParserFormats.hpp"
 #include "Platform.hpp"
-#include "StaticStringMap.hpp"
+#include "base/StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
 #include "Utils.hpp"

@@ -12,7 +12,7 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
-#include "../StaticStringMap.hpp"
+#include "../base/StaticStringMap.hpp"
 #include "../base/Path.hpp"
 
 FLAG_LIST_DECL();

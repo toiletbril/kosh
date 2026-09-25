@@ -15,7 +15,7 @@
 #include "Builtin.hpp"
 #include "CLI.hpp"
 #include "Platform.hpp"
-#include "StaticStringMap.hpp"
+#include "base/StaticStringMap.hpp"
 #include "base/Common.hpp"
 #include "base/Maybe.hpp"
 #include "base/PackedStringKey.hpp"

@@ -12,7 +12,7 @@
 #include "Errors.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
-#include "StaticStringMap.hpp"
+#include "base/StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "base/Debug.hpp"
 

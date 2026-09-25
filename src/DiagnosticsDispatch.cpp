@@ -8,7 +8,7 @@
  */
 
 #include "Diagnostics.hpp"
-#include "StaticStringMap.hpp"
+#include "base/StaticStringMap.hpp"
 #include "base/PackedStringKey.hpp"
 
 namespace koshka {
