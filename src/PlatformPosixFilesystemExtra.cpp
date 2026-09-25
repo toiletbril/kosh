@@ -1499,7 +1499,7 @@ static fn fill_file_status(const struct statx &info,
   status.has_file_identity = true;
 }
 
-static constexpr u32 IO_URING_ENTRY_COUNT = 256;
+static constexpr u32 IO_URING_ENTRY_COUNT = 512;
 
 struct io_uring_batch
 {

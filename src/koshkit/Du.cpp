@@ -403,16 +403,23 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
                         allocator);
   }
 
-  output_rows.sort([](const du_output_row &left, const du_output_row &right) {
+  let output_order = ArrayList<usize>{allocator};
+  output_order.reserve(output_rows.count());
+  for (usize index = 0; index < output_rows.count(); index++)
+    output_order.push(index);
+  output_order.sort([&](usize left_index, usize right_index) {
+    let const &left = output_rows[left_index];
+    let const &right = output_rows[right_index];
     if (left.size_bytes != right.size_bytes)
       return left.size_bytes > right.size_bytes;
     return left.path.view() < right.path.view();
   });
 
   let rendered_sizes = ArrayList<String>{allocator};
-  rendered_sizes.reserve(output_rows.count());
+  rendered_sizes.reserve(output_order.count());
   usize size_width = 0;
-  for (let const &row : output_rows) {
+  for (let const row_index : output_order) {
+    let const &row = output_rows[row_index];
     let rendered_size = FLAG_DU_HUMAN.is_enabled()
                             ? format_human_size(row.size_bytes, allocator)
                             : String::from(row.size_bytes, allocator);
@@ -424,9 +431,9 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{allocator};
   let const color_mode = koshkit_should_color() ? du_color_mode::Colored
                                                 : du_color_mode::Plain;
-  for (usize index = 0; index < output_rows.count(); index++)
-    append_size_line(output, output_rows[index], rendered_sizes[index].view(),
-                     size_width, color_mode);
+  for (usize index = 0; index < output_order.count(); index++)
+    append_size_line(output, output_rows[output_order[index]],
+                     rendered_sizes[index].view(), size_width, color_mode);
 
   ec.print_to_stdout(output);
   if (was_interrupted) return 130;
