@@ -82,7 +82,7 @@ struct namespace_process
 struct namespace_relation
 {
   explicit namespace_relation(Allocator allocator)
-      : identifier(allocator), name(allocator)
+      : identifier(allocator), name(allocator), reason(allocator)
   {}
 
   StringView type;
@@ -91,6 +91,7 @@ struct namespace_relation
   u64 identifier_value{0};
   i64 process_id{0};
   String name;
+  String reason;
   StringView role;
   bool is_identifier_numeric{false};
   bool is_available{false};
@@ -178,12 +179,17 @@ fn append_namespace_report(String &output, bool should_color,
     self_suffix += type;
     let const self_target = os::read_symlink(
         eviliso_namespace_proc_path(self_suffix.view(), allocator), allocator);
+    let const self_failure_reason = self_target.has_value()
+                                        ? String{allocator}
+                                        : os::last_system_error_message();
     for (let const &process : processes) {
       let target = Maybe<String>{};
+      let failure_reason = String{allocator};
       if (process.is_self) {
         if (self_target.has_value()) {
           target = String{allocator, self_target->view()};
-        }
+        } else
+          failure_reason = self_failure_reason.clone();
       } else {
         let process_suffix = String::from(process.process_id, allocator);
         process_suffix += "/ns/";
@@ -191,6 +197,7 @@ fn append_namespace_report(String &output, bool should_color,
         target = os::read_symlink(
             eviliso_namespace_proc_path(process_suffix.view(), allocator),
             allocator);
+        if (!target.has_value()) failure_reason = os::last_system_error_message();
       }
 
       let identifier = target.has_value()
@@ -205,6 +212,7 @@ fn append_namespace_report(String &output, bool should_color,
           identifier_value.is_error() ? 0 : identifier_value.value();
       relation.process_id = process.process_id;
       relation.name = String{allocator, process.name.view()};
+      relation.reason = steal(failure_reason);
       relation.role =
           process.is_self ? StringView{"self"} : StringView{"other"};
       relation.is_identifier_numeric = !identifier_value.is_error();
@@ -251,6 +259,7 @@ fn append_namespace_report(String &output, bool should_color,
   cells.reserve(5);
   if (detail == eviliso_detail_mode::All) {
     for (let const &relation : relations) {
+      if (!relation.is_available) continue;
       let process_id = String::from(relation.process_id, allocator);
       cells.clear();
       cells.push({relation.type, colors::ansi::BOLD_MAGENTA});
@@ -260,32 +269,104 @@ fn append_namespace_report(String &output, bool should_color,
       cells.push({relation.role, colors::ansi::BOLD_MAGENTA});
       table.add_row(cells);
     }
-    append_titled_report_table(output, "Namespaces", table, should_color);
-    return;
-  }
-
-  usize relation_index = 0;
-  while (relation_index < relations.count()) {
-    let const &first = relations[relation_index];
-    usize group_end = relation_index + 1;
-    while (group_end < relations.count()) {
-      let const &candidate = relations[group_end];
-      if (candidate.type != first.type ||
-          candidate.identifier != first.identifier)
-      {
-        break;
+  } else {
+    usize relation_index = 0;
+    while (relation_index < relations.count()) {
+      let const &first = relations[relation_index];
+      if (!first.is_available) {
+        relation_index++;
+        continue;
       }
-      group_end++;
+      usize group_end = relation_index + 1;
+      while (group_end < relations.count()) {
+        let const &candidate = relations[group_end];
+        if (!candidate.is_available || candidate.type != first.type ||
+            candidate.identifier != first.identifier)
+          break;
+        group_end++;
+      }
+      let count = String::from(group_end - relation_index, allocator);
+      cells.clear();
+      cells.push({first.type, colors::ansi::BOLD_MAGENTA});
+      cells.push({first.identifier.view(), colors::ansi::RESET});
+      cells.push({count.view(), colors::ansi::BOLD_GREEN});
+      table.add_row(cells);
+      relation_index = group_end;
     }
-    let count = String::from(group_end - relation_index, allocator);
-    cells.clear();
-    cells.push({first.type, colors::ansi::BOLD_MAGENTA});
-    cells.push({first.identifier.view(), colors::ansi::RESET});
-    cells.push({count.view(), colors::ansi::BOLD_GREEN});
-    table.add_row(cells);
-    relation_index = group_end;
   }
   append_titled_report_table(output, "Namespaces", table, should_color);
+
+  let failure_table = ReportTable{allocator};
+  failure_table.add_column("TYPE", report_table_alignment::Left,
+                            colors::ansi::BOLD_CYAN);
+  if (detail == eviliso_detail_mode::All) {
+    failure_table.add_column("PID", report_table_alignment::Right,
+                              colors::ansi::BOLD_CYAN);
+    failure_table.add_column("NAME", report_table_alignment::Left,
+                              colors::ansi::BOLD_CYAN);
+    failure_table.add_column("ROLE", report_table_alignment::Left,
+                              colors::ansi::BOLD_CYAN);
+  } else {
+    failure_table.add_column("PROCESSES", report_table_alignment::Right,
+                              colors::ansi::BOLD_CYAN);
+  }
+  failure_table.add_column("STATUS", report_table_alignment::Left,
+                            colors::ansi::BOLD_CYAN);
+  failure_table.add_column("REASON", report_table_alignment::Left,
+                            colors::ansi::BOLD_CYAN);
+  bool has_failure = false;
+  if (detail == eviliso_detail_mode::All) {
+    for (let const &relation : relations) {
+      if (relation.is_available) continue;
+      has_failure = true;
+      let const process_id = String::from(relation.process_id, allocator);
+      let cells = ArrayList<report_table_cell_view>{allocator};
+      cells.push({relation.type, colors::ansi::BOLD_MAGENTA});
+      cells.push({process_id.view(), colors::ansi::BOLD_GREEN});
+      cells.push({relation.name.view(), colors::ansi::RESET});
+      cells.push({relation.role, colors::ansi::BOLD_MAGENTA});
+      cells.push({"Unavailable", colors::ansi::BOLD_YELLOW});
+      cells.push({relation.reason.is_empty() ? StringView{"unknown error"}
+                                                 : relation.reason.view(),
+                  colors::ansi::RESET});
+      failure_table.add_row(cells);
+    }
+  } else {
+    usize relation_index = 0;
+    while (relation_index < relations.count()) {
+      let const &first = relations[relation_index];
+      if (first.is_available) {
+        relation_index++;
+        continue;
+      }
+      let const reason = first.reason.is_empty() ? StringView{"unknown error"}
+                                                 : first.reason.view();
+      usize group_end = relation_index + 1;
+      while (group_end < relations.count()) {
+        let const &candidate = relations[group_end];
+        let const candidate_reason =
+            candidate.reason.is_empty() ? StringView{"unknown error"}
+                                        : candidate.reason.view();
+        if (candidate.is_available || candidate.type != first.type ||
+            candidate_reason != reason)
+          break;
+        group_end++;
+      }
+      has_failure = true;
+      let const process_count = String::from(group_end - relation_index,
+                                              allocator);
+      let cells = ArrayList<report_table_cell_view>{allocator};
+      cells.push({first.type, colors::ansi::BOLD_MAGENTA});
+      cells.push({process_count.view(), colors::ansi::BOLD_GREEN});
+      cells.push({"Unavailable", colors::ansi::BOLD_YELLOW});
+      cells.push({reason, colors::ansi::RESET});
+      failure_table.add_row(cells);
+      relation_index = group_end;
+    }
+  }
+  if (has_failure)
+    append_titled_report_table(output, "Namespace status failures",
+                               failure_table, should_color);
 }
 
 struct cgroup_membership
