@@ -45,6 +45,12 @@ enum class week_start : u8
   Monday,
 };
 
+enum class cal_color_mode : u8
+{
+  Plain,
+  Colored,
+};
+
 static pure fn is_cal_leap_year(i64 year) wontthrow -> bool
 {
   return year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
@@ -63,10 +69,11 @@ static pure fn cal_weekday(i64 year, usize month, usize day) wontthrow -> usize
 }
 
 static fn append_calendar_month(String &output, usize month, i64 year,
-                                const std::tm &current_date, bool should_color,
-                                Allocator allocator,
-                                week_start first_day) throws -> void
+                                const std::tm &current_date,
+                                Allocator allocator, week_start first_day,
+                                cal_color_mode color_mode) throws -> void
 {
+  let const should_color = color_mode == cal_color_mode::Colored;
   let title = String{allocator, CAL_MONTH_NAMES[month - 1]};
   title += ' ';
   title += String::from(year, allocator);
@@ -181,23 +188,25 @@ fn Cal::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let output = String{cxt.scratch_allocator()};
-  let const should_color = koshkit_should_color();
+  let const color_mode = koshkit_should_color() ? cal_color_mode::Colored
+                                                : cal_color_mode::Plain;
   let const first_day =
       FLAG_CAL_TODAY.is_enabled() ? week_start::Monday : week_start::Sunday;
   if (month != 0) {
-    append_calendar_month(output, month, year, current_date, should_color,
-                          cxt.scratch_allocator(), first_day);
+    append_calendar_month(output, month, year, current_date,
+                          cxt.scratch_allocator(), first_day, color_mode);
   } else {
     for (usize current_month = 1; current_month <= 12; current_month++) {
       if (current_month != 1) output += '\n';
       append_calendar_month(output, current_month, year, current_date,
-                            should_color, cxt.scratch_allocator(), first_day);
+                            cxt.scratch_allocator(), first_day, color_mode);
     }
   }
 
   if (FLAG_CAL_TODAY.is_enabled()) {
     output += '\n';
-    append_report_text(output, "Today", colors::ansi::BOLD_GREEN, should_color);
+    append_report_text(output, "Today", colors::ansi::BOLD_GREEN,
+                       color_mode == cal_color_mode::Colored);
     output += " is ";
     output += CAL_WEEKDAY_NAMES[static_cast<usize>(current_date.tm_wday)];
     output += ", ";
