@@ -222,7 +222,7 @@ test "$value" = yes && echo one
 [ -n "$value" ] && echo three
 [ -z "$value" ] || echo four
 skipped-fixes-status=1 contents=#!/bin/sh|grep -E pattern /dev/null|grep -F pattern /dev/null|echo $((1+2))|[ x$1 = xbare ] && echo unquoted|echo $[v[0]+1]|
-.test-work/format-apply/skipped-fixes.sh:5:3: warning: The x-prefix test workaround is obsolete. (SC2268)
+.test-work/format-apply/skipped-fixes.sh:5:3: Warning: The x-prefix test workaround is obsolete. (SC2268)
      5 |  [ x$1 = xbare ] && echo unquoted
        |    ^~~
 note: Quote the variable directly.
@@ -230,7 +230,7 @@ note: Quote the variable directly.
      5 |  [ x$1 = xbare ] && echo unquoted
        |     ^~
 note: Quote it to avoid an empty or split argument.
-.test-work/format-apply/skipped-fixes.sh:6:6: warning: The `$[...]` spelling is not defined by POSIX. (SC2007)
+.test-work/format-apply/skipped-fixes.sh:6:6: Warning: The `$[...]` spelling is not defined by POSIX. (SC2007)
      6 |  echo $[v[0]+1]
        |       ^~~~~~~~~
 note: Use `$((...))` for arithmetic expansion.

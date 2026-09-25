@@ -199,7 +199,8 @@ fn report_event(String &output, StringView path, const os::file_status &status,
                                timezone, output.allocator());
     output += " ";
   } else if (FLAG_GOODFSW_MACHINE.is_enabled() ||
-             FLAG_GOODFSW_TIMESTAMP.is_enabled())
+             FLAG_GOODFSW_TIMESTAMP.is_enabled() ||
+             !FLAG_GOODFSW_HUMAN.is_enabled())
   {
     output +=
         String::from(static_cast<u64>(scan_time), output.allocator()).view();
