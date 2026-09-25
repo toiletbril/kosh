@@ -707,6 +707,11 @@ fn SourceBatchReader::read_sequential() throws -> ReadResult
 
   reader.pending_byte_count = *read_count;
   reader.chunk_state = reader_chunk_state::Pending;
+  /* A short read is the EOF boundary only for sources already known regular.
+     Pipes and other sequential sources must keep reading until EOF. */
+  if (m_kind_mode == source_kind_mode::KnownRegular &&
+      *read_count < reader.read_byte_count)
+    close_reader(reader);
   return ReadResult::Chunks;
 }
 
