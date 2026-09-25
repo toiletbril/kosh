@@ -46,6 +46,12 @@ struct du_size_result
   bool should_emit;
 };
 
+enum class du_color_mode : u8
+{
+  Plain,
+  Colored,
+};
+
 struct du_directory_frame
 {
   Path path;
@@ -312,8 +318,9 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
 
 fn append_size_line(String &output, const du_output_row &row,
                     StringView rendered_size, usize size_width,
-                    bool should_color) throws -> void
+                    du_color_mode color_mode) throws -> void
 {
+  let const should_color = color_mode == du_color_mode::Colored;
   append_report_column(output, rendered_size, size_width, true,
                        colors::ansi::BOLD_GREEN, should_color);
   output += "  ";
@@ -415,10 +422,11 @@ fn Du::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   let output = String{allocator};
-  let const should_color = koshkit_should_color();
+  let const color_mode = koshkit_should_color() ? du_color_mode::Colored
+                                                : du_color_mode::Plain;
   for (usize index = 0; index < output_rows.count(); index++)
     append_size_line(output, output_rows[index], rendered_sizes[index].view(),
-                     size_width, should_color);
+                     size_width, color_mode);
 
   ec.print_to_stdout(output);
   if (was_interrupted) return 130;
