@@ -86,11 +86,24 @@ fn Batch::reserve(usize operation_count) throws -> void
 
 fn Batch::add(batch_operation operation) throws -> void
 {
+  switch (operation.syscall_id) {
+  case batch_operation::Kind::Lstat:
+  case batch_operation::Kind::Stat:
+  case batch_operation::Kind::Exists: m_has_metadata_operations = true; break;
+  case batch_operation::Kind::Read:
+  case batch_operation::Kind::Write:
+  case batch_operation::Kind::WriteCurrent:
+  case batch_operation::Kind::Invalid: break;
+  }
   operation.request_id = m_operations.count();
   m_operations.push(steal(operation));
 }
 
-fn Batch::clear() wontthrow -> void { m_operations.clear(); }
+fn Batch::clear() wontthrow -> void
+{
+  m_operations.clear();
+  m_has_metadata_operations = false;
+}
 
 static pure fn is_same_metadata_request(
     const batch_internal::batched_syscall &left,
@@ -231,6 +244,17 @@ fn Batch::execute(ArrayList<batch_result> &results,
   defer { m_optimized_operations.clear(); };
 
   if (deduplication == batch_deduplication::Disabled) {
+    results.clear();
+    results.reserve(m_operations.count());
+    for (usize index = 0; index < m_operations.count(); index++)
+      results.push({});
+
+    batch_internal::execute_batch_operations(
+        m_operations.begin(), m_operations.count(), results.begin());
+    return;
+  }
+
+  if (!m_has_metadata_operations) {
     results.clear();
     results.reserve(m_operations.count());
     for (usize index = 0; index < m_operations.count(); index++)

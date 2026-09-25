@@ -211,6 +211,7 @@ private:
   ArrayList<usize> m_canonical_positions;
   ArrayList<usize> m_buckets;
   ArrayList<batch_operation> m_optimized_operations;
+  bool m_has_metadata_operations{false};
 };
 
 } /* namespace koshka::os */
