@@ -68,7 +68,15 @@ static fn manpage_name_for(StringView command) throws -> String
   return String{command};
 }
 
-static StringMap<ArrayList<String>> MAN_SUBCOMMAND_INDEX{heap_allocator()};
+using sorted_subcommand_array =
+    SortedArrayList<String, order_comparator<String>>;
+
+struct cached_subcommand_list
+{
+  sorted_subcommand_array values{heap_allocator(), sort_order::ascending};
+};
+
+static StringMap<cached_subcommand_list> MAN_SUBCOMMAND_INDEX{heap_allocator()};
 /* Every stripped section-1 page name mapped to its full file path, the
    existence gate for the subcommand split. */
 static StringMap<String> MAN_PAGE_FILE_PATHS{heap_allocator()};
@@ -309,8 +317,8 @@ static fn build_man_subcommand_index(EvalContext &context) throws -> void
     if (tail.is_empty() || (tail[0] >= '0' && tail[0] <= '9')) return;
     if (!MAN_PAGE_FILE_PATHS.find(head).has_value()) return;
     MAN_SUBCOMMAND_INDEX
-        .get_or_create(head, ArrayList<String>{heap_allocator()})
-        .push(String{tail});
+        .get_or_create(head, cached_subcommand_list{})
+        .values.push_managed(tail);
   });
 
   /* A killed manpath fork hides every root the environment leaves out. The
@@ -483,16 +491,18 @@ fn internal::complete_from_man_subcommands(StringView line, StringView token,
   }
 
   let const subcommands = MAN_SUBCOMMAND_INDEX.find(command);
-  if (!subcommands.has_value() || subcommands->is_empty()) return None;
+  if (!subcommands.has_value() || subcommands->values.is_empty()) return None;
 
   /* Only the token matches are validated, so a typo reads no page. */
   let matches = ArrayList<String>{heap_allocator()};
-  for (let const &subcommand : *subcommands.value())
-    if (subcommand.view().starts_with(token) &&
-        man_subcommand_page_is_valid(command, subcommand.view(), for_listing))
-    {
+  let const &sorted_subcommands = subcommands->values;
+  let const first = sorted_subcommands.lower_bound(token);
+  for (usize i = first; i < sorted_subcommands.count(); i++) {
+    let const &subcommand = sorted_subcommands[i];
+    if (!subcommand.view().starts_with(token)) break;
+    if (man_subcommand_page_is_valid(command, subcommand.view(), for_listing))
       matches.push(String{subcommand.view()});
-    }
+  }
   LOG(Debug, "%zu subcommands of '%.*s' match token '%.*s'", matches.count(),
       static_cast<int>(command.length), command.data,
       static_cast<int>(token.length), token.data);
