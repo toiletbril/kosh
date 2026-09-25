@@ -287,7 +287,7 @@ fn Nl::execute(const ExecContext &ec, EvalContext &cxt,
         number += static_cast<i64>(increment);
     } else {
       output.append_repeated(' ', static_cast<usize>(width_value));
-      output += separator;
+      output += line.is_empty() ? StringView{" "} : separator;
     }
     output += line;
     output += '\n';
