@@ -55,8 +55,9 @@ FLAG_OPTIONAL(EVILPS_LIVE, 'l', "live", Live,
               "this refresh rate.",
               is_evilps_sample_duration, "seconds");
 FLAG_OPTIONAL(EVILPS_CUMULATIVE, 'C', "cumulative", Live,
-              "Average counters over an M-second sliding window; without "
-              "--live, compare snapshots across M seconds.",
+              "Average counters over an M-second sliding window; the default "
+              "is one second. Without --live, compare snapshots across M "
+              "seconds.",
               is_evilps_sample_duration, "seconds");
 FLAG(HELP, Bool, '\0', "help", "Display help.");
 
