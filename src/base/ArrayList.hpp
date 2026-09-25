@@ -132,6 +132,52 @@ public:
   template <class Wanted>
   hot mustuse pure fn find(const Wanted &wanted) const throws -> Maybe<usize>
   {
+    using value_type = std::remove_cv_t<T>;
+    using wanted_type = std::remove_cv_t<Wanted>;
+
+    if constexpr (std::is_same_v<value_type, wanted_type> &&
+                  (std::is_arithmetic_v<value_type> ||
+                   std::is_enum_v<value_type>) &&
+                  sizeof(value_type) < sizeof(u64)) {
+      constexpr usize LANES = sizeof(u64) / sizeof(value_type);
+      usize element_index = 0;
+      for (; element_index + LANES <= m_length; element_index += LANES) {
+        u64 match_mask = 0;
+#pragma clang loop unroll_count(8)
+        for (usize lane = 0; lane < LANES; lane++)
+          if (m_data[element_index + lane] == wanted)
+            match_mask |= static_cast<u64>(1) << lane;
+        if (match_mask != 0)
+          return element_index +
+                 static_cast<usize>(__builtin_ctzll(match_mask));
+      }
+      for (; element_index < m_length; element_index++)
+        if (m_data[element_index] == wanted) return element_index;
+      return None;
+    }
+
+#if T__HAS_GCC_EXTENSIONS
+    if constexpr (std::is_same_v<value_type, wanted_type> &&
+                  std::is_arithmetic_v<value_type> &&
+                  sizeof(value_type) == sizeof(u64)) {
+      using vector_type = value_type __attribute__((vector_size(16)));
+      vector_type needles = {wanted, wanted};
+      usize element_index = 0;
+      for (; element_index + 2 <= m_length; element_index += 2) {
+        vector_type values;
+        __builtin_memcpy(&values, m_data + element_index, sizeof(values));
+        let const matches = values == needles;
+        u64 match_values[2];
+        __builtin_memcpy(match_values, &matches, sizeof(match_values));
+        if (match_values[0] != 0) return element_index;
+        if (match_values[1] != 0) return element_index + 1;
+      }
+      for (; element_index < m_length; element_index++)
+        if (m_data[element_index] == wanted) return element_index;
+      return None;
+    }
+#endif
+
 #pragma clang loop unroll_count(4)
     for (usize element_index = 0; element_index < m_length; element_index++)
       if (m_data[element_index] == wanted) return element_index;
