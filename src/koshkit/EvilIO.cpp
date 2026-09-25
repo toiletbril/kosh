@@ -41,8 +41,8 @@ FLAG_OPTIONAL(EVILIO_CUMULATIVE, 'C', "cumulative", Live,
               is_evilio_sample_duration, "seconds");
 FLAG(EVILIO_PS, Bool, '\0', "ps", "Show every visible process.");
 FLAG_OPTIONAL(EVILIO_LIVE, 'l', "live", Live,
-              "Sample and refresh live output every N seconds; the default is "
-              "0.5 seconds.",
+              "Refresh live output every N seconds; default 0.5 seconds while "
+              "sampling.",
               is_evilio_sample_duration, "seconds");
 FLAG(EVILIO_COUNT, String, 'n', "count", "Show this many processes.");
 FLAG(EVILIO_PID, String, 'p', "pid", "Show only this process.");
@@ -779,7 +779,7 @@ fn append_disk_io_report(String &output, const ArrayList<disk_io_row> &rows,
                      colors::ansi::BOLD_CYAN);
     table.add_column("WRITE LATENCY", report_table_alignment::Right,
                      colors::ansi::BOLD_CYAN);
-    table.add_column("AVERAGE QUEUE", report_table_alignment::Right,
+    table.add_column("AVG QUEUE", report_table_alignment::Right,
                      colors::ansi::BOLD_CYAN);
   }
   table.add_column("QUEUE", report_table_alignment::Right,
