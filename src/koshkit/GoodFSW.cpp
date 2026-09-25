@@ -59,6 +59,12 @@ enum class goodfsw_traversal_mode : u8
   Recursive,
 };
 
+enum class goodfsw_color_mode : u8
+{
+  Plain,
+  Colored,
+};
+
 constexpr f64 DEFAULT_LATENCY_SECONDS = 1.0;
 constexpr usize MAXIMUM_SCAN_DEPTH = 64;
 
@@ -120,8 +126,10 @@ pure fn event_style(watch_event event) wontthrow -> StringView
 }
 
 fn append_event_names(String &output, const os::file_status &status,
-                      watch_event event, bool should_color) throws -> void
+                      watch_event event,
+                      goodfsw_color_mode color_mode) throws -> void
 {
+  let const should_color = color_mode == goodfsw_color_mode::Colored;
   let event_name = StringView{};
   switch (event) {
   case watch_event::Created: event_name = "Created"; break;
@@ -180,8 +188,9 @@ fn format_watch_timestamp(i64 seconds, u32 nanoseconds, usize precision,
 fn report_event(String &output, StringView path, const os::file_status &status,
                 watch_event event, i64 scan_time, u32 scan_nanoseconds,
                 usize timestamp_precision, timestamp_timezone timezone,
-                bool should_color) throws -> void
+                goodfsw_color_mode color_mode) throws -> void
 {
+  let const should_color = color_mode == goodfsw_color_mode::Colored;
   let const is_human =
       FLAG_GOODFSW_HUMAN.is_enabled() && !FLAG_GOODFSW_MACHINE.is_enabled();
   if (is_human) {
@@ -200,14 +209,14 @@ fn report_event(String &output, StringView path, const os::file_status &status,
   if (is_human) {
     append_report_text(output, path, colors::ansi::BOLD, should_color);
     output += " ";
-    append_event_names(output, status, event, should_color);
+    append_event_names(output, status, event, color_mode);
   } else {
     output += String::from(event_mask(event), output.allocator()).view();
     output += " ";
     append_report_text(output, path, colors::ansi::BOLD, should_color);
     if (FLAG_GOODFSW_EVENT_FLAGS.is_enabled()) {
       output += " ";
-      append_event_names(output, status, event, should_color);
+      append_event_names(output, status, event, color_mode);
     }
   }
 
@@ -383,7 +392,9 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
   }
   sort_entries(previous);
 
-  let const should_color = koshkit_should_color();
+  let const color_mode = koshkit_should_color()
+                             ? goodfsw_color_mode::Colored
+                             : goodfsw_color_mode::Plain;
 
   bool was_interrupted = false;
   loop
@@ -435,7 +446,7 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
         rendered.mode = entry.mode;
         report_event(output, entry.path.view(), rendered, watch_event::Removed,
                      scan_time, scan_nanoseconds, timestamp_precision, timezone,
-                     should_color);
+                     color_mode);
         previous_position++;
         continue;
       }
@@ -449,7 +460,7 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
         rendered.mode = entry.mode;
         report_event(output, entry.path.view(), rendered, watch_event::Created,
                      scan_time, scan_nanoseconds, timestamp_precision, timezone,
-                     should_color);
+                     color_mode);
         current_position++;
         continue;
       }
@@ -461,12 +472,12 @@ fn GoodFSW::execute(const ExecContext &ec, EvalContext &cxt,
       if (!is_same_content(previous_entry, current_entry)) {
         report_event(output, current_entry.path.view(), rendered,
                      watch_event::Updated, scan_time, scan_nanoseconds,
-                     timestamp_precision, timezone, should_color);
+                     timestamp_precision, timezone, color_mode);
       } else if (!is_same_attributes(previous_entry, current_entry)) {
         report_event(output, current_entry.path.view(), rendered,
                      watch_event::AttributeModified, scan_time,
                      scan_nanoseconds, timestamp_precision, timezone,
-                     should_color);
+                     color_mode);
       }
 
       previous_position++;
