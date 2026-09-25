@@ -681,7 +681,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       if (definition.recursive_call_count == 0)
         definition.first_recursive_call_location = call_location;
       definition.recursive_call_count++;
-      definition.has_async_recursive_call |= is_async();
+      if (is_async()) definition.async_recursive_call_count++;
     }
     actx.apply_called_function(command_literal, call_location);
   }

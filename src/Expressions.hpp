@@ -270,7 +270,7 @@ struct function_definition_record
   bool is_analysis_complete{false};
   SourceLocation first_recursive_call_location{};
   usize recursive_call_count{0};
-  bool has_async_recursive_call{false};
+  usize async_recursive_call_count{0};
 };
 
 /* One function definition a reader may ask about. The body span is recovered

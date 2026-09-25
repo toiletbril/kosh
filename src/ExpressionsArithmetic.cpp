@@ -1466,7 +1466,7 @@ fn FunctionDefinition::analyze(AnalysisContext &actx,
       actx.function_definitions[function_definition_index];
   if (function_definition.recursive_call_count > 0) {
     let const diagnostic = function_definition.recursive_call_count >= 2 &&
-                                   function_definition.has_async_recursive_call
+                                   function_definition.async_recursive_call_count >= 2
                                ? diagnostic_id::fork_bomb
                                : diagnostic_id::sc2264;
     actx.report_diagnostic(diagnostic,

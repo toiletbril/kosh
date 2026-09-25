@@ -36,6 +36,9 @@ compat-level-three-obsolete=1
 compat-level-two-recursion=1
 compat-level-three-recursion=1
 compat-recursion-warning=1
+one-async-fork-bomb=0
+two-async-fork-bomb=1
+two-async-note=1
 file-directive
 file-directive-errors=0
 local-directive-warnings=2

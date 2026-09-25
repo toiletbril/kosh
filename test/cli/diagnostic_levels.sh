@@ -69,6 +69,10 @@ compat_lenient_level_one=$("$BIN" -M bash -W -c "$compat_lenient_source" 2>&1)
 compat_lenient_level_two=$("$BIN" -M bash -WW -c "$compat_lenient_source" 2>&1)
 compat_level_two=$("$BIN" -M bash -WW -c "$compat_source" 2>&1)
 compat_level_three=$("$BIN" -M bash -WWW -c "$compat_source" 2>&1)
+one_async_recursive_source='one_async(){ one_async & echo after; }'
+two_async_recursive_source='two_async(){ two_async & two_async &; }'
+one_async_recursive_output=$("$BIN" -M bash -WWW -c "$one_async_recursive_source" 2>&1)
+two_async_recursive_output=$("$BIN" -M bash -WWW -c "$two_async_recursive_source" 2>&1)
 echo "compat-level-one-lenient=$(printf '%s\n' "$compat_lenient_level_one" |
   grep -c 'read before it is assigned')"
 echo "compat-level-two-lenient=$(printf '%s\n' "$compat_lenient_level_two" |
@@ -87,6 +91,12 @@ echo "compat-level-three-recursion=$(printf '%s\n' "$compat_level_three" |
   grep -c 'SC2264')"
 echo "compat-recursion-warning=$(printf '%s\n' "$compat_level_two" |
   grep -c "The 'wrapper' function calls itself")"
+echo "one-async-fork-bomb=$(printf '%s\n' "$one_async_recursive_output" |
+  grep -c 'This is a fork bomb')"
+echo "two-async-fork-bomb=$(printf '%s\n' "$two_async_recursive_output" |
+  grep -c 'This is a fork bomb')"
+echo "two-async-note=$(printf '%s\n' "$two_async_recursive_output" |
+  grep -c 'Note: rewrite your program')"
 
 cat > "$temporary_directory/file-directive.sh" <<'EOF'
 # shellcheck disable=SC2164
