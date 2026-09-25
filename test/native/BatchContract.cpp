@@ -583,6 +583,8 @@ fn execute_batch_operations(const batched_syscall *operations,
         break;
       case batched_syscall_id::Lstat:
       case batched_syscall_id::Stat:
+      case batched_syscall_id::LstatAt:
+      case batched_syscall_id::StatAt:
       case batched_syscall_id::Exists:
       case batched_syscall_id::Invalid: break;
       }
@@ -611,6 +613,8 @@ fn execute_batch_operations(const batched_syscall *operations,
       case batched_syscall_id::Invalid: result.error_number = 22; break;
       case batched_syscall_id::Lstat:
       case batched_syscall_id::Stat:
+      case batched_syscall_id::LstatAt:
+      case batched_syscall_id::StatAt:
       case batched_syscall_id::Exists: break;
       }
     }
