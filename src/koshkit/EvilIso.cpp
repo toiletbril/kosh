@@ -672,6 +672,7 @@ fn collect_process_cgroup_snapshot(Allocator allocator,
   let candidates = os::enumerate_processes(os::process_detail::ResourceStats);
   let snapshot = ArrayList<process_cgroup_snapshot>{allocator};
   snapshot.reserve(candidates.count());
+  let const self_process_id = os::get_current_process_id();
   for (let const &process : candidates) {
     let record = process_cgroup_snapshot{allocator};
     record.process_id = process.pid;
@@ -684,8 +685,9 @@ fn collect_process_cgroup_snapshot(Allocator allocator,
                          ? String{allocator, "-"}
                          : String{allocator, process.command_line.view()};
     if (collection == eviliso_collection_mode::Collect) {
-      let suffix = String::from(process.pid, allocator);
-      suffix += "/cgroup";
+      let suffix = process.pid == self_process_id
+                       ? String{allocator, "self/cgroup"}
+                       : String::from(process.pid, allocator) + "/cgroup";
       let const contents =
           Path{cgroup_proc_path(suffix.view(), allocator), allocator}
               .read_entire_file();
@@ -789,9 +791,16 @@ pure fn process_snapshot_status_name(process_snapshot_status status) wontthrow
   unreachable("unknown process snapshot status");
 }
 
+enum class cgroup_failure_fallback : u8
+{
+  SuppressEmpty,
+  ReportUnavailable,
+};
+
 fn append_cgroup_failure_report(
     String &output, bool should_color,
-    const ArrayList<process_cgroup_snapshot> &snapshot) throws -> void
+    const ArrayList<process_cgroup_snapshot> &snapshot,
+    cgroup_failure_fallback fallback) throws -> void
 {
   let const allocator = snapshot.allocator();
   let table = ReportTable{allocator};
@@ -817,7 +826,7 @@ fn append_cgroup_failure_report(
     table.add_row(cells);
   }
 
-  if (!has_failure) {
+  if (!has_failure && fallback == cgroup_failure_fallback::ReportUnavailable) {
     let cells = ArrayList<report_table_cell_view>{allocator};
     cells.reserve(3);
     cells.push({"-", colors::ansi::BOLD_GREEN});
@@ -825,8 +834,12 @@ fn append_cgroup_failure_report(
     cells.push({"Unavailable", colors::ansi::BOLD_YELLOW});
     table.add_row(cells);
   }
-  append_titled_report_table(output, "Cgroup status failures", table,
-                             should_color);
+  if (has_failure)
+    append_titled_report_table(output, "Cgroup status failures", table,
+                               should_color);
+  else if (fallback == cgroup_failure_fallback::ReportUnavailable)
+    append_titled_report_table(output, "Cgroup status failures", table,
+                               should_color);
 }
 
 fn append_cgroup_report(String &output, bool should_color,
@@ -844,7 +857,8 @@ fn append_cgroup_report(String &output, bool should_color,
     }
   }
   if (!self_index.has_value()) {
-    append_cgroup_failure_report(output, should_color, snapshot);
+    append_cgroup_failure_report(output, should_color, snapshot,
+                                 cgroup_failure_fallback::ReportUnavailable);
     return;
   }
 
@@ -920,7 +934,8 @@ fn append_cgroup_report(String &output, bool should_color,
     report.add_row(cells);
   }
   append_titled_report_table(output, "Cgroup membership", report, should_color);
-  append_cgroup_failure_report(output, should_color, snapshot);
+  append_cgroup_failure_report(output, should_color, snapshot,
+                               cgroup_failure_fallback::SuppressEmpty);
 }
 
 fn eviliso_sessions() throws -> ArrayList<os::user_session>

@@ -35,7 +35,9 @@ trap cleanup EXIT
 has_cgroup_section()
 {
   case $1 in
-  *"HIERARCHY"*"CONTROLLER"*|*"Membership: unavailable"*) return 0 ;;
+  *"Cgroup membership"*|*"Cgroup status failures"*|*"Membership unavailable"*)
+    return 0
+    ;;
   *) return 1 ;;
   esac
 }
@@ -43,20 +45,21 @@ has_cgroup_section()
 has_namespace_section()
 {
   printf '%s\n' "$1" | command grep -E \
-    '^TYPE +ID +(PROCESSES|PID +NAME +ROLE) *$' \
+    '^[[:space:]]+TYPE +ID +(PROCESSES|PID +NAME +ROLE) *$' \
     > "$TEST_NULL_DEVICE" 2>&1
 }
 
 has_session_section()
 {
   printf '%s\n' "$1" | command grep -E \
-    '^USER +TERMINAL( +LOGIN TIME)? *$' > "$TEST_NULL_DEVICE" 2>&1
+    '^[[:space:]]+USER +TERMINAL( +LOGIN TIME)? *$' \
+    > "$TEST_NULL_DEVICE" 2>&1
 }
 
 default_report=$(run_report "")
 default_shape=matched
 case $default_report in
-  *"Remote sockets:"*"Runtime:"*)
+  *"Socket summary"*"Container runtimes"*)
     default_shape=matched
     ;;
   *) default_shape=missing ;;
@@ -69,15 +72,15 @@ printf 'default-shape=%s\n' "$default_shape"
 cgroup_detail_report=$(run_report '-a -c')
 detail_shape=matched
 case $cgroup_detail_report in
-  *"HIERARCHY"*"CONTROLLER"*"PATH"*"PID"*"NAME"*"ROLE"*"self"*) ;;
-  *"Membership: unavailable"*) ;;
+  *"Cgroup membership"*"HIERARCHY"*"CONTROLLER"*"PATH"*"PID"*"NAME"*"ROLE"*"self"*) ;;
+  *"Membership unavailable"*) ;;
   *) detail_shape=missing ;;
 esac
 printf 'detail-shape=%s\n' "$detail_shape"
 
-remote_report=$(run_report --remote)
+remote_report=$(run_report '--remote --all')
 case $remote_report in
-  *"Remote sockets:"*"Total sockets:"*"FAMILY"*"PROTO"*"STATE"*"RECV-Q"*\
+  *"Socket summary"*"Remote peers"*"FAMILY"*"PROTO"*"STATE"*"RECV-Q"*\
 *"SEND-Q"*"LOCAL"*"PEER"*"SOCKET"*"PID"*"UID"*"USER"*"NAME"*\
 *"COMMAND"*"NETNS"*"ORCHESTRATOR"*"RUNTIME"*"CONTAINER"*"CGROUP"*)
     remote_table=matched
@@ -90,8 +93,8 @@ for selector_section in \
   'namespaces|-n|namespace-section' \
   'cgroups|-c|cgroup-section' \
   'sessions|-s|session-section' \
-  'remote|-r|Remote sockets:' \
-  'runtime|-k|Runtime:'; do
+  'remote|-r|Socket summary' \
+  'runtime|-k|Container runtimes'; do
   old_ifs=$IFS
   IFS='|'
   set -- $selector_section
@@ -127,35 +130,35 @@ for selector_section in \
   case $1 in
   namespaces)
     case $report in
-    *"HIERARCHY"*|*"Remote sockets:"*|*"Runtime:"*)
+    *"Cgroup membership"*|*"Socket summary"*|*"Container runtimes"*)
       selector_scope=wrong
       ;;
     esac
     ;;
   cgroups)
     case $report in
-    *"Remote sockets:"*|*"Runtime:"*)
+    *"Socket summary"*|*"Container runtimes"*)
       selector_scope=wrong
       ;;
     esac
     ;;
   sessions)
     case $report in
-    *"HIERARCHY"*|*"Remote sockets:"*|*"Runtime:"*)
+    *"Namespaces"*|*"Socket summary"*|*"Container runtimes"*)
       selector_scope=wrong
       ;;
     esac
     ;;
   remote)
     case $report in
-    *"HIERARCHY"*|*"Runtime:"*)
+    *"Cgroup membership"*|*"Container runtimes"*)
       selector_scope=wrong
       ;;
     esac
     ;;
   runtime)
     case $report in
-    *"HIERARCHY"*|*"Remote sockets:"*)
+    *"Namespaces"*|*"Socket summary"*)
       selector_scope=wrong
       ;;
     esac
@@ -173,10 +176,10 @@ done
 containers_report=$(run_report '--containers')
 containers_alias=missing
 case $containers_report in
-  *"Runtime:"*) containers_alias=matched ;;
+  *"Containers"*) containers_alias=matched ;;
 esac
 case $containers_report in
-  *"HIERARCHY"*|*"Remote sockets:"*|*"USER   TERMINAL"*)
+  *"Cgroup membership"*|*"Socket summary"*|*"USER   TERMINAL"*)
     containers_alias=wrong
     ;;
 esac
@@ -184,12 +187,12 @@ printf 'containers-alias=%s\n' "$containers_alias"
 
 combined_report=$(run_report '-n -k')
 case $combined_report in
-*"Runtime:"*) combined_scope=matched ;;
+  *"Container runtimes"*) combined_scope=matched ;;
 *) combined_scope=missing ;;
 esac
 has_namespace_section "$combined_report" || combined_scope=missing
 case $combined_report in
-*"HIERARCHY"*|*"Remote sockets:"*) combined_scope=wrong ;;
+  *"Cgroup membership"*|*"Socket summary"*) combined_scope=wrong ;;
 esac
 if has_session_section "$combined_report"; then combined_scope=wrong; fi
 printf 'combined-scope=%s\n' "$combined_scope"
@@ -201,17 +204,19 @@ else
   all_scope=missing
 fi
 case $namespace_detail in
-*"HIERARCHY"*|*"Remote sockets:"*|*"Runtime:"*) all_scope=wrong ;;
+  *"Cgroup membership"*|*"Socket summary"*|*"Container runtimes"*)
+    all_scope=wrong
+    ;;
 esac
 if has_session_section "$namespace_detail"; then all_scope=wrong; fi
 printf 'all-scope=%s\n' "$all_scope"
 
 all_report=$(run_report -a)
 case $all_report in
-*"HIERARCHY"*"Remote sockets:"*"Runtime:"*)
+  *"Namespaces"*"Socket summary"*"Container runtimes"*)
   all_default_scope=matched
   ;;
-*"Membership: unavailable"*"Remote sockets:"*"Runtime:"*)
+  *"Membership unavailable"*"Socket summary"*"Container runtimes"*)
   all_default_scope=matched
   ;;
 *) all_default_scope=missing ;;
@@ -266,8 +271,7 @@ if test "${OS-}" != Windows_NT; then
       namespace_summary_rows="$namespace_summary_rows$2:$3"
     done < "$namespace_summary"
     test "$namespace_summary_header" = yes && \
-      test "$namespace_summary_rows" = \
-      '2:2|10:1|unavailable:2' || namespace_synthetic=wrong
+    test "$namespace_summary_rows" = '2:2|10:1' || namespace_synthetic=wrong
     while IFS= read -r row; do
       set -- $row
       test "$#" -eq 3 && test "$1" = net || continue
@@ -276,8 +280,12 @@ if test "${OS-}" != Windows_NT; then
       fi
       namespace_net_rows="$namespace_net_rows$2:$3"
     done < "$namespace_summary"
-    test "$namespace_net_rows" = '7:1|unavailable:4' || \
+    test "$namespace_net_rows" = '7:1' || \
       namespace_synthetic=wrong
+    case $(command cat "$namespace_summary") in
+    *"Namespace status failures"*"Unavailable"*) ;;
+    *) namespace_synthetic=wrong ;;
+    esac
 
     namespace_detail_report=$cgroup_work/namespace-detail
     KOSH_TEST_EVILISO_NAMESPACE_PROC=$namespace_root \
@@ -301,8 +309,8 @@ if test "${OS-}" != Windows_NT; then
       namespace_detail_rows="$namespace_detail_rows$2:$3:$4:$5"
     done < "$namespace_detail_report"
     test "$namespace_detail_header" = yes && \
-      test "$namespace_detail_rows" = \
-        '2:11:kosh-e06-ns-alpha:other|2:17:kosh-e06-ns-self:self|10:3:kosh-e06-ns-zeta:other|unavailable:29:kosh-e06-ns-denied:other|unavailable:31:kosh-e06-ns-exited:other' || \
+    test "$namespace_detail_rows" = \
+        '2:11:kosh-e06-ns-alpha:other|2:17:kosh-e06-ns-self:self|10:3:kosh-e06-ns-zeta:other' || \
       namespace_synthetic=wrong
     while IFS= read -r row; do
       set -- $row
@@ -313,6 +321,10 @@ if test "${OS-}" != Windows_NT; then
       fi
     done < "$namespace_detail_report"
     test "$namespace_net_detail" = yes || namespace_synthetic=wrong
+    case $(command cat "$namespace_detail_report") in
+    *"Namespace status failures"*"Unavailable"*) ;;
+    *) namespace_synthetic=wrong ;;
+    esac
     case $(command cat "$namespace_detail_report") in
     *"cgroup:"*|*"cgroup process:"*) namespace_synthetic=wrong ;;
     esac
@@ -327,10 +339,13 @@ if test "${OS-}" != Windows_NT; then
     namespace_unsupported_count=0
     while IFS= read -r row; do
       set -- $row
-      test "$1" = TYPE && continue
-      test "$#" -eq 5 && test "$2" = unavailable && \
-        test "$4" = - && test "$5" = self || namespace_synthetic=wrong
-      namespace_unsupported_count=$((namespace_unsupported_count + 1))
+      if test "$#" -ge 10 && test "$5" = Unavailable; then
+        test "$3" = - && test "$4" = self && test "$6" = No && \
+          test "$7" = such && test "$8" = file && test "$9" = or && \
+          test "${10}" = directory || \
+          namespace_synthetic=wrong
+        namespace_unsupported_count=$((namespace_unsupported_count + 1))
+      fi
     done < "$namespace_unsupported_report"
     test "$namespace_unsupported_count" -eq 8 || namespace_synthetic=wrong
   else
@@ -378,7 +393,7 @@ if test "${IS_NONDEBUG_BUILD:-0}" = 0; then
   has_v2=no
   while IFS= read -r row; do
     set -- $row
-    test "$#" -eq 6 || continue
+    test "$#" -eq 7 || continue
     test "$1" = HIERARCHY && continue
     case "$1:$2:$3" in
     41:kosh-test-exact:/target) has_v1=yes ;;
@@ -393,6 +408,8 @@ if test "${IS_NONDEBUG_BUILD:-0}" = 0; then
       ;;
     *) cgroup_synthetic=wrong ;;
     esac
+    test "$7" = status || test "$7" = available || \
+      cgroup_synthetic=wrong
   done < "$synthetic_report"
   test "$self_count" -eq 2 && test "$other_count" -eq 2 && \
     test "$has_v1" = yes && test "$has_v2" = yes || cgroup_synthetic=wrong
@@ -447,7 +464,9 @@ if test "${IS_NONDEBUG_BUILD:-0}" = 0; then
   has_cgroup_writer_descriptor=no
   wait "$cgroup_report_pid" || cgroup_synthetic=wrong
   cgroup_report_pid=
-  case $(command cat "$race_report") in
+  race_membership=$(command sed -n \
+    '/Cgroup membership/,/Cgroup status failures/p' "$race_report")
+  case $race_membership in
   *" $exited_cgroup_pid "*) cgroup_synthetic=wrong ;;
   esac
 else
@@ -475,26 +494,30 @@ if test "${IS_NONDEBUG_BUILD:-0}" = 0; then
   session_default=$(TZ=UTC KOSH_TEST_EVILISO_SESSIONS=$session_fixture \
     "$BIN" -c 'koshkit --color never eviliso -s')
   expected_session_default=$(printf '%s\n' \
-    'USER   TERMINAL' \
-    'alpha  tty1    ' \
-    'alpha  tty2    ' \
-    'zeta   pts/9   ')
+    '  Sessions' \
+    '  USER   TERMINAL' \
+    '  alpha  tty1    ' \
+    '  alpha  tty2    ' \
+    '  zeta   pts/9   ')
   test "$session_default" = "$expected_session_default" || \
     session_synthetic=wrong
   session_detail=$(TZ=UTC KOSH_TEST_EVILISO_SESSIONS=$session_fixture \
     "$BIN" -c 'koshkit --color never eviliso -a -s')
   expected_session_detail=$(printf '%s\n' \
-    'USER   TERMINAL  LOGIN TIME         ' \
-    'alpha  tty1      1970-01-01 00:01:40' \
-    'alpha  tty2      1970-01-01 00:03:20' \
-    'zeta   pts/9     unavailable        ')
+    '  Sessions' \
+    '  USER   TERMINAL  LOGIN TIME         ' \
+    '  alpha  tty1      1970-01-01 00:01:40' \
+    '  alpha  tty2      1970-01-01 00:03:20' \
+    '  zeta   pts/9     unavailable        ')
   test "$session_detail" = "$expected_session_detail" || \
     session_synthetic=wrong
   empty_sessions=$cgroup_work/empty-sessions
   : > "$empty_sessions"
   empty_session_report=$(KOSH_TEST_EVILISO_SESSIONS=$empty_sessions \
     "$BIN" -c 'koshkit --color never eviliso -a -s')
-  test "$empty_session_report" = 'USER  TERMINAL  LOGIN TIME' || \
+  expected_empty_session=$(printf '%s\n' \
+    '  Sessions' '  USER  TERMINAL  LOGIN TIME')
+  test "$empty_session_report" = "$expected_empty_session" || \
     session_synthetic=wrong
 else
   session_report=$(TZ=UTC KOSH_TEST_EVILISO_SESSIONS=$session_fixture \
