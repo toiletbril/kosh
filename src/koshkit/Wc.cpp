@@ -30,6 +30,35 @@ namespace koshka {
 
 namespace koshkit {
 
+enum class wc_count_selection : u8
+{
+  None = 0,
+  Lines = 1,
+  Words = 2,
+  Bytes = 4,
+};
+
+enum class wc_scan_mode : u8
+{
+  None,
+  Lines,
+  Words,
+  LinesWords,
+};
+
+constexpr fn operator|(wc_count_selection left, wc_count_selection right)
+    wontthrow -> wc_count_selection
+{
+  return static_cast<wc_count_selection>(static_cast<u8>(left) |
+                                         static_cast<u8>(right));
+}
+
+constexpr fn has_wc_count(wc_count_selection selection,
+                          wc_count_selection count) wontthrow -> bool
+{
+  return (static_cast<u8>(selection) & static_cast<u8>(count)) != 0;
+}
+
 static fn is_blank(char c) wontthrow -> bool
 {
   return c == ' ' || (c >= '\t' && c <= '\r');
@@ -53,14 +82,24 @@ struct wc_source_state
 };
 
 static fn update_wc_source(wc_source_state &state, StringView content,
-                           u8 scan_mode, bool should_count_bytes) wontthrow
+                           wc_count_selection selection) wontthrow
     -> void
 {
-  if (should_count_bytes) state.byte_count += content.length;
+  let const scan_mode =
+      has_wc_count(selection, wc_count_selection::Lines) &&
+              has_wc_count(selection, wc_count_selection::Words)
+          ? wc_scan_mode::LinesWords
+      : has_wc_count(selection, wc_count_selection::Lines)
+          ? wc_scan_mode::Lines
+      : has_wc_count(selection, wc_count_selection::Words)
+          ? wc_scan_mode::Words
+          : wc_scan_mode::None;
+  if (has_wc_count(selection, wc_count_selection::Bytes))
+    state.byte_count += content.length;
 
   switch (scan_mode) {
-  case 0: break;
-  case 1: {
+  case wc_scan_mode::None: break;
+  case wc_scan_mode::Lines: {
     let remaining = content;
     loop
     {
@@ -71,7 +110,7 @@ static fn update_wc_source(wc_source_state &state, StringView content,
     }
     break;
   }
-  case 2:
+  case wc_scan_mode::Words:
     for (usize byte_position = 0; byte_position < content.length;
          byte_position++)
     {
@@ -84,7 +123,7 @@ static fn update_wc_source(wc_source_state &state, StringView content,
       }
     }
     break;
-  case 3:
+  case wc_scan_mode::LinesWords:
     for (usize byte_position = 0; byte_position < content.length;
          byte_position++)
     {
@@ -114,9 +153,8 @@ static fn decimal_digit_count(u64 value) wontthrow -> usize
 }
 
 static fn append_counts(String &line, u64 lines, u64 words, u64 bytes,
-                        bool should_show_lines, bool should_show_words,
-                        bool should_show_bytes, StringView name,
-                        usize field_width) throws -> void
+                        StringView name, usize field_width,
+                        wc_count_selection selection) throws -> void
 {
   bool has_field = false;
 
@@ -132,9 +170,9 @@ static fn append_counts(String &line, u64 lines, u64 words, u64 bytes,
     has_field = true;
   };
 
-  if (should_show_lines) do_emit_field(lines);
-  if (should_show_words) do_emit_field(words);
-  if (should_show_bytes) do_emit_field(bytes);
+  if (has_wc_count(selection, wc_count_selection::Lines)) do_emit_field(lines);
+  if (has_wc_count(selection, wc_count_selection::Words)) do_emit_field(words);
+  if (has_wc_count(selection, wc_count_selection::Bytes)) do_emit_field(bytes);
 
   if (!name.is_empty()) {
     line += ' ';
@@ -159,14 +197,19 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
 
   KOSHKIT_SHOW_HELP_AND_RETURN(ec, args);
 
-  bool should_show_lines = FLAG_WC_LINES.is_enabled();
-  bool should_show_words = FLAG_WC_WORDS.is_enabled();
-  bool should_show_bytes = FLAG_WC_BYTES.is_enabled();
-  if (!should_show_lines && !should_show_words && !should_show_bytes) {
-    should_show_lines = true;
-    should_show_words = true;
-    should_show_bytes = true;
-  }
+  let const has_requested_selection = FLAG_WC_LINES.is_enabled() ||
+                                      FLAG_WC_WORDS.is_enabled() ||
+                                      FLAG_WC_BYTES.is_enabled();
+  let const selection =
+      !has_requested_selection
+          ? wc_count_selection::Lines | wc_count_selection::Words |
+                wc_count_selection::Bytes
+      : (FLAG_WC_LINES.is_enabled() ? wc_count_selection::Lines
+                                    : wc_count_selection::None) |
+            (FLAG_WC_WORDS.is_enabled() ? wc_count_selection::Words
+                                        : wc_count_selection::None) |
+            (FLAG_WC_BYTES.is_enabled() ? wc_count_selection::Bytes
+                                        : wc_count_selection::None);
 
   let const sources =
       source_list_from_operands(operands, cxt.scratch_allocator());
@@ -175,8 +218,6 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
   for (usize source_index = 0; source_index < sources.count(); source_index++)
     source_states.push({});
 
-  let const scan_mode = static_cast<u8>((should_show_lines ? 1 : 0) |
-                                        (should_show_words ? 2 : 0));
   let reader = SourceBatchReader{ec, sources, cxt.scratch_allocator()};
   let chunks = ArrayList<SourceBatchReader::Chunk>{cxt.scratch_allocator()};
   loop
@@ -191,7 +232,7 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
         state.error_number = chunk.error_number;
         continue;
       }
-      update_wc_source(state, chunk.content, scan_mode, should_show_bytes);
+      update_wc_source(state, chunk.content, selection);
     }
   }
 
@@ -222,13 +263,16 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   u64 max_count = 0;
-  if (should_show_lines && total_lines > max_count) {
+  if (has_wc_count(selection, wc_count_selection::Lines) &&
+      total_lines > max_count) {
     max_count = total_lines;
   }
-  if (should_show_words && total_words > max_count) {
+  if (has_wc_count(selection, wc_count_selection::Words) &&
+      total_words > max_count) {
     max_count = total_words;
   }
-  if (should_show_bytes && total_bytes > max_count) {
+  if (has_wc_count(selection, wc_count_selection::Bytes) &&
+      total_bytes > max_count) {
     max_count = total_bytes;
   }
 
@@ -237,13 +281,11 @@ fn Wc::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{cxt.scratch_allocator()};
   for (let const &row : rows)
     append_counts(output, row.line_count, row.word_count, row.byte_count,
-                  should_show_lines, should_show_words, should_show_bytes,
-                  row.name, field_width);
+                  row.name, field_width, selection);
 
   if (sources.count() > 1)
     append_counts(output, total_lines, total_words, total_bytes,
-                  should_show_lines, should_show_words, should_show_bytes,
-                  StringView{"total"}, field_width);
+                  StringView{"total"}, field_width, selection);
 
   ec.print_to_stdout(output);
   return status;
