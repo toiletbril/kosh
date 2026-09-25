@@ -27,14 +27,20 @@ REGISTER_KOSHKIT_UTIL_FLAGS(Fold);
 
 namespace koshka::koshkit {
 
+enum class fold_break_mode : u8
+{
+  Width,
+  Blank,
+};
+
 static fn append_folded_line(String &output, StringView line, usize width,
-                             bool should_break_at_blanks) throws -> void
+                             fold_break_mode break_mode) throws -> void
 {
   usize start = 0;
 
   while (line.length - start > width) {
     usize break_length = width;
-    if (should_break_at_blanks) {
+    if (break_mode == fold_break_mode::Blank) {
       for (usize offset = width; offset > 0; offset--)
         if (std::isspace(static_cast<u8>(line[start + offset - 1])) != 0) {
           break_length = offset;
@@ -92,7 +98,8 @@ fn Fold::execute(const ExecContext &ec, EvalContext &cxt,
       append_folded_line(
           output,
           content.substring_of_length(line_start, line_end - line_start), width,
-          FLAG_FOLD_SPACES.is_enabled());
+          FLAG_FOLD_SPACES.is_enabled() ? fold_break_mode::Blank
+                                         : fold_break_mode::Width);
       line_start = line_end < content.length ? line_end + 1 : line_end;
     }
   };
