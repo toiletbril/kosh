@@ -285,12 +285,15 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
           : SourceBatchReader::source_read_mode::Batched};
   let chunks = ArrayList<SourceBatchReader::Chunk>{allocator};
   ArrayList<usize> source_line_numbers{allocator};
-  source_line_numbers.reserve(sources.count());
-  for (usize index = 0; index < sources.count(); index++)
-    source_line_numbers.push(1);
+  if (should_print_line_numbers) {
+    source_line_numbers.reserve(sources.count());
+    for (usize index = 0; index < sources.count(); index++)
+      source_line_numbers.push(1);
+  }
   bool has_any_match = false;
   let const do_process_line = [&](usize source_index, StringView source,
                                   StringView value) throws -> void {
+    char line_number[20];
     let const is_match =
         should_use_literal_search
             ? (should_ignore_case ? utils::contains_case_insensitive_ascii(
@@ -304,7 +307,8 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
         output += ':';
       }
       if (should_print_line_numbers) {
-        output += String::from(source_line_numbers[source_index], allocator);
+        output += utils::uint_to_text_into(source_line_numbers[source_index],
+                                           line_number, sizeof(line_number));
         output += ':';
       }
       output += value;
@@ -342,11 +346,13 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
 
         if (should_use_literal_search && line.is_empty()) {
           do_process_line(chunk.source_index, source, segment);
-          source_line_numbers[chunk.source_index]++;
+          if (should_print_line_numbers)
+            source_line_numbers[chunk.source_index]++;
         } else {
           line.append(segment);
           do_process_line(chunk.source_index, source, line.view());
-          source_line_numbers[chunk.source_index]++;
+          if (should_print_line_numbers)
+            source_line_numbers[chunk.source_index]++;
         }
         position = delimiter_position;
         position++;
@@ -370,7 +376,7 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
 
       if (!line.is_empty()) {
         do_process_line(chunk.source_index, source, line.view());
-        source_line_numbers[chunk.source_index]++;
+        if (should_print_line_numbers) source_line_numbers[chunk.source_index]++;
       }
     }
   }
