@@ -957,8 +957,16 @@ fn ProgramResolver::command_name_has_prefix(StringView prefix) throws -> bool
   unused(os::normalize_program_name(normalized_prefix));
   prepare_complete_path_cache(normalized_prefix.view(),
                               ValidationScope::Prefix);
+  let const normalized_prefix_view = normalized_prefix.view();
+  if (token_has_uppercase(normalized_prefix_view)) {
+    let const position = m_command_names.lower_bound(normalized_prefix_view);
+    if (position >= m_command_names.count()) return false;
+    return smart_case_prefix_matches(m_command_names[position].view(),
+                                     normalized_prefix_view);
+  }
+
   for (let const &name : m_command_names)
-    if (smart_case_prefix_matches(name.view(), normalized_prefix.view()))
+    if (smart_case_prefix_matches(name.view(), normalized_prefix_view))
       return true;
 
   return false;
