@@ -1066,7 +1066,7 @@ const diagnostic_definition DIAGNOSTIC_DEFINITIONS[] = {
       Strict, Policy),
     D(2264, "fork-bomb", "multiple asynchronous calls can fork forever",
       "The '{0}' function calls itself",
-      "This is a fork bomb. Rewrite your program or ignore this warning",
+      "This is a fork bomb. Note: rewrite your program or ignore this warning",
       "'{0}' is defined here", Strict, Policy),
     D(2267, "deprecated-xargs-replace", "the `xargs -i` flag is deprecated",
       "The `xargs -i` flag is deprecated",
