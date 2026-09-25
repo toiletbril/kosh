@@ -50,8 +50,9 @@ static pure fn is_evilps_sample_duration(koshka::StringView value) wontthrow
          ((value[0] >= '0' && value[0] <= '9') || value[0] == '.');
 }
 FLAG_OPTIONAL(EVILPS_LIVE, 'l', "live", Live,
-              "Sample and refresh the process tree every N seconds until "
-              "interrupted; the default is 0.5 seconds.",
+              "Refresh the process tree every N seconds until interrupted; "
+              "the default is 0.5 seconds. Sampling stays independent of "
+              "this refresh rate.",
               is_evilps_sample_duration, "seconds");
 FLAG_OPTIONAL(EVILPS_CUMULATIVE, 'C', "cumulative", Live,
               "Average counters over an M-second sliding window; without "
@@ -886,7 +887,7 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
     let frame_arena = BumpArena{};
     let const is_terminal = os::is_fd_a_tty(ec.out_fd.value_or(KOSH_STDOUT));
     let const sample_interval_nanoseconds =
-        static_cast<u64>(live_interval_seconds * 1000000000.0);
+        static_cast<u64>(DEFAULT_LIVE_SAMPLE_INTERVAL_SECONDS * 1000000000.0);
     let const refresh_interval_nanoseconds =
         static_cast<u64>(live_interval_seconds * 1000000000.0);
     let const window_nanoseconds =

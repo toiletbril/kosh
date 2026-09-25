@@ -41,8 +41,8 @@ FLAG_OPTIONAL(EVILIO_CUMULATIVE, 'C', "cumulative", Live,
               is_evilio_sample_duration, "seconds");
 FLAG(EVILIO_PS, Bool, '\0', "ps", "Show every visible process.");
 FLAG_OPTIONAL(EVILIO_LIVE, 'l', "live", Live,
-              "Refresh live output every N seconds; default 0.5 seconds while "
-              "sampling.",
+              "Refresh live output every N seconds; the default is 0.5 "
+              "seconds. Sampling stays independent of this refresh rate.",
               is_evilio_sample_duration, "seconds");
 FLAG(EVILIO_COUNT, String, 'n', "count", "Show this many processes.");
 FLAG(EVILIO_PID, String, 'p', "pid", "Show only this process.");
@@ -1546,7 +1546,8 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
 
     if (should_show_processes) {
       return run_live_process_io(ec, selected_pid, row_limit,
-                                 sample_duration_seconds, live_interval_seconds,
+                                 sample_duration_seconds,
+                                 DEFAULT_LIVE_SAMPLE_INTERVAL_SECONDS,
                                  refresh_interval_seconds, is_terminal,
                                  sample_duration_label.view(),
                                  sort_key,
@@ -1554,7 +1555,8 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
                                               : evilio_color_mode::Plain);
     }
 
-    return run_live_disk_io(ec, sample_duration_seconds, live_interval_seconds,
+    return run_live_disk_io(ec, sample_duration_seconds,
+                            DEFAULT_LIVE_SAMPLE_INTERVAL_SECONDS,
                             refresh_interval_seconds, is_terminal,
                             sample_duration_label.view(), sort_key,
                             should_color ? evilio_color_mode::Colored

@@ -35,8 +35,8 @@ static pure fn is_evilnet_sample_duration(koshka::StringView value) wontthrow
          ((value[0] >= '0' && value[0] <= '9') || value[0] == '.');
 }
 FLAG_OPTIONAL(EVILNET_LIVE, 'l', "live", Live,
-              "Sample and refresh live traffic every N seconds; the default "
-              "is 0.5 seconds.",
+              "Refresh live traffic every N seconds; the default is 0.5 "
+              "seconds. Sampling stays independent of this refresh rate.",
               is_evilnet_sample_duration, "seconds");
 FLAG_OPTIONAL(EVILNET_CUMULATIVE, 'C', "cumulative", Live,
               "Measure traffic over an M-second rolling window; the default is "
@@ -943,7 +943,8 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
   }
   if (FLAG_EVILNET_LIVE.is_enabled()) {
     return run_live_network_traffic(
-        ec, heap_allocator(), window_seconds, live_interval_seconds,
+        ec, heap_allocator(), window_seconds,
+        DEFAULT_LIVE_SAMPLE_INTERVAL_SECONDS,
         live_interval_seconds, sort_key, color_mode);
   }
   let const should_show_all = FLAG_EVILNET_ALL.is_enabled();
