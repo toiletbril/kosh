@@ -888,7 +888,6 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
                        evilio_color_mode color_mode) throws -> i32
 {
   let const allocator = heap_allocator();
-  let const should_color = color_mode == evilio_color_mode::Colored;
   let frame_arena = BumpArena{};
   let retained = ArrayList<live_process_row>{allocator};
   let const falloff_nanoseconds =
@@ -1100,7 +1099,6 @@ fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
                     evilio_color_mode color_mode) throws -> i32
 {
   let const allocator = heap_allocator();
-  let const should_color = color_mode == evilio_color_mode::Colored;
   let frame_arena = BumpArena{};
   let retained = ArrayList<live_disk_row>{allocator};
   let const falloff_nanoseconds =
