@@ -866,13 +866,15 @@ fn append_disk_io_report(String &output, const ArrayList<disk_io_row> &rows,
   append_titled_report_table(output, "Disk I/O", table, should_color);
 }
 fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
-                       usize row_limit, Maybe<evilio_sort_key> sort_key,
-                       f64 window_seconds, f64 sample_interval_seconds,
+                       usize row_limit, f64 window_seconds,
+                       f64 sample_interval_seconds,
                        f64 refresh_interval_seconds, bool is_terminal,
-                       bool should_color,
-                       StringView sample_duration_label) throws -> i32
+                       StringView sample_duration_label,
+                       Maybe<evilio_sort_key> sort_key,
+                       evilio_color_mode color_mode) throws -> i32
 {
   let const allocator = heap_allocator();
+  let const should_color = color_mode == evilio_color_mode::Colored;
   let frame_arena = BumpArena{};
   let retained = ArrayList<live_process_row>{allocator};
   let const falloff_nanoseconds =
@@ -1008,8 +1010,7 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
                              should_color);
     append_process_io_rate_report(output, rows, row_limit, frame_allocator,
                                   sample_duration_label, nullptr,
-                                  should_color ? evilio_color_mode::Colored
-                                               : evilio_color_mode::Plain);
+                                  color_mode);
     ec.print_to_stdout(output);
   }
 }
@@ -1078,11 +1079,12 @@ fn make_disk_window_row(const live_disk_row &row, u64 window_start_nanoseconds,
 
 fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
                     f64 sample_interval_seconds, f64 refresh_interval_seconds,
-                    bool is_terminal, bool should_color,
-                    StringView sample_duration_label,
-                    Maybe<evilio_sort_key> sort_key) throws -> i32
+                    bool is_terminal, StringView sample_duration_label,
+                    Maybe<evilio_sort_key> sort_key,
+                    evilio_color_mode color_mode) throws -> i32
 {
   let const allocator = heap_allocator();
+  let const should_color = color_mode == evilio_color_mode::Colored;
   let frame_arena = BumpArena{};
   let retained = ArrayList<live_disk_row>{allocator};
   let const falloff_nanoseconds =
@@ -1195,8 +1197,7 @@ fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
                              should_color);
     append_disk_io_report(
         output, rows, frame_allocator, sample_duration_label,
-        report_sampling_mode::Rolling,
-        should_color ? evilio_color_mode::Colored : evilio_color_mode::Plain);
+        report_sampling_mode::Rolling, color_mode);
     ec.print_to_stdout(output);
   }
 }
@@ -1530,15 +1531,20 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     };
 
     if (should_show_processes) {
-      return run_live_process_io(ec, selected_pid, row_limit, sort_key,
+      return run_live_process_io(ec, selected_pid, row_limit,
                                  sample_duration_seconds, live_interval_seconds,
                                  refresh_interval_seconds, is_terminal,
-                                 should_color, sample_duration_label.view());
+                                 sample_duration_label.view(),
+                                 sort_key,
+                                 should_color ? evilio_color_mode::Colored
+                                              : evilio_color_mode::Plain);
     }
 
     return run_live_disk_io(ec, sample_duration_seconds, live_interval_seconds,
-                            refresh_interval_seconds, is_terminal, should_color,
-                            sample_duration_label.view(), sort_key);
+                            refresh_interval_seconds, is_terminal,
+                            sample_duration_label.view(), sort_key,
+                            should_color ? evilio_color_mode::Colored
+                                         : evilio_color_mode::Plain);
   }
 
   if (FLAG_EVILIO_CUMULATIVE.is_enabled() && should_show_processes) {
