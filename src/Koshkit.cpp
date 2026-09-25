@@ -1056,11 +1056,23 @@ cold static fn show_soft_koshkit_error(const ExecContext &ec, EvalContext &cxt,
   print_error(String{message} + "\n");
 }
 
+static fn koshkit_invocation_name(const ExecContext &ec, Allocator allocator)
+    throws -> String
+{
+  if (ec.is_multicall && !ec.args().is_empty())
+    return String{allocator, ec.args()[0].view()};
+  if (ec.args().count() > 1)
+    return String{allocator, "koshkit "} + ec.args()[1].view();
+  return String{allocator, ec.program()};
+}
+
 cold noinline fn report_soft_koshkit_error(const ExecContext &ec,
                                            EvalContext &cxt,
                                            StringView message) throws -> void
 {
-  show_soft_koshkit_error(ec, cxt, ec.source_location(), message);
+  let const prefix = koshkit_invocation_name(ec, cxt.scratch_allocator());
+  show_soft_koshkit_error(ec, cxt, ec.source_location(),
+                          prefix.view() + ": " + message);
 }
 
 cold noinline fn report_soft_koshkit_error(const ExecContext &ec,
@@ -1073,11 +1085,12 @@ cold noinline fn report_soft_koshkit_error(const ExecContext &ec,
 
 cold noinline fn report_soft_koshkit_util_error(const ExecContext &ec,
                                                 EvalContext &cxt,
-                                                StringView utility_name,
+    StringView utility_name,
                                                 StringView message) throws
     -> void
 {
-  report_soft_koshkit_error(ec, cxt, String{utility_name} + ": " + message);
+  unused(utility_name);
+  report_soft_koshkit_error(ec, cxt, message);
 }
 
 cold noinline fn report_soft_koshkit_util_error(const ExecContext &ec,
@@ -1094,8 +1107,10 @@ cold noinline fn report_soft_koshkit_util_error(
     const ExecContext &ec, EvalContext &cxt, SourceLocation location,
     StringView utility_name, StringView message) throws -> void
 {
-  let const prefixed = String{utility_name} + ": " + message;
-  show_soft_koshkit_error(ec, cxt, steal(location), prefixed.view());
+  unused(utility_name);
+  let const prefix = koshkit_invocation_name(ec, cxt.scratch_allocator());
+  show_soft_koshkit_error(ec, cxt, steal(location),
+                          prefix.view() + ": " + message);
 }
 
 cold noinline fn report_soft_koshkit_util_error(
