@@ -384,12 +384,6 @@ fn append_report_field(String &output, StringView name, StringView value,
 fn append_report_inline_field(String &output, StringView name, StringView value,
                               StringView style, bool should_color) throws
     -> void;
-struct report_table_row
-{
-  String name;
-  String value;
-  StringView style;
-};
 enum class report_table_alignment : u8
 {
   Left,
@@ -415,11 +409,9 @@ class ReportTable
 {
 public:
   explicit ReportTable(Allocator allocator)
-      : m_rows(allocator), m_columns(allocator), m_grid_rows(allocator)
+      : m_columns(allocator), m_grid_rows(allocator)
   {}
 
-  fn add(StringView name, StringView value, StringView style = {}) throws
-      -> void;
   fn add_column(StringView heading,
                 report_table_alignment alignment = report_table_alignment::Left,
                 StringView style = {}) throws -> void;
@@ -437,7 +429,6 @@ public:
       -> String;
 
 private:
-  ArrayList<report_table_row> m_rows;
   ArrayList<report_table_column> m_columns;
   ArrayList<ArrayList<report_table_cell>> m_grid_rows;
   bool m_should_show_header{true};
@@ -446,9 +437,6 @@ private:
 fn append_titled_report_table(String &output, StringView title,
                               const ReportTable &table,
                               bool should_color) throws -> void;
-fn append_report_table(String &output, const ArrayList<report_table_row> &rows,
-                       bool should_color, StringView indentation = "  ") throws
-    -> void;
 fn append_report_name_section(String &output, StringView title,
                               const ArrayList<StringView> &names,
                               bool should_color,

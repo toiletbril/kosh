@@ -555,10 +555,24 @@ fn GoodCore::execute(
   if (!FLAG_GOODCORE_QUIET.is_enabled()) {
     let const should_color = koshkit_should_color();
     let table = ReportTable{allocator};
-    table.add("Archive", output.view(), colors::ansi::GREEN);
-    table.add("Executable", binary->view(), colors::ansi::GREEN);
-    table.add("Files", String::from(copied_path_count, allocator).view(),
-              colors::ansi::GREEN);
+    table.add_column("FIELD", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("VALUE", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    let cells = ArrayList<report_table_cell_view>{allocator};
+    cells.reserve(2);
+    cells.push({"Archive", colors::ansi::BOLD_CYAN});
+    cells.push({output.view(), colors::ansi::GREEN});
+    table.add_row(cells);
+    cells.clear();
+    cells.push({"Executable", colors::ansi::BOLD_CYAN});
+    cells.push({binary->view(), colors::ansi::GREEN});
+    table.add_row(cells);
+    cells.clear();
+    let const file_count = String::from(copied_path_count, allocator);
+    cells.push({"Files", colors::ansi::BOLD_CYAN});
+    cells.push({file_count.view(), colors::ansi::GREEN});
+    table.add_row(cells);
 
     let result = String{allocator};
     result += table.to_string(should_color, "").view();

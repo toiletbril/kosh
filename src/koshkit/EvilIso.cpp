@@ -722,7 +722,15 @@ fn append_cgroup_report(String &output, bool should_color,
     }
   }
   if (!self_index.has_value()) {
-    table.add("Membership", "unavailable", colors::ansi::BOLD_CYAN);
+    table.add_column("FIELD", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("VALUE", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    let cells = ArrayList<report_table_cell_view>{allocator};
+    cells.reserve(2);
+    cells.push({"Membership", colors::ansi::BOLD_CYAN});
+    cells.push({"unavailable", colors::ansi::BOLD_YELLOW});
+    table.add_row(cells);
     append_titled_report_table(output, "Cgroup membership", table,
                                should_color);
     return;
@@ -987,7 +995,15 @@ fn append_remote_report(String &output, bool should_color,
 {
   let table = ReportTable{allocator};
   if (!os::has_network_socket_listing()) {
-    table.add("Sockets", "unavailable", colors::ansi::BOLD_CYAN);
+    table.add_column("FIELD", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    table.add_column("VALUE", report_table_alignment::Left,
+                     colors::ansi::BOLD_CYAN);
+    let cells = ArrayList<report_table_cell_view>{allocator};
+    cells.reserve(2);
+    cells.push({"Sockets", colors::ansi::BOLD_CYAN});
+    cells.push({"unavailable", colors::ansi::BOLD_YELLOW});
+    table.add_row(cells);
     append_titled_report_table(output, "Socket summary", table, should_color);
     return;
   }
@@ -1045,10 +1061,21 @@ fn append_remote_report(String &output, bool should_color,
       zero_identity_count + do_count_unique(socket_identities);
   let const remote_count =
       remote_zero_identity_count + do_count_unique(remote_identities);
-  table.add("Remote sockets", String::from(remote_count, allocator).view(),
-            colors::ansi::BOLD_CYAN);
-  table.add("Total sockets", String::from(socket_count, allocator).view(),
-            colors::ansi::BOLD_CYAN);
+  table.add_column("FIELD", report_table_alignment::Left,
+                   colors::ansi::BOLD_CYAN);
+  table.add_column("VALUE", report_table_alignment::Right,
+                   colors::ansi::BOLD_CYAN);
+  let summary_cells = ArrayList<report_table_cell_view>{allocator};
+  summary_cells.reserve(2);
+  let const remote_socket_text = String::from(remote_count, allocator);
+  summary_cells.push({"Remote sockets", colors::ansi::BOLD_CYAN});
+  summary_cells.push({remote_socket_text.view(), colors::ansi::BOLD_GREEN});
+  table.add_row(summary_cells);
+  summary_cells.clear();
+  let const total_socket_text = String::from(socket_count, allocator);
+  summary_cells.push({"Total sockets", colors::ansi::BOLD_CYAN});
+  summary_cells.push({total_socket_text.view(), colors::ansi::BOLD_GREEN});
+  table.add_row(summary_cells);
   append_titled_report_table(output, "Socket summary", table, should_color);
   if (rows_mode == eviliso_remote_rows_mode::Hide) return;
 
