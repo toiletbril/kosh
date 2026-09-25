@@ -1476,10 +1476,10 @@ fn terminal_name(descriptor fd) throws -> Maybe<String>
 }
 
 terminal_echo_guard::terminal_echo_guard(descriptor input,
-                                         bool should_disable) wontthrow
+                                         terminal_echo_mode mode) wontthrow
     : m_input(input)
 {
-  if (!should_disable || !is_fd_a_tty(input)) return;
+  if (mode != terminal_echo_mode::Disable || !is_fd_a_tty(input)) return;
   if (tcgetattr(input, &m_original_mode) != 0) {
     m_did_succeed = false;
     return;

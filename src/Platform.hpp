@@ -293,10 +293,16 @@ using os_args = ArrayList<const char *>;
 #define KOSH_STDERR STDERR_FILENO
 #endif
 
+enum class terminal_echo_mode : u8
+{
+  Keep,
+  Disable,
+};
+
 class terminal_echo_guard
 {
 public:
-  terminal_echo_guard(descriptor input, bool should_disable) wontthrow;
+  terminal_echo_guard(descriptor input, terminal_echo_mode mode) wontthrow;
   ~terminal_echo_guard();
 
   terminal_echo_guard(const terminal_echo_guard &) = delete;
