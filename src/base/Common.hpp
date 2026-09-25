@@ -127,7 +127,11 @@ using opaque = void;
 #define T__HAS_GCC_EXTENSIONS 1
 #define t__used               __attribute__((used))
 #define t__pure               __attribute__((pure))
+#if defined KOSH_TINYREL
+#define t__forceinline        inline t__used
+#else
 #define t__forceinline        inline __attribute__((always_inline))
+#endif
 #define t__unreachable()      __builtin_unreachable()
 #define t__debugtrap()        __builtin_trap()
 #else /* __GNUC__ || __clang__ || __COSMOCC__ */
@@ -200,7 +204,9 @@ public:
 #define pure t__pure
 #define cold [[gnu::cold]]
 #define hot  [[gnu::hot]]
-#if defined __clang__
+#if defined KOSH_TINYREL
+#define flatten /* tinyrel leaves call-graph decisions to the optimizer */
+#elif defined __clang__
 #define flatten [[gnu::flatten]]
 #else
 #define flatten /* nothing. GNU is too harsh with inlining. */

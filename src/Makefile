@@ -1,4 +1,4 @@
-# make MODE=dbg/rel/prof/cosmo/cosmo_dbg
+# make MODE=dbg/rel/tinyrel/prof/cosmo/cosmo_dbg
 MODE ?= dbg
 TARGET ?= # Linux/Windows_NT/Darwin
 ARCH ?= $(shell uname -m)
@@ -194,6 +194,7 @@ BUILD_DEFINITIONS := \
 	-DKOSH_COMMIT_HASH="\"$(call encode_build_metadata,$(COMMIT_HASH))\"" \
 	-DKOSH_BUILD_MODE="\"$(call encode_build_metadata,$(MODE))\"" \
 	-DKOSH_ENVCXXFLAGS="\"$(call encode_build_metadata,$(USER_CXXFLAGS))\"" \
+	$(if $(filter tinyrel,$(MODE)),-DKOSH_TINYREL,) \
 	$(if $(filter 1,$(NO_TOILETLINE)),-DKOSH_NO_TOILETLINE,)
 
 CXXFLAGS := \
@@ -252,6 +253,32 @@ ifeq ($(MODE), rel)
 CXXFLAGS += \
 	-DNDEBUG \
 	-O3 \
+	-funroll-loops \
+	-U_FORTIFY_SOURCE \
+	-D_FORTIFY_SOURCE=2
+ifneq ($(TARGET), Windows_NT)
+ifneq ($(TARGET), Darwin)
+CXXFLAGS += -flto
+else ifeq ($(HOST_OPERATING_SYSTEM), Darwin)
+CXXFLAGS += -flto
+endif
+endif
+ifeq ($(TARGET), Linux)
+ifeq ($(IS_LINUX_CROSS_COMPILATION), 1)
+CXXFLAGS += -static
+else ifeq ($(SHOULD_LINK_STATIC_LINUX), 1)
+CXXFLAGS += \
+	-static-pie \
+	-nostdlib++
+LINK_LIBRARIES += -lsupc++
+endif
+endif
+# MODE=tinyrel
+else ifeq ($(MODE), tinyrel)
+CXXFLAGS += \
+	-DNDEBUG \
+	-Os \
+	-fno-unroll-loops \
 	-U_FORTIFY_SOURCE \
 	-D_FORTIFY_SOURCE=2
 ifneq ($(TARGET), Windows_NT)
@@ -312,7 +339,8 @@ CXXFLAGS += \
 	-g3 \
 	-DNDEBUG \
 	-fno-omit-frame-pointer \
-	-flto
+	-flto \
+	-funroll-loops
 ifneq ($(TARGET), Windows_NT)
 CXXFLAGS += \
 	-O3 \
@@ -350,7 +378,7 @@ LINK_LIBRARIES += -lsupc++
 endif
 endif
 else
-$(error Invalid MODE=$(MODE). Available modes are "dbg", "rel", "prof", "cov", "cosmo", "cosmo_dbg")
+$(error Invalid MODE=$(MODE). Available modes are "dbg", "rel", "tinyrel", "prof", "cov", "cosmo", "cosmo_dbg")
 endif
 
 ifneq ($(TARGET), Windows_NT)
