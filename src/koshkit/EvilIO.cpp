@@ -878,6 +878,10 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
   let const refresh_label =
       format_live_duration(refresh_interval_seconds, allocator);
   let baseline_rows = read_process_io_rows(allocator, selected_pid, true);
+  if (os::INTERRUPT_REQUESTED != 0) {
+    os::INTERRUPT_REQUESTED = 0;
+    return 130;
+  }
   if (selected_pid.has_value() && baseline_rows.is_empty()) return 1;
   for (let const &row : baseline_rows) {
     live_process_row entry{};
@@ -921,6 +925,10 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
     if (now - last_sample_nanoseconds >= sample_interval_nanoseconds) {
       let after_rows =
           read_process_io_rows(frame_allocator, selected_pid, true);
+      if (os::INTERRUPT_REQUESTED != 0) {
+        os::INTERRUPT_REQUESTED = 0;
+        return 130;
+      }
       if (selected_pid.has_value() && after_rows.is_empty()) return 1;
 
       for (let const &row : after_rows) {
