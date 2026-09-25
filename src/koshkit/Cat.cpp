@@ -32,6 +32,18 @@ namespace koshka {
 
 namespace koshkit {
 
+enum class cat_number_mode : u8
+{
+  Unnumbered,
+  Numbered,
+};
+
+enum class cat_highlight_mode : u8
+{
+  Plain,
+  Highlighted,
+};
+
 static fn append_number_prefix(String &output, i64 line_number,
                                Allocator allocator) throws -> void
 {
@@ -43,10 +55,13 @@ static fn append_number_prefix(String &output, i64 line_number,
 }
 
 static fn append_cat_source(String &output, StringView source,
-                            bool should_number, bool should_highlight,
                             i64 &line_number, bool &is_at_output_line_start,
-                            EvalContext &context) throws -> void
+                            EvalContext &context, cat_number_mode number_mode,
+                            cat_highlight_mode highlight_mode) throws -> void
 {
+  let const should_number = number_mode == cat_number_mode::Numbered;
+  let const should_highlight =
+      highlight_mode == cat_highlight_mode::Highlighted;
   if (!should_number && !should_highlight) {
     output += source;
     return;
@@ -195,9 +210,15 @@ fn Cat::execute(const ExecContext &ec, EvalContext &cxt,
             should_highlight_output &&
             Path{source}.is_shell_source(result.content->view()) &&
             !result.content->view().find_character('\0').has_value();
-        append_cat_source(output, result.content->view(),
-                          FLAG_CAT_NUMBER.is_enabled(), should_highlight_source,
-                          line_number, is_at_output_line_start, cxt);
+        let const number_mode = FLAG_CAT_NUMBER.is_enabled()
+                                    ? cat_number_mode::Numbered
+                                    : cat_number_mode::Unnumbered;
+        let const highlight_mode = should_highlight_source
+                                       ? cat_highlight_mode::Highlighted
+                                       : cat_highlight_mode::Plain;
+        append_cat_source(output, result.content->view(), line_number,
+                          is_at_output_line_start, cxt, number_mode,
+                          highlight_mode);
         result.content.reset();
       }
       next_source_index++;
