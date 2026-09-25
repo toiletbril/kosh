@@ -15,7 +15,13 @@
 
 namespace koshka::koshkit {
 
+enum class file_kind_mode : u8
+{
+  Regular,
+  Directory,
+};
+
 fn parse_file_mode(StringView expression, u32 current_mode, u32 creation_mask,
-                   bool is_directory) wontthrow -> Maybe<u32>;
+                   file_kind_mode kind) wontthrow -> Maybe<u32>;
 
 }

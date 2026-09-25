@@ -255,7 +255,9 @@ fn Mknod::execute(const ExecContext &ec, EvalContext &cxt,
   }
   u32 mode = 0666;
   if (FLAG_MKNOD_MODE.is_set()) {
-    let const parsed = parse_file_mode(FLAG_MKNOD_MODE.value(), mode, 0, false);
+    let const parsed =
+        parse_file_mode(FLAG_MKNOD_MODE.value(), mode, 0,
+                        file_kind_mode::Regular);
     if (!parsed.has_value()) {
       KOSHKIT_REPORT_ERROR_AT(FLAG_MKNOD_MODE.value_location(), "Invalid mode",
                               "use an octal or symbolic permission mode");

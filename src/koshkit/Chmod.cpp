@@ -51,7 +51,9 @@ static fn change_mode(const ExecContext &ec, EvalContext &cxt, const Path &path,
 
   let const parsed =
       parse_file_mode(expression, status.mode, os::get_file_creation_mask(),
-                      os::file_type_letter(status.mode) == 'd');
+                      os::file_type_letter(status.mode) == 'd'
+                          ? file_kind_mode::Directory
+                          : file_kind_mode::Regular);
   ASSERT(parsed.has_value());
 
   bool did_succeed = true;
@@ -120,7 +122,8 @@ fn Chmod::execute(const ExecContext &ec, EvalContext &cxt,
 
   if (operands.count() < 2) return report_usage_error(ec, cxt, args[0].view());
   let const expression = operands[0].view();
-  if (!parse_file_mode(expression, 0, 0, false).has_value()) {
+  if (!parse_file_mode(expression, 0, 0, file_kind_mode::Regular)
+           .has_value()) {
     KOSHKIT_REPORT_ERROR_AT(
         operand_locations[0], "invalid mode '" + operands[0] + "'",
         "use one to four octal digits or symbolic clauses such as u+x,g-w");

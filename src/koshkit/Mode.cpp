@@ -12,7 +12,7 @@
 namespace koshka::koshkit {
 
 fn parse_file_mode(StringView expression, u32 current_mode, u32 creation_mask,
-                   bool is_directory) wontthrow -> Maybe<u32>
+                   file_kind_mode kind) wontthrow -> Maybe<u32>
 {
   if (expression.is_empty()) return None;
 
@@ -63,7 +63,8 @@ fn parse_file_mode(StringView expression, u32 current_mode, u32 creation_mask,
       case 'w': requested_bits |= 0222; break;
       case 'x': requested_bits |= 0111; break;
       case 'X':
-        if (is_directory || (mode & 0111) != 0) requested_bits |= 0111;
+        if (kind == file_kind_mode::Directory || (mode & 0111) != 0)
+          requested_bits |= 0111;
         break;
       case 's':
         if ((selected_classes & 0700) != 0) requested_special_bits |= 04000;

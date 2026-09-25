@@ -46,7 +46,8 @@ fn Mkfifo::execute(const ExecContext &ec, EvalContext &cxt,
   u32 mode = 0666;
   if (FLAG_MKFIFO_MODE.is_set()) {
     let const parsed =
-        parse_file_mode(FLAG_MKFIFO_MODE.value(), mode, 0, false);
+        parse_file_mode(FLAG_MKFIFO_MODE.value(), mode, 0,
+                        file_kind_mode::Regular);
     if (!parsed.has_value())
       throw Error{
           "invalid mode '" +
