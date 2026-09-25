@@ -263,7 +263,8 @@ fn EvilFiles::execute(
       continue;
     }
 
-    let const files = os::list_process_open_files(process.pid, allocator);
+    let const files = os::list_process_open_files(
+        process.pid, allocator, os::process_open_file_detail::Basic);
     if (files.is_empty()) continue;
 
     if (files.count() == 1 && files[0].is_inaccessible) {

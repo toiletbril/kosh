@@ -298,7 +298,8 @@ fn GoodCore::execute(
   let binary = Maybe<String>{};
   let paths = ArrayList<String>{allocator};
   if (has_pid) {
-    for (let const &file : os::list_process_open_files(process_id, allocator)) {
+    for (let const &file : os::list_process_open_files(
+             process_id, allocator, os::process_open_file_detail::Basic)) {
       if (file.use == os::process_file_use::Executable) {
         binary = file.path.clone();
       }

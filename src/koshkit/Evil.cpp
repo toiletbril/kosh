@@ -143,8 +143,9 @@ fn append_anomaly_report(String &output, EvalContext &cxt,
     return;
   }
 
-  let const files = os::list_process_open_files(os::get_current_process_id(),
-                                                allocator, true);
+  let const files = os::list_process_open_files(
+      os::get_current_process_id(), allocator,
+      os::process_open_file_detail::IncludeMappings);
   let executable_path = StringView{};
   bool is_mapping_evidence_available = true;
   for (let const &file : files) {

@@ -2503,7 +2503,7 @@ fn has_process_open_file_listing() wontthrow -> bool
 }
 
 fn list_process_open_files(i64 pid, Allocator allocator,
-                           bool should_include_mappings) throws
+                           process_open_file_detail detail) throws
     -> ArrayList<process_open_file>
 {
   ArrayList<process_open_file> files{allocator};
@@ -2522,7 +2522,7 @@ fn list_process_open_files(i64 pid, Allocator allocator,
   };
 
 #if defined __APPLE__
-  if (should_include_mappings) {
+  if (detail == process_open_file_detail::IncludeMappings) {
     files.push(process_open_file{
         String{allocator, "[inaccessible]"},
         -1, 0, 0, 0, 0,
@@ -2639,7 +2639,7 @@ fn list_process_open_files(i64 pid, Allocator allocator,
     do_push(path, -1, 0, 0, 0, 0, reference.use, 'r', is_deleted, {});
   }
 
-  if (should_include_mappings) {
+  if (detail == process_open_file_detail::IncludeMappings) {
     bool did_read_mappings = false;
     let maps_path = String{allocator, process_path};
     maps_path += "/maps";
@@ -2824,7 +2824,7 @@ fn list_process_open_files(i64 pid, Allocator allocator,
   return files;
 #else
   unused(pid);
-  unused(should_include_mappings);
+  unused(detail);
   return files;
 #endif
 }
