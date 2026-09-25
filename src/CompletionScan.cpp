@@ -726,8 +726,8 @@ fn internal::complete_from_builtin_flags(StringView line, StringView token,
       {
         if (token.is_empty() && mode != completion_mode::Listing) return None;
 
-        let names =
-            complete_command_names(token, command_match_mode::Prefix, context);
+        let names = complete_command_names(
+            token, context, nullptr, command_match_mode::Prefix);
         if (!names.is_empty()) return names;
         return None;
       }
@@ -913,7 +913,8 @@ fn internal::complete_from_builtin_flags(StringView line, StringView token,
     if (token.is_empty() && mode != completion_mode::Listing) return None;
 
     let names =
-        complete_command_names(token, command_match_mode::Prefix, context);
+        complete_command_names(token, context, nullptr,
+                               command_match_mode::Prefix);
     if (!names.is_empty()) return names;
     return None;
   }
@@ -961,7 +962,8 @@ fn internal::complete_from_builtin_flags(StringView line, StringView token,
       if (token.is_empty() && mode != completion_mode::Listing) return None;
 
       let names =
-          complete_command_names(token, command_match_mode::Prefix, context);
+          complete_command_names(token, context, nullptr,
+                                 command_match_mode::Prefix);
       if (!names.is_empty()) return names;
     }
     return None;

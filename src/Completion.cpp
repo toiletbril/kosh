@@ -355,9 +355,9 @@ private:
 
 template <typename Collector>
 static fn
-collect_command_names(StringView token, command_match_mode match_mode,
-                      EvalContext &context, Collector &collector,
-                      const ArrayList<StringView> *extra_command_names) throws
+collect_command_names(StringView token, EvalContext &context, Collector &collector,
+                      const ArrayList<StringView> *extra_command_names,
+                      command_match_mode match_mode) throws
     -> void
 {
   let const token_is_glob = match_mode == command_match_mode::Glob;
@@ -439,14 +439,15 @@ collect_command_names(StringView token, command_match_mode match_mode,
 }
 
 static fn complete_command_name_prefix(
-    StringView token, command_match_mode match_mode, EvalContext &context,
-    const ArrayList<StringView> *extra_command_names) throws
+    StringView token, EvalContext &context,
+    const ArrayList<StringView> *extra_command_names,
+    command_match_mode match_mode) throws
     -> GhostPrefixCollector
 {
   let collector =
       GhostPrefixCollector{GhostPrefixCollector::Selection::FirstMatch};
-  collect_command_names(token, match_mode, context, collector,
-                        extra_command_names);
+  collect_command_names(token, context, collector, extra_command_names,
+                        match_mode);
   return collector;
 }
 
@@ -468,8 +469,9 @@ static fn compute_longest_common_prefix(const ArrayList<String> &candidates,
 }
 
 fn complete_command_names(
-    StringView token, command_match_mode match_mode, EvalContext &context,
-    const ArrayList<StringView> *extra_command_names) throws
+    StringView token, EvalContext &context,
+    const ArrayList<StringView> *extra_command_names,
+    command_match_mode match_mode) throws
     -> ArrayList<String>
 {
   let collector = CommandListCollector{};
@@ -477,8 +479,8 @@ fn complete_command_names(
   LOG(Debug, "completing command position for token '%.*s'",
       static_cast<int>(token.length), token.data);
 
-  collect_command_names(token, match_mode, context, collector,
-                        extra_command_names);
+  collect_command_names(token, context, collector, extra_command_names,
+                        match_mode);
   return collector.take();
 }
 
@@ -488,8 +490,8 @@ fn complete_command_names_by_prefix(StringView token,
 {
   let collector = PrefixListCollector{};
 
-  collect_command_names(token, command_match_mode::Prefix, context, collector,
-                        nullptr);
+  collect_command_names(token, context, collector, nullptr,
+                        command_match_mode::Prefix);
   return collector.take();
 }
 
@@ -587,9 +589,9 @@ check_filesystem_entry(const filesystem_listing &listing,
 
 static fn build_filesystem_candidate(
     StringView directory_part, StringView raw_directory_part, StringView name,
-    bool is_directory, directory_suffix_mode suffix_mode,
-    path_text_mode text_mode, StringView raw_token,
-    const utils::decoded_shell_word &decoded_word) throws -> String
+    bool is_directory, StringView raw_token,
+    const utils::decoded_shell_word &decoded_word,
+    directory_suffix_mode suffix_mode, path_text_mode text_mode) throws -> String
 {
   let const inside_quote = text_mode == path_text_mode::Literal;
   let const preserve_directory_spelling = raw_directory_part != directory_part;
@@ -653,9 +655,9 @@ static fn build_filesystem_candidate(
 template <typename Collector>
 static fn collect_filesystem_matches(
     StringView token, const utils::decoded_shell_word &decoded_word,
-    const Path &base_directory, path_text_mode text_mode,
-    filesystem_entry_filter filter, directory_suffix_mode suffix_mode,
-    EvalContext &context, Collector &collector) throws -> void
+    const Path &base_directory, EvalContext &context, Collector &collector,
+    path_text_mode text_mode, filesystem_entry_filter filter,
+    directory_suffix_mode suffix_mode) throws -> void
 {
   let const inside_quote = text_mode == path_text_mode::Literal;
   let listing = open_filesystem_listing(decoded_word, base_directory, context);
@@ -737,8 +739,8 @@ static fn collect_filesystem_matches(
           let const name = entry.name.view();
           let candidate = build_filesystem_candidate(
               parts.directory_part, raw_directory_part, name,
-              eligible_entry->is_directory, suffix_mode, text_mode, token,
-              decoded_word);
+              eligible_entry->is_directory, token, decoded_word, suffix_mode,
+              text_mode);
           collector.add(candidate.view(), match.tier);
         }
       };
@@ -778,10 +780,12 @@ static fn collect_filesystem_matches(
 
 template <typename Collector>
 static fn complete_filesystem_with(
-    StringView token, const Path &base_directory, path_text_mode text_mode,
-    filesystem_entry_filter filter, directory_suffix_mode suffix_mode,
-    EvalContext &context, Collector collector,
-    const utils::decoded_shell_word *decoded = nullptr) throws -> Collector
+    StringView token, const Path &base_directory, EvalContext &context,
+    Collector collector, const utils::decoded_shell_word *decoded = nullptr,
+    path_text_mode text_mode = path_text_mode::ShellSyntax,
+    filesystem_entry_filter filter = filesystem_entry_filter::All,
+    directory_suffix_mode suffix_mode = directory_suffix_mode::Marked) throws
+    -> Collector
 {
   let decoded_storage = utils::decoded_shell_word{completion_allocator()};
   if (decoded == nullptr) {
@@ -791,22 +795,24 @@ static fn complete_filesystem_with(
       decoded_storage = utils::decode_shell_word(token, completion_allocator());
     decoded = &decoded_storage;
   }
-  collect_filesystem_matches(token, *decoded, base_directory, text_mode, filter,
-                             suffix_mode, context, collector);
+  collect_filesystem_matches(token, *decoded, base_directory, context, collector,
+                             text_mode, filter, suffix_mode);
 
   return collector;
 }
 
 static fn
 complete_filesystem(StringView token, const Path &base_directory,
-                    path_text_mode text_mode, filesystem_entry_filter filter,
                     EvalContext &context,
-                    const utils::decoded_shell_word *decoded = nullptr) throws
+                    const utils::decoded_shell_word *decoded = nullptr,
+                    path_text_mode text_mode = path_text_mode::ShellSyntax,
+                    filesystem_entry_filter filter = filesystem_entry_filter::All)
+    throws
     -> ArrayList<String>
 {
   let collector = complete_filesystem_with<CommandListCollector>(
-      token, base_directory, text_mode, filter, directory_suffix_mode::Marked,
-      context, CommandListCollector{}, decoded);
+      token, base_directory, context, CommandListCollector{}, decoded, text_mode,
+      filter, directory_suffix_mode::Marked);
   return collector.take();
 }
 
@@ -814,8 +820,9 @@ fn complete_filesystem_names(StringView token, EvalContext &context,
                              const Path &base_directory) throws
     -> ArrayList<String>
 {
-  return complete_filesystem(token, base_directory, path_text_mode::Literal,
-                             filesystem_entry_filter::All, context);
+  return complete_filesystem(token, base_directory, context, nullptr,
+                             path_text_mode::Literal,
+                             filesystem_entry_filter::All);
 }
 
 fn complete_filesystem_names_by_prefix(StringView token, EvalContext &context,
@@ -827,8 +834,8 @@ fn complete_filesystem_names_by_prefix(StringView token, EvalContext &context,
                          ? filesystem_entry_filter::DirectoriesOnly
                          : filesystem_entry_filter::All;
   let collector = complete_filesystem_with<PrefixListCollector>(
-      token, base_directory, path_text_mode::Literal, filter,
-      directory_suffix_mode::Bare, context, PrefixListCollector{});
+      token, base_directory, context, PrefixListCollector{}, nullptr,
+      path_text_mode::Literal, filter, directory_suffix_mode::Bare);
   return collector.take();
 }
 
@@ -842,22 +849,23 @@ ScopedCompletionScratch::~ScopedCompletionScratch()
 }
 
 static fn complete_filesystem_prefix(
-    StringView token, const Path &base_directory, path_text_mode text_mode,
-    filesystem_entry_filter filter, EvalContext &context,
-    const utils::decoded_shell_word *decoded = nullptr) throws
+    StringView token, const Path &base_directory, EvalContext &context,
+    const utils::decoded_shell_word *decoded = nullptr,
+    path_text_mode text_mode = path_text_mode::ShellSyntax,
+    filesystem_entry_filter filter = filesystem_entry_filter::All) throws
     -> GhostPrefixCollector
 {
   return complete_filesystem_with<GhostPrefixCollector>(
-      token, base_directory, text_mode, filter, directory_suffix_mode::Marked,
-      context,
-      GhostPrefixCollector{GhostPrefixCollector::Selection::FirstMatch},
-      decoded);
+      token, base_directory, context,
+      GhostPrefixCollector{GhostPrefixCollector::Selection::FirstMatch}, decoded,
+      text_mode, filter, directory_suffix_mode::Marked);
 }
 
 /* Only the trailing component is globbed. */
 static fn complete_glob(StringView token, const Path &base_directory,
-                        filesystem_entry_filter filter, EvalContext &context,
-                        const utils::decoded_shell_word &decoded_word) throws
+                        EvalContext &context,
+                        const utils::decoded_shell_word &decoded_word,
+                        filesystem_entry_filter filter) throws
     -> ArrayList<String>
 {
   let candidates = ArrayList<String>{completion_allocator()};
@@ -955,8 +963,8 @@ static fn complete_glob(StringView token, const Path &base_directory,
             : parts.directory_part;
     let candidate = build_filesystem_candidate(
         parts.directory_part, raw_directory_part, name,
-        eligible_entry->is_directory, directory_suffix_mode::Marked,
-        path_text_mode::ShellSyntax, token, decoded_word);
+        eligible_entry->is_directory, token, decoded_word,
+        directory_suffix_mode::Marked, path_text_mode::ShellSyntax);
 
     candidates.push(steal(candidate));
   }
@@ -1274,8 +1282,8 @@ fn complete(StringView line, usize cursor, EvalContext &context,
   {
     candidates = complete_tilde_user(stage_token);
   } else if (inline_glob) {
-    candidates = complete_glob(token, base_directory, filesystem_filter,
-                               context, decoded_token);
+    candidates = complete_glob(token, base_directory, context, decoded_token,
+                               filesystem_filter);
     if (!candidates.is_empty()) {
       let joined = String{arena};
       for (usize i = 0; i < candidates.count(); i++) {
@@ -1293,8 +1301,8 @@ fn complete(StringView line, usize cursor, EvalContext &context,
     } else if (is_command && !token_has_path_separator) {
       candidates = complete_command_names(
           stage_token,
-          token_is_glob ? command_match_mode::Glob : command_match_mode::Prefix,
-          context, extra_command_names);
+          context, extra_command_names,
+          token_is_glob ? command_match_mode::Glob : command_match_mode::Prefix);
       should_rebuild_shell_syntax_candidates = true;
     }
   } else if (is_command && !token_has_path_separator) {
@@ -1306,17 +1314,15 @@ fn complete(StringView line, usize cursor, EvalContext &context,
         should_ignore_common_prefix_case =
             !stage_token.is_empty() && !token_is_glob &&
             !utils::token_has_uppercase(stage_token);
-        candidates =
-            complete_command_names(stage_token,
-                                   token_is_glob ? command_match_mode::Glob
-                                                 : command_match_mode::Prefix,
-                                   context, extra_command_names);
+        candidates = complete_command_names(
+            stage_token, context, extra_command_names,
+            token_is_glob ? command_match_mode::Glob
+                          : command_match_mode::Prefix);
       } else {
         let collector = complete_command_name_prefix(
-            stage_token,
+            stage_token, context, extra_command_names,
             token_is_glob ? command_match_mode::Glob
-                          : command_match_mode::Prefix,
-            context, extra_command_names);
+                          : command_match_mode::Prefix);
         ghost_candidate_count = collector.count();
         source_candidate_scan_count = collector.source_scans();
         materialized_candidate_count = collector.materialized();
@@ -1325,8 +1331,8 @@ fn complete(StringView line, usize cursor, EvalContext &context,
       should_rebuild_shell_syntax_candidates = true;
     }
   } else if (token_is_glob) {
-    candidates = complete_glob(token, base_directory, filesystem_filter,
-                               context, decoded_token);
+    candidates = complete_glob(token, base_directory, context, decoded_token,
+                               filesystem_filter);
   } else {
     /* The argument cascade runs in the bash and the default moods, the POSIX
        mood goes straight to files. The build tools answer before the man
@@ -1372,16 +1378,16 @@ fn complete(StringView line, usize cursor, EvalContext &context,
           !basename.is_empty() && (!os::FILESYSTEM_IS_CASE_SENSITIVE ||
                                    !utils::token_has_uppercase(basename));
       candidates = complete_filesystem(
-          token, base_directory, path_text_mode::ShellSyntax, filesystem_filter,
-          context, &decoded_token);
+          token, base_directory, context, &decoded_token,
+          path_text_mode::ShellSyntax, filesystem_filter);
       should_close_generated_prefix_quote = decoded_token.quote_character == 0;
     } else if (!decoded_token.text.is_empty()) {
       /* A token ending in a slash names a directory the ghost has not read yet,
          and the collector indexes it and suggests its first entry. An empty
          token names nothing and gets no suggestion. */
       let collector = complete_filesystem_prefix(
-          token, base_directory, path_text_mode::ShellSyntax, filesystem_filter,
-          context, &decoded_token);
+          token, base_directory, context, &decoded_token,
+          path_text_mode::ShellSyntax, filesystem_filter);
       ghost_candidate_count = collector.count();
       source_candidate_scan_count = collector.source_scans();
       materialized_candidate_count = collector.materialized();
