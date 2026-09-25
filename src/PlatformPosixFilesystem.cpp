@@ -652,7 +652,7 @@ fn set_file_mode(StringView path, u32 mode) wontthrow -> bool
 }
 
 fn set_file_owner(StringView path, i64 owner_id, i64 group_id,
-                  bool should_follow_symlink) wontthrow -> bool
+                  symlink_follow_mode follow_mode) wontthrow -> bool
 {
   bool did_succeed;
   int saved_errno;
@@ -662,7 +662,7 @@ fn set_file_owner(StringView path, i64 owner_id, i64 group_id,
         owner_id < 0 ? static_cast<uid_t>(-1) : static_cast<uid_t>(owner_id);
     let const group =
         group_id < 0 ? static_cast<gid_t>(-1) : static_cast<gid_t>(group_id);
-    did_succeed = should_follow_symlink
+    did_succeed = follow_mode == symlink_follow_mode::Follow
                       ? ::chown(path_string.c_str(), owner, group) == 0
                       : ::lchown(path_string.c_str(), owner, group) == 0;
     saved_errno = errno;

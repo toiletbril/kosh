@@ -601,8 +601,13 @@ fn list_process_open_files(i64 pid, Allocator allocator,
 
 fn make_directory(StringView path, u32 mode) wontthrow -> bool;
 fn set_file_mode(StringView path, u32 mode) wontthrow -> bool;
+enum class symlink_follow_mode : u8
+{
+  Follow,
+  NoFollow,
+};
 fn set_file_owner(StringView path, i64 owner_id, i64 group_id,
-                  bool should_follow_symlink) wontthrow -> bool;
+                  symlink_follow_mode follow_mode) wontthrow -> bool;
 fn create_hard_link(StringView target, StringView link_path) wontthrow -> bool;
 fn make_fifo(StringView path, u32 mode) wontthrow -> bool;
 fn make_device_node(StringView path, u32 mode, u32 major_number,

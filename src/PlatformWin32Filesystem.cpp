@@ -918,12 +918,12 @@ fn set_file_mode(StringView path, u32 mode) wontthrow -> bool
 }
 
 fn set_file_owner(StringView path, i64 owner_id, i64 group_id,
-                  bool should_follow_symlink) wontthrow -> bool
+                  symlink_follow_mode follow_mode) wontthrow -> bool
 {
   unused(path);
   unused(owner_id);
   unused(group_id);
-  unused(should_follow_symlink);
+  unused(follow_mode);
   SetLastError(ERROR_NOT_SUPPORTED);
   return false;
 }
