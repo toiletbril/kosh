@@ -211,24 +211,24 @@ private:
       }
       defer { os::free_regex(compiled); };
 
-      let spans = ArrayList<os::regex_span>{m_allocator};
-      String error_message{m_allocator};
-      let const result = os::execute_regex(compiled, left.view(), spans,
-                                           error_message, m_allocator);
-      if (result == os::regex_match_result::Error)
-        throw Error{"" + error_message};
-      if (result == os::regex_match_result::NoMatch) {
+      let const match = os::execute_regex(
+          compiled, os::regex_execution_options{left.view(), m_allocator});
+      if (match.result == os::regex_match_result::Error)
+        throw Error{"" + match.error_message};
+      if (match.result == os::regex_match_result::NoMatch) {
         left = String{m_allocator, "0"};
-      } else if (spans.count() > 1) {
-        if (spans[1].start < 0)
+      } else if (match.spans.count() > 1) {
+        if (match.spans[1].start < 0)
           left = String{m_allocator};
         else
           left = String{m_allocator,
                         left.view().substring_of_length(
-                            static_cast<usize>(spans[1].start),
-                            static_cast<usize>(spans[1].end - spans[1].start))};
+                            static_cast<usize>(match.spans[1].start),
+                            static_cast<usize>(match.spans[1].end -
+                                               match.spans[1].start))};
       } else {
-        left = String::from(spans[0].end - spans[0].start, m_allocator);
+        left = String::from(match.spans[0].end - match.spans[0].start,
+                            m_allocator);
       }
     }
     return left;

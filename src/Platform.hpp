@@ -1380,17 +1380,39 @@ enum class regex_match_result : u8
 
 constexpr bool HAS_REGEX_ENGINE = true;
 
+enum class regex_start_position : u8
+{
+  Beginning,
+  NotBeginning,
+};
+
+struct regex_execution_options
+{
+  StringView subject{};
+  Allocator scratch;
+  regex_start_position start_position{regex_start_position::Beginning};
+};
+
+struct regex_execution_report
+{
+  explicit regex_execution_report(Allocator allocator)
+      : spans(allocator), error_message(allocator)
+  {}
+
+  regex_match_result result{regex_match_result::NoMatch};
+  ArrayList<regex_span> spans;
+  String error_message;
+};
+
 fn compile_regex(StringView pattern, compiled_regex &out,
                  case_sensitivity sensitivity) throws -> regex_compile_result;
 fn compile_basic_regex(StringView pattern, compiled_regex &out,
                        case_sensitivity sensitivity) throws
     -> regex_compile_result;
 
-fn execute_regex(compiled_regex &compiled, StringView subject,
-                 ArrayList<regex_span> &spans, String &error_message,
-                 Allocator scratch,
-                 bool is_not_beginning_of_line = false) throws
-    -> regex_match_result;
+fn execute_regex(compiled_regex &compiled,
+                 const regex_execution_options &options) throws
+    -> regex_execution_report;
 
 fn free_regex(compiled_regex &compiled) wontthrow -> void;
 

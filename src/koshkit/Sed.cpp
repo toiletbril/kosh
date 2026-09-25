@@ -464,21 +464,22 @@ static fn apply_sed_substitution(sed_command &command, String &line,
 
   while (consumed <= line.length()) {
     let const subject = line.view().substring(consumed);
-    let spans = ArrayList<os::regex_span>{allocator};
-    String error_message{allocator};
-    let const match_result =
-        os::execute_regex(command.expression, subject, spans, error_message,
-                          allocator, consumed != 0);
-    if (match_result == os::regex_match_result::Error)
-      throw Error{"" + error_message};
-    if (match_result == os::regex_match_result::NoMatch) {
+    let const match = os::execute_regex(
+        command.expression,
+        os::regex_execution_options{
+            subject, allocator,
+            consumed != 0 ? os::regex_start_position::NotBeginning
+                          : os::regex_start_position::Beginning});
+    if (match.result == os::regex_match_result::Error)
+      throw Error{"" + match.error_message};
+    if (match.result == os::regex_match_result::NoMatch) {
       result += subject;
       break;
     }
 
-    ASSERT(!spans.is_empty());
-    let const match_start = static_cast<usize>(spans[0].start);
-    let const match_end = static_cast<usize>(spans[0].end);
+    ASSERT(!match.spans.is_empty());
+    let const match_start = static_cast<usize>(match.spans[0].start);
+    let const match_end = static_cast<usize>(match.spans[0].end);
     result += subject.substring_of_length(0, match_start);
 
     if (match_start == 0 && match_end == 0 && did_previous_match_consume) {
@@ -488,7 +489,8 @@ static fn apply_sed_substitution(sed_command &command, String &line,
       continue;
     }
 
-    append_sed_replacement(result, command.replacement.view(), subject, spans);
+    append_sed_replacement(result, command.replacement.view(), subject,
+                           match.spans);
     did_replace = true;
     consumed += match_end;
 

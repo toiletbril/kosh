@@ -245,34 +245,33 @@ struct conditional_evaluator
 
     os::compiled_regex *compiled =
         cxt.cached_compiled_regex(escaped_pattern.view());
-    let spans = ArrayList<os::regex_span>{cxt.scratch_allocator()};
-    let error_message = String{cxt.scratch_allocator()};
-    let const result = os::execute_regex(*compiled, value, spans, error_message,
-                                         cxt.scratch_allocator());
+    let const match = os::execute_regex(
+        *compiled, os::regex_execution_options{value, cxt.scratch_allocator()});
     LOG(All, "the =~ regex %s the value",
-        result == os::regex_match_result::Matched ? "matched"
-                                                  : "did not match");
+        match.result == os::regex_match_result::Matched ? "matched"
+                                                        : "did not match");
 
-    if (result == os::regex_match_result::NoMatch) {
+    if (match.result == os::regex_match_result::NoMatch) {
       cxt.set_indexed_array("BASH_REMATCH",
                             ArrayList<String>{heap_allocator()});
       return false;
     }
-    if (result == os::regex_match_result::Error) {
+    if (match.result == os::regex_match_result::Error) {
       /* A genuine engine failure such as REG_ESPACE surfaces with the engine's
          own message instead of reading as false. */
-      fail_conditional("Unable to match the =~ pattern", error_message.view());
+      fail_conditional("Unable to match the =~ pattern",
+                       match.error_message.view());
     }
 
     let rematch = ArrayList<String>{heap_allocator()};
-    rematch.reserve(spans.count());
-    for (usize i = 0; i < spans.count(); i++) {
-      if (spans[i].start < 0) {
+    rematch.reserve(match.spans.count());
+    for (usize i = 0; i < match.spans.count(); i++) {
+      if (match.spans[i].start < 0) {
         rematch.push(String{heap_allocator()});
         continue;
       }
-      let const start = static_cast<usize>(spans[i].start);
-      let const end = static_cast<usize>(spans[i].end);
+      let const start = static_cast<usize>(match.spans[i].start);
+      let const end = static_cast<usize>(match.spans[i].end);
       rematch.push(String{heap_allocator(),
                           value.substring_of_length(start, end - start)});
     }

@@ -285,38 +285,42 @@ fn compile_basic_regex(StringView pattern, compiled_regex &out,
   return regex_compile_result::Ok;
 }
 
-fn execute_regex(compiled_regex &compiled, StringView subject,
-                 ArrayList<regex_span> &spans, String &error_message,
-                 Allocator scratch, bool is_not_beginning_of_line) throws
-    -> regex_match_result
+fn execute_regex(compiled_regex &compiled,
+                 const regex_execution_options &options) throws
+    -> regex_execution_report
 {
-  let const subject_text = String{scratch, subject};
+  let report = regex_execution_report{options.scratch};
+  let const subject_text = String{options.scratch, options.subject};
   let const group_count = compiled.re.re_nsub + 1;
-  let matches = ArrayList<regmatch_t>{scratch};
+  let matches = ArrayList<regmatch_t>{options.scratch};
   matches.reserve(group_count);
   for (usize i = 0; i < group_count; i++)
     matches.push(regmatch_t{});
 
-  let const execute_flags = is_not_beginning_of_line ? REG_NOTBOL : 0;
+  let const execute_flags =
+      options.start_position == regex_start_position::NotBeginning ? REG_NOTBOL
+                                                                    : 0;
   const int match_result = regexec(&compiled.re, subject_text.c_str(),
                                    group_count, matches.begin(), execute_flags);
 
-  if (match_result == REG_NOMATCH) return regex_match_result::NoMatch;
+  if (match_result == REG_NOMATCH) return report;
 
   if (match_result != 0) {
     char error_text[256];
     regerror(match_result, &compiled.re, error_text, sizeof(error_text));
-    error_message = String{heap_allocator(), StringView{error_text}};
-    return regex_match_result::Error;
+    report.error_message = String{options.scratch, StringView{error_text}};
+    report.result = regex_match_result::Error;
+    return report;
   }
 
-  spans.reserve(group_count);
+  report.spans.reserve(group_count);
   for (usize i = 0; i < group_count; i++) {
-    spans.push(regex_span{static_cast<i64>(matches[i].rm_so),
-                          static_cast<i64>(matches[i].rm_eo)});
+    report.spans.push(regex_span{static_cast<i64>(matches[i].rm_so),
+                                 static_cast<i64>(matches[i].rm_eo)});
   }
 
-  return regex_match_result::Matched;
+  report.result = regex_match_result::Matched;
+  return report;
 }
 
 fn free_regex(compiled_regex &compiled) wontthrow -> void
