@@ -359,7 +359,7 @@ fn Pr::execute(const ExecContext &ec, EvalContext &cxt,
   let source_results = ArrayList<source_read_result>{cxt.scratch_allocator()};
   source_results.reserve(sources.count());
   for (usize source_index = 0; source_index < sources.count(); source_index++)
-    source_results.push({None, 0, false});
+    source_results.push({None, 0, source_completion_state::Pending});
 
   let reader = SourceBatchReader{ec, sources, cxt.scratch_allocator()};
   let chunks = ArrayList<SourceBatchReader::Chunk>{cxt.scratch_allocator()};
@@ -378,7 +378,7 @@ fn Pr::execute(const ExecContext &ec, EvalContext &cxt,
 
     for (let const &chunk : chunks) {
       let &result = source_results[chunk.source_index];
-      result.is_complete = chunk.is_complete;
+      result.completion = chunk.completion;
       if (chunk.error_number != 0) {
         result.content.reset();
         result.error_number = chunk.error_number;
@@ -390,7 +390,8 @@ fn Pr::execute(const ExecContext &ec, EvalContext &cxt,
     }
 
     while (next_source_index < source_results.count() &&
-           source_results[next_source_index].is_complete)
+           source_results[next_source_index].completion ==
+               source_completion_state::Complete)
     {
       let &result = source_results[next_source_index];
       let const source = sources[next_source_index];

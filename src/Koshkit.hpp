@@ -640,16 +640,94 @@ fn make_directories(const Path &directory, u32 mode) wontthrow -> bool;
 fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
     -> Maybe<String>;
 
+enum class source_completion_state : u8
+{
+  Pending,
+  Complete,
+};
+
+enum class source_open_state : u8
+{
+  Opened,
+  Failed,
+};
+
 struct source_read_result
 {
   Maybe<String> content;
   i32 error_number{0};
-  bool is_complete{false};
+  source_completion_state completion{source_completion_state::Pending};
 };
 
 class SourceBatchReader
 {
 public:
+  enum class source_dash_mode : u8
+  {
+    TreatAsStdin,
+    TreatAsPath,
+  };
+
+  enum class source_kind_mode : u8
+  {
+    Probe,
+    KnownRegular,
+  };
+
+  enum class source_read_mode : u8
+  {
+    Batched,
+    Sequential,
+  };
+
+  enum class chunk_emit_mode : u8
+  {
+    All,
+    One,
+  };
+
+  enum class metadata_window_mode : u8
+  {
+    Unloaded,
+    Loaded,
+  };
+
+  enum class source_defer_mode : u8
+  {
+    Ready,
+    Deferred,
+  };
+
+  enum class source_probe_mode : u8
+  {
+    Blocking,
+    Nonblocking,
+  };
+
+  enum class source_seek_mode : u8
+  {
+    Seekable,
+    Sequential,
+  };
+
+  enum class reader_descriptor_mode : u8
+  {
+    Borrowed,
+    Owned,
+  };
+
+  enum class reader_state : u8
+  {
+    Active,
+    Complete,
+  };
+
+  enum class reader_chunk_state : u8
+  {
+    Empty,
+    Pending,
+  };
+
   enum class ReadResult : u8
   {
     Chunks,
@@ -662,14 +740,16 @@ public:
     StringView content;
     usize source_index{0};
     i32 error_number{0};
-    bool is_complete{false};
-    bool was_open_error{false};
+    source_completion_state completion{source_completion_state::Pending};
+    source_open_state open_state{source_open_state::Opened};
   };
 
   SourceBatchReader(const ExecContext &ec, const ArrayList<StringView> &sources,
                     Allocator allocator, usize read_byte_count = 64 * 1024,
-                    bool should_treat_dash_as_stdin = true,
-                    bool sources_are_known_regular = false) throws;
+                    source_dash_mode dash_mode = source_dash_mode::TreatAsStdin,
+                    source_kind_mode kind_mode = source_kind_mode::Probe,
+                    source_read_mode read_mode = source_read_mode::Batched)
+      throws;
   ~SourceBatchReader();
 
   fn read_next(ArrayList<Chunk> &chunks) throws -> ReadResult;
@@ -691,10 +771,10 @@ private:
     usize read_byte_count{0};
     os::descriptor descriptor{KOSH_INVALID_FD};
     i32 pending_error_number{0};
-    bool should_close{false};
-    bool is_complete{false};
-    bool has_pending_chunk{false};
-    bool was_open_error{false};
+    reader_descriptor_mode descriptor_mode{reader_descriptor_mode::Borrowed};
+    reader_state state{reader_state::Active};
+    reader_chunk_state chunk_state{reader_chunk_state::Empty};
+    source_open_state open_state{source_open_state::Opened};
   };
 
   static fn close_reader(Reader &reader) wontthrow -> void;
@@ -703,8 +783,8 @@ private:
   fn read_seekable() throws -> ReadResult;
   fn read_sequential() throws -> ReadResult;
   fn append_pending_chunks(ArrayList<Chunk> &chunks,
-                           bool should_emit_one) throws -> void;
-  fn read_next_internal(ArrayList<Chunk> &chunks, bool should_emit_one) throws
+                           chunk_emit_mode emit_mode) throws -> void;
+  fn read_next_internal(ArrayList<Chunk> &chunks, chunk_emit_mode emit_mode) throws
       -> ReadResult;
 
   const ExecContext &m_ec;
@@ -718,9 +798,10 @@ private:
   ArrayList<os::file_status> m_metadata_statuses;
   usize m_read_byte_count;
   usize m_source_index{0};
-  bool m_should_treat_dash_as_stdin;
-  bool m_sources_are_known_regular;
-  bool should_defer_source{false};
+  source_dash_mode m_dash_mode;
+  source_kind_mode m_kind_mode;
+  source_read_mode m_read_mode;
+  source_defer_mode m_defer_mode{source_defer_mode::Ready};
 };
 
 fn read_named_or_stdin_batch(const ExecContext &ec,

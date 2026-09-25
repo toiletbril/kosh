@@ -35,6 +35,12 @@ namespace koshka {
 
 namespace koshkit {
 
+enum class grep_recursion_mode : u8
+{
+  Files,
+  Recursive,
+};
+
 constexpr usize GREP_UNKNOWN_BATCH_COUNT = 512;
 constexpr usize GREP_READ_BYTE_COUNT = 256 * 1024;
 
@@ -205,7 +211,9 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   let const pattern = operands[0].view();
   let const should_ignore_case = FLAG_GREP_IGNORE_CASE.is_enabled();
   let const should_invert = FLAG_GREP_INVERT.is_enabled();
-  let const should_recurse = FLAG_GREP_RECURSIVE.is_enabled();
+  let const recursion_mode = FLAG_GREP_RECURSIVE.is_enabled()
+                                 ? grep_recursion_mode::Recursive
+                                 : grep_recursion_mode::Files;
   let const should_print_line_numbers = FLAG_GREP_LINE_NUMBER.is_enabled();
   let const should_suppress_names = FLAG_GREP_NO_FILENAME.is_enabled();
   let const should_use_literal_search =
@@ -243,7 +251,7 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   ArrayList<String> recursive_storage{allocator};
   ArrayList<StringView> sources{allocator};
   i32 status = 0;
-  if (should_recurse) {
+  if (recursion_mode == grep_recursion_mode::Recursive) {
     for (let const source : operand_sources) {
       if (source == "-") {
         sources.push(source);
@@ -267,7 +275,14 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   let output = String{allocator};
   let line = String{allocator};
   let reader = SourceBatchReader{
-      ec, sources, allocator, GREP_READ_BYTE_COUNT, true, should_recurse};
+      ec, sources, allocator, GREP_READ_BYTE_COUNT,
+      SourceBatchReader::source_dash_mode::TreatAsStdin,
+      recursion_mode == grep_recursion_mode::Recursive
+          ? SourceBatchReader::source_kind_mode::KnownRegular
+          : SourceBatchReader::source_kind_mode::Probe,
+      recursion_mode == grep_recursion_mode::Recursive
+          ? SourceBatchReader::source_read_mode::Sequential
+          : SourceBatchReader::source_read_mode::Batched};
   let chunks = ArrayList<SourceBatchReader::Chunk>{allocator};
   ArrayList<usize> source_line_numbers{allocator};
   source_line_numbers.reserve(sources.count());
@@ -337,7 +352,7 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
         position++;
       }
 
-      if (!chunk.is_complete) continue;
+      if (chunk.completion != source_completion_state::Complete) continue;
       if (chunk.error_number != 0) {
         line.clear();
         os::set_last_system_error(chunk.error_number);

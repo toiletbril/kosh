@@ -331,7 +331,7 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
   line_counts.reserve(sources.count());
   open_error_flags.reserve(sources.count());
   for (usize source_index = 0; source_index < sources.count(); source_index++) {
-    source_results.push({None, 0, false});
+    source_results.push({None, 0, source_completion_state::Pending});
     line_counts.push(0);
     open_error_flags.push(0);
   }
@@ -354,11 +354,12 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
 
     for (let const &chunk : chunks) {
       let &result = source_results[chunk.source_index];
-      result.is_complete = chunk.is_complete;
+      result.completion = chunk.completion;
       if (chunk.error_number != 0) {
         result.content.reset();
         result.error_number = chunk.error_number;
-        open_error_flags[chunk.source_index] = chunk.was_open_error ? 1 : 0;
+        open_error_flags[chunk.source_index] =
+            chunk.open_state == source_open_state::Failed ? 1 : 0;
         continue;
       }
       if (!result.content.has_value())
@@ -390,10 +391,14 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
       let const has_reached_limit =
           is_byte_mode ? static_cast<u64>(result.content->length()) == count
                        : line_counts[chunk.source_index] == count;
-      if (has_reached_limit && !result.is_complete) {
+      if (has_reached_limit &&
+          result.completion != source_completion_state::Complete)
+      {
         reader.finish_source(chunk.source_index);
-        result.is_complete = true;
-      } else if (is_byte_mode && !result.is_complete) {
+        result.completion = source_completion_state::Complete;
+      } else if (is_byte_mode &&
+                 result.completion != source_completion_state::Complete)
+      {
         let const remaining_count =
             count - static_cast<u64>(result.content->length());
         reader.set_source_read_byte_count(
@@ -404,7 +409,8 @@ fn Head::execute(const ExecContext &ec, EvalContext &cxt,
     }
 
     while (next_source_index < source_results.count() &&
-           source_results[next_source_index].is_complete)
+           source_results[next_source_index].completion ==
+               source_completion_state::Complete)
     {
       let &result = source_results[next_source_index];
       if (!result.content.has_value()) {

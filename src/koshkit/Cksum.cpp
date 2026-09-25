@@ -63,7 +63,7 @@ struct checksum_source_state
   u32 checksum{0};
   u64 byte_count{0};
   i32 error_number{0};
-  bool is_complete{false};
+  source_completion_state completion{source_completion_state::Pending};
 };
 
 static fn finish_checksum(u32 checksum, u64 byte_count) wontthrow -> u32
@@ -111,18 +111,19 @@ fn Cksum::execute(const ExecContext &ec, EvalContext &cxt,
       let &state = source_states[chunk.source_index];
       if (chunk.error_number != 0) {
         state.error_number = chunk.error_number;
-        state.is_complete = true;
+        state.completion = source_completion_state::Complete;
         continue;
       }
 
       state.checksum = update_checksum(state.checksum, chunk.content.data,
                                        chunk.content.length);
       state.byte_count += chunk.content.length;
-      state.is_complete = chunk.is_complete;
+      state.completion = chunk.completion;
     }
 
     while (next_output_index < sources.count() &&
-           source_states[next_output_index].is_complete)
+           source_states[next_output_index].completion ==
+               source_completion_state::Complete)
     {
       let const &state = source_states[next_output_index];
       let const source = sources[next_output_index];

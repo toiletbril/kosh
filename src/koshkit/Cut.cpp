@@ -196,7 +196,7 @@ fn Cut::execute(const ExecContext &ec, EvalContext &cxt,
         line.clear();
       }
 
-      if (!chunk.is_complete) continue;
+      if (chunk.completion != source_completion_state::Complete) continue;
 
       let const source = sources[chunk.source_index];
       if (chunk.error_number != 0) {

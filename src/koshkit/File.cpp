@@ -1041,13 +1041,15 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
     for (usize source_index = 0; source_index < sample_sources.count();
          source_index++)
     {
-      source_results.push({None, 0, false});
+      source_results.push({None, 0, source_completion_state::Pending});
     }
 
     let const read_byte_count =
         sample_byte_count < 64 * 1024 ? sample_byte_count : usize{64 * 1024};
     let reader = SourceBatchReader{
-        ec, sample_sources, allocator, read_byte_count, false, true};
+        ec, sample_sources, allocator, read_byte_count,
+        SourceBatchReader::source_dash_mode::TreatAsPath,
+        SourceBatchReader::source_kind_mode::KnownRegular};
     let chunks = ArrayList<SourceBatchReader::Chunk>{allocator};
     loop
     {
@@ -1065,7 +1067,7 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
 
       for (let const &chunk : chunks) {
         let &result = source_results[chunk.source_index];
-        result.is_complete = chunk.is_complete;
+        result.completion = chunk.completion;
         if (chunk.error_number != 0) {
           result.content.reset();
           result.error_number = chunk.error_number;
@@ -1075,11 +1077,11 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
           result.content->append(chunk.content);
 
           if (result.content->length() == sample_byte_count &&
-              !result.is_complete)
+              result.completion != source_completion_state::Complete)
           {
             reader.finish_source(chunk.source_index);
-            result.is_complete = true;
-          } else if (!result.is_complete) {
+            result.completion = source_completion_state::Complete;
+          } else if (result.completion != source_completion_state::Complete) {
             let const remaining_count =
                 sample_byte_count - result.content->length();
             reader.set_source_read_byte_count(chunk.source_index,
@@ -1089,14 +1091,14 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
           }
         }
 
-        if (!result.is_complete) continue;
+        if (result.completion != source_completion_state::Complete) continue;
 
         let const operand_position =
             sample_operand_positions[chunk.source_index];
         custom_sample_ready.set(operand_position);
         if (!result.content.has_value()) {
           custom_sample_errors.set(operand_position);
-          if (chunk.was_open_error)
+          if (chunk.open_state == source_open_state::Failed)
             custom_sample_open_errors.set(operand_position);
           custom_sample_error_numbers[operand_position] = result.error_number;
           continue;

@@ -393,8 +393,9 @@ fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
 SourceBatchReader::SourceBatchReader(const ExecContext &ec,
                                      const ArrayList<StringView> &sources,
                                      Allocator allocator, usize read_byte_count,
-                                     bool should_treat_dash_as_stdin,
-                                     bool sources_are_known_regular) throws
+                                     source_dash_mode dash_mode,
+                                     source_kind_mode kind_mode,
+                                     source_read_mode read_mode) throws
     : m_ec(ec),
       m_sources(sources),
       m_readers(allocator),
@@ -404,8 +405,9 @@ SourceBatchReader::SourceBatchReader(const ExecContext &ec,
       m_metadata_paths(allocator),
       m_metadata_statuses(allocator),
       m_read_byte_count(read_byte_count),
-      m_should_treat_dash_as_stdin(should_treat_dash_as_stdin),
-      m_sources_are_known_regular(sources_are_known_regular)
+      m_dash_mode(dash_mode),
+      m_kind_mode(kind_mode),
+      m_read_mode(read_mode)
 {
   constexpr usize READER_COUNT = 16;
   m_readers.reserve(READER_COUNT);
@@ -425,9 +427,10 @@ SourceBatchReader::~SourceBatchReader()
 
 fn SourceBatchReader::close_reader(Reader &reader) wontthrow -> void
 {
-  if (reader.should_close) os::close_fd(reader.descriptor);
-  reader.should_close = false;
-  reader.is_complete = true;
+  if (reader.descriptor_mode == reader_descriptor_mode::Owned)
+    os::close_fd(reader.descriptor);
+  reader.descriptor_mode = reader_descriptor_mode::Borrowed;
+  reader.state = reader_state::Complete;
 }
 
 fn SourceBatchReader::finish_source(usize source_index) wontthrow -> void
@@ -438,7 +441,7 @@ fn SourceBatchReader::finish_source(usize source_index) wontthrow -> void
     close_reader(reader);
     reader.pending_byte_count = 0;
     reader.pending_error_number = 0;
-    reader.has_pending_chunk = false;
+    reader.chunk_state = reader_chunk_state::Empty;
     return;
   }
 
@@ -448,7 +451,7 @@ fn SourceBatchReader::finish_source(usize source_index) wontthrow -> void
     close_reader(*m_sequential_reader);
     m_sequential_reader->pending_byte_count = 0;
     m_sequential_reader->pending_error_number = 0;
-    m_sequential_reader->has_pending_chunk = false;
+    m_sequential_reader->chunk_state = reader_chunk_state::Empty;
   }
 }
 
@@ -479,12 +482,14 @@ fn SourceBatchReader::retire_completed_readers() throws -> void
   {
     let const reader_index = remaining_count - 1;
     let const &reader = m_readers[reader_index];
-    if (reader.is_complete && !reader.has_pending_chunk)
+    if (reader.state == reader_state::Complete &&
+        reader.chunk_state == reader_chunk_state::Empty)
       m_readers.remove(reader_index);
   }
 
-  if (m_sequential_reader.has_value() && m_sequential_reader->is_complete &&
-      !m_sequential_reader->has_pending_chunk)
+  if (m_sequential_reader.has_value() &&
+      m_sequential_reader->state == reader_state::Complete &&
+      m_sequential_reader->chunk_state == reader_chunk_state::Empty)
   {
     m_sequential_reader.reset();
   }
@@ -494,16 +499,18 @@ fn SourceBatchReader::fill_readers() throws -> void
 {
   constexpr usize READER_COUNT = 16;
 
-  if (m_readers.is_empty()) should_defer_source = false;
+  if (m_readers.is_empty()) m_defer_mode = source_defer_mode::Ready;
 
-  bool has_metadata_window = false;
+  metadata_window_mode metadata_mode = metadata_window_mode::Unloaded;
   usize metadata_index = 0;
-  while (!m_sequential_reader.has_value() && m_readers.count() < READER_COUNT &&
+  let const reader_limit =
+      m_read_mode == source_read_mode::Sequential ? usize{1} : READER_COUNT;
+  while (!m_sequential_reader.has_value() && m_readers.count() < reader_limit &&
          m_source_index < m_sources.count())
   {
     let const source_index = m_source_index;
     let const source = m_sources[source_index];
-    if (m_should_treat_dash_as_stdin && source == "-") {
+    if (m_dash_mode == source_dash_mode::TreatAsStdin && source == "-") {
       Reader reader;
       reader.buffer.reserve(m_read_byte_count);
       reader.source_index = source_index;
@@ -514,12 +521,14 @@ fn SourceBatchReader::fill_readers() throws -> void
       break;
     }
 
-    let const should_probe_nonblocking =
-        !m_readers.is_empty() && !m_sources_are_known_regular;
-    if (should_probe_nonblocking) {
-      if (should_defer_source) break;
+    let const probe_mode =
+        !m_readers.is_empty() && m_kind_mode != source_kind_mode::KnownRegular
+            ? source_probe_mode::Nonblocking
+            : source_probe_mode::Blocking;
+    if (probe_mode == source_probe_mode::Nonblocking) {
+      if (m_defer_mode == source_defer_mode::Deferred) break;
 
-      if (!has_metadata_window) {
+      if (metadata_mode == metadata_window_mode::Unloaded) {
         m_batch.clear();
         m_metadata_paths.clear();
         m_metadata_statuses.clear();
@@ -530,7 +539,9 @@ fn SourceBatchReader::fill_readers() throws -> void
              candidate_index++)
         {
           let const candidate = m_sources[candidate_index];
-          if (m_should_treat_dash_as_stdin && candidate == "-") break;
+          if (m_dash_mode == source_dash_mode::TreatAsStdin &&
+              candidate == "-")
+            break;
 
           m_metadata_paths.push(Path{candidate});
           m_metadata_statuses.push({});
@@ -540,7 +551,7 @@ fn SourceBatchReader::fill_readers() throws -> void
                                                 m_metadata_statuses[index]));
         }
         m_batch.execute(m_results);
-        has_metadata_window = true;
+        metadata_mode = metadata_window_mode::Loaded;
       }
 
       if (metadata_index >= m_results.count()) break;
@@ -548,38 +559,43 @@ fn SourceBatchReader::fill_readers() throws -> void
       if (m_results[metadata_index].error_number != 0 ||
           os::file_type_letter(m_metadata_statuses[metadata_index].mode) != '-')
       {
-        should_defer_source = true;
+        m_defer_mode = source_defer_mode::Deferred;
         break;
       }
       metadata_index++;
     }
 
     let descriptor = os::open_file_descriptor(
-        source, should_probe_nonblocking ? os::file_open_mode::ReadNonblocking
-                                         : os::file_open_mode::Read);
+        source, probe_mode == source_probe_mode::Nonblocking
+                    ? os::file_open_mode::ReadNonblocking
+                    : os::file_open_mode::Read);
     if (!descriptor.has_value()) {
       if (os::last_system_error_is_descriptor_quota() && !m_readers.is_empty())
       {
-        should_defer_source = true;
+        m_defer_mode = source_defer_mode::Deferred;
         break;
       }
 
       Reader reader;
       reader.source_index = source_index;
       reader.pending_error_number = os::get_last_system_error_number();
-      reader.is_complete = true;
-      reader.has_pending_chunk = true;
-      reader.was_open_error = true;
+      reader.state = reader_state::Complete;
+      reader.chunk_state = reader_chunk_state::Pending;
+      reader.open_state = source_open_state::Failed;
       m_readers.push(steal(reader));
       m_source_index++;
       break;
     }
 
-    let const is_seekable =
-        m_sources_are_known_regular || os::descriptor_is_seekable(*descriptor);
-    if (should_probe_nonblocking && !is_seekable) {
+    let const seek_mode =
+        m_kind_mode == source_kind_mode::KnownRegular ||
+                os::descriptor_is_seekable(*descriptor)
+            ? source_seek_mode::Seekable
+            : source_seek_mode::Sequential;
+    if (probe_mode == source_probe_mode::Nonblocking &&
+        seek_mode == source_seek_mode::Sequential) {
       os::close_fd(*descriptor);
-      should_defer_source = true;
+      m_defer_mode = source_defer_mode::Deferred;
       break;
     }
 
@@ -588,10 +604,15 @@ fn SourceBatchReader::fill_readers() throws -> void
     reader.source_index = source_index;
     reader.read_byte_count = m_read_byte_count;
     reader.descriptor = *descriptor;
-    reader.should_close = true;
+    reader.descriptor_mode = reader_descriptor_mode::Owned;
     m_source_index++;
 
-    if (!is_seekable) {
+    if (m_read_mode == source_read_mode::Sequential) {
+      m_sequential_reader = steal(reader);
+      break;
+    }
+
+    if (seek_mode == source_seek_mode::Sequential) {
       m_sequential_reader = steal(reader);
       break;
     }
@@ -607,10 +628,12 @@ fn SourceBatchReader::read_seekable() throws -> ReadResult
   for (usize reader_index = 0; reader_index < m_readers.count(); reader_index++)
   {
     let &reader = m_readers[reader_index];
-    if (reader.has_pending_chunk || reader.is_complete) continue;
+    if (reader.chunk_state == reader_chunk_state::Pending ||
+        reader.state == reader_state::Complete)
+      continue;
     if (reader.read_byte_count == 0) {
       close_reader(reader);
-      reader.has_pending_chunk = true;
+      reader.chunk_state = reader_chunk_state::Pending;
       continue;
     }
 
@@ -632,17 +655,17 @@ fn SourceBatchReader::read_seekable() throws -> ReadResult
     if (result.error_number != 0) {
       close_reader(reader);
       reader.pending_error_number = result.error_number;
-      reader.has_pending_chunk = true;
+      reader.chunk_state = reader_chunk_state::Pending;
       continue;
     }
     if (result.transferred_byte_count == 0) {
       close_reader(reader);
-      reader.has_pending_chunk = true;
+      reader.chunk_state = reader_chunk_state::Pending;
       continue;
     }
 
     reader.pending_byte_count = result.transferred_byte_count;
-    reader.has_pending_chunk = true;
+    reader.chunk_state = reader_chunk_state::Pending;
     reader.byte_offset += result.transferred_byte_count;
     /* A short positioned read from a regular file is the EOF boundary. Avoid
        submitting a second zero-byte read for the common small-file case. */
@@ -656,10 +679,12 @@ fn SourceBatchReader::read_seekable() throws -> ReadResult
 fn SourceBatchReader::read_sequential() throws -> ReadResult
 {
   let &reader = *m_sequential_reader;
-  if (reader.has_pending_chunk || reader.is_complete) return ReadResult::Chunks;
+  if (reader.chunk_state == reader_chunk_state::Pending ||
+      reader.state == reader_state::Complete)
+    return ReadResult::Chunks;
   if (reader.read_byte_count == 0) {
     close_reader(reader);
-    reader.has_pending_chunk = true;
+    reader.chunk_state = reader_chunk_state::Pending;
     return ReadResult::Chunks;
   }
 
@@ -671,47 +696,52 @@ fn SourceBatchReader::read_sequential() throws -> ReadResult
     let const error_number = os::get_last_system_error_number();
     close_reader(reader);
     reader.pending_error_number = error_number;
-    reader.has_pending_chunk = true;
+    reader.chunk_state = reader_chunk_state::Pending;
     return ReadResult::Chunks;
   }
   if (*read_count == 0) {
     close_reader(reader);
-    reader.has_pending_chunk = true;
+    reader.chunk_state = reader_chunk_state::Pending;
     return ReadResult::Chunks;
   }
 
   reader.pending_byte_count = *read_count;
-  reader.has_pending_chunk = true;
+  reader.chunk_state = reader_chunk_state::Pending;
   return ReadResult::Chunks;
 }
 
 fn SourceBatchReader::append_pending_chunks(ArrayList<Chunk> &chunks,
-                                            bool should_emit_one) throws -> void
+                                            chunk_emit_mode emit_mode) throws
+    -> void
 {
   let const emit_capacity =
-      should_emit_one ? usize{1}
-                      : m_readers.count() +
-                            static_cast<usize>(m_readers.is_empty() &&
-                                               m_sequential_reader.has_value());
+      emit_mode == chunk_emit_mode::One
+          ? usize{1}
+          : m_readers.count() +
+                static_cast<usize>(m_readers.is_empty() &&
+                                   m_sequential_reader.has_value());
   chunks.reserve(emit_capacity);
 
   let const do_append = [&](Reader &reader) throws -> bool {
-    if (!reader.has_pending_chunk) return false;
+    if (reader.chunk_state != reader_chunk_state::Pending) return false;
 
     chunks.push({
         StringView{reader.buffer.begin(), reader.pending_byte_count},
-        reader.source_index, reader.pending_error_number, reader.is_complete,
-        reader.was_open_error
+        reader.source_index, reader.pending_error_number,
+        reader.state == reader_state::Complete
+            ? source_completion_state::Complete
+            : source_completion_state::Pending,
+        reader.open_state
     });
     reader.pending_byte_count = 0;
     reader.pending_error_number = 0;
-    reader.has_pending_chunk = false;
+    reader.chunk_state = reader_chunk_state::Empty;
     return true;
   };
 
   for (let &reader : m_readers) {
     if (!do_append(reader)) continue;
-    if (should_emit_one) return;
+    if (emit_mode == chunk_emit_mode::One) return;
   }
 
   if (m_readers.is_empty() && m_sequential_reader.has_value())
@@ -719,7 +749,7 @@ fn SourceBatchReader::append_pending_chunks(ArrayList<Chunk> &chunks,
 }
 
 fn SourceBatchReader::read_next_internal(ArrayList<Chunk> &chunks,
-                                         bool should_emit_one) throws
+                                         chunk_emit_mode emit_mode) throws
     -> ReadResult
 {
   chunks.clear();
@@ -737,7 +767,7 @@ fn SourceBatchReader::read_next_internal(ArrayList<Chunk> &chunks,
     if (result == ReadResult::Interrupted) return result;
   }
 
-  append_pending_chunks(chunks, should_emit_one);
+  append_pending_chunks(chunks, emit_mode);
   if (!chunks.is_empty()) return ReadResult::Chunks;
   if (m_source_index == m_sources.count() && m_readers.is_empty() &&
       !m_sequential_reader.has_value())
@@ -750,13 +780,13 @@ fn SourceBatchReader::read_next_internal(ArrayList<Chunk> &chunks,
 
 fn SourceBatchReader::read_next(ArrayList<Chunk> &chunks) throws -> ReadResult
 {
-  return read_next_internal(chunks, false);
+  return read_next_internal(chunks, chunk_emit_mode::All);
 }
 
 fn SourceBatchReader::read_next_ordered(ArrayList<Chunk> &chunks) throws
     -> ReadResult
 {
-  return read_next_internal(chunks, true);
+  return read_next_internal(chunks, chunk_emit_mode::One);
 }
 
 fn read_named_or_stdin_batch(const ExecContext &ec,
@@ -767,7 +797,7 @@ fn read_named_or_stdin_batch(const ExecContext &ec,
   let results = ArrayList<source_read_result>{allocator};
   results.reserve(sources.count());
   for (usize source_index = 0; source_index < sources.count(); source_index++)
-    results.push({None, 0, false});
+    results.push({None, 0, source_completion_state::Pending});
 
   let reader = SourceBatchReader{ec, sources, allocator};
   let chunks = ArrayList<SourceBatchReader::Chunk>{allocator};
@@ -782,7 +812,7 @@ fn read_named_or_stdin_batch(const ExecContext &ec,
 
     for (let const &chunk : chunks) {
       let &result = results[chunk.source_index];
-      result.is_complete = chunk.is_complete;
+      result.completion = chunk.completion;
       if (chunk.error_number != 0) {
         result.content.reset();
         result.error_number = chunk.error_number;
