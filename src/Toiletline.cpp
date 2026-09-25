@@ -2000,6 +2000,9 @@ fn get_input(const String &prompt) -> input_result
   let const was_history_empty = previous_history_total_count == 0;
   let const previous_history_status = HISTORY_FILE_STATUS;
   let const had_previous_history_status = HAS_HISTORY_FILE_STATUS;
+  /* Refresh geometry before every prompt so history keys are not interpreted
+     against a stale or zero-width frame after a terminal or tmux resize. */
+  ::itl_g_tty_changed_size = 1;
   i32 code = ::tl_get_input(TL_BUFFER, sizeof(TL_BUFFER), prompt.c_str());
   if (history_path.has_value() &&
       ::itl_g_history_total_count != previous_history_total_count)
