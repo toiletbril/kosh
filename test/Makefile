@@ -111,13 +111,17 @@ clean:
 	@rm -rf $(FAILED_LIST).d
 	@rm -rf "$(CURDIR)/.test-work"
 
-test: batch_contract_test $(EVILISO_LOOPBACK_DEPENDENCY) $(BIN) \
+test: batch_contract_test report_table_test $(EVILISO_LOOPBACK_DEPENDENCY) $(BIN) \
 	$(WINDOWS_DIFF_BOOTSTRAP)
 	@$(SHELL) run-test-suite.sh all
 
 batch_contract_test:
 	@$(MAKE) -C ../src MODE='$(MODE)' TARGET='$(TARGET)' ARCH='$(ARCH)' \
 		NO_TOILETLINE='$(NO_TOILETLINE)' batch_contract_test
+
+report_table_test:
+	@$(MAKE) -C ../src MODE='$(MODE)' TARGET='$(TARGET)' ARCH='$(ARCH)' \
+		NO_TOILETLINE='$(NO_TOILETLINE)' report_table_test
 
 eviliso_loopback_helper:
 	@$(MAKE) -C ../src MODE='$(MODE)' TARGET='$(TARGET)' ARCH='$(ARCH)' \
