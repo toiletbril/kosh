@@ -1919,7 +1919,8 @@ static fn execute_io_uring_batch(const batched_syscall *operations,
           __atomic_load_n(ring.completion_tail, __ATOMIC_ACQUIRE);
       if (completion_head == completion_tail) {
         let const wait_result =
-            ::syscall(SYS_io_uring_enter, ring.descriptor, 0, 1,
+            ::syscall(SYS_io_uring_enter, ring.descriptor, 0,
+                      static_cast<u32>(queued_count - completed_count),
                       IORING_ENTER_GETEVENTS, nullptr, 0);
         if (wait_result < 0 && errno == EINTR) {
           if (!INTERRUPT_REQUESTED) continue;
