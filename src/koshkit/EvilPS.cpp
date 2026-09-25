@@ -14,10 +14,10 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
-#include "../base/StaticStringMap.hpp"
 #include "../Toiletline.hpp"
 #include "../Utils.hpp"
 #include "../base/Arena.hpp"
+#include "../base/StaticStringMap.hpp"
 
 FLAG_LIST_DECL();
 
@@ -146,8 +146,8 @@ fn set_cpu_percentage(tree_node &node, const live_process_cpu_row &history,
 {
   if (history.history_nanoseconds.count() < 2) return;
 
-  let const boundary = find_rolling_window_boundary(
-      history.history_nanoseconds, window_start_nanoseconds);
+  let const boundary = find_rolling_window_boundary(history.history_nanoseconds,
+                                                    window_start_nanoseconds);
   let const baseline = interpolate_rolling_counter(
       history.history_milliseconds[boundary.before_index],
       history.history_milliseconds[boundary.after_index],
@@ -161,9 +161,9 @@ fn set_cpu_percentage(tree_node &node, const live_process_cpu_row &history,
     return;
   }
 
-  node.cpu_percentage_hundredths = static_cast<u64>(
-      static_cast<u128>(current_milliseconds - *baseline) *
-      10000000000ULL / (now_nanoseconds - boundary.timestamp));
+  node.cpu_percentage_hundredths =
+      static_cast<u64>(static_cast<u128>(current_milliseconds - *baseline) *
+                       10000000000ULL / (now_nanoseconds - boundary.timestamp));
   node.has_cpu_percentage = true;
 }
 
@@ -932,8 +932,8 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
       if (now - last_sample_nanoseconds >= sample_interval_nanoseconds) {
         live_line_width_limit = line_width_limit;
         if (!FLAG_EVILPS_WIDE.is_enabled() && is_terminal) {
-          if (let const dimensions = os::get_terminal_dimensions(
-                  ec.out_fd.value_or(KOSH_STDOUT));
+          if (let const dimensions =
+                  os::get_terminal_dimensions(ec.out_fd.value_or(KOSH_STDOUT));
               dimensions.has_value() && dimensions->columns > 8)
             live_line_width_limit = dimensions->columns;
         }
@@ -953,8 +953,8 @@ fn EvilPS::execute(const ExecContext &ec, EvalContext &cxt,
       last_refresh_nanoseconds = now;
       u32 terminal_rows = 24;
       if (is_terminal) {
-        if (let const dimensions = os::get_terminal_dimensions(
-                ec.out_fd.value_or(KOSH_STDOUT)))
+        if (let const dimensions =
+                os::get_terminal_dimensions(ec.out_fd.value_or(KOSH_STDOUT)))
           terminal_rows = dimensions->rows;
       }
       usize visible_line_count = 0;

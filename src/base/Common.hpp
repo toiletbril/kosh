@@ -128,12 +128,12 @@ using opaque = void;
 #define t__used               __attribute__((used))
 #define t__pure               __attribute__((pure))
 #if defined KOSH_TINYREL
-#define t__forceinline        inline t__used
+#define t__forceinline inline t__used
 #else
-#define t__forceinline        inline __attribute__((always_inline))
+#define t__forceinline inline __attribute__((always_inline))
 #endif
-#define t__unreachable()      __builtin_unreachable()
-#define t__debugtrap()        __builtin_trap()
+#define t__unreachable() __builtin_unreachable()
+#define t__debugtrap()   __builtin_trap()
 #else /* __GNUC__ || __clang__ || __COSMOCC__ */
 #error Oh no! Segmentation fault. Please download a better compiler that \
        supports GNU extensions!

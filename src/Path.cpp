@@ -11,8 +11,8 @@
 
 #include "MimicMood.hpp"
 #include "Platform.hpp"
-#include "base/StaticStringMap.hpp"
 #include "base/PackedStringKey.hpp"
+#include "base/StaticStringMap.hpp"
 #include "base/Trace.hpp"
 
 namespace koshka {

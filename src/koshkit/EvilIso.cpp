@@ -197,7 +197,8 @@ fn append_namespace_report(String &output, bool should_color,
         target = os::read_symlink(
             eviliso_namespace_proc_path(process_suffix.view(), allocator),
             allocator);
-        if (!target.has_value()) failure_reason = os::last_system_error_message();
+        if (!target.has_value())
+          failure_reason = os::last_system_error_message();
       }
 
       let identifier = target.has_value()
@@ -298,22 +299,22 @@ fn append_namespace_report(String &output, bool should_color,
 
   let failure_table = ReportTable{allocator};
   failure_table.add_column("TYPE", report_table_alignment::Left,
-                            colors::ansi::BOLD_CYAN);
+                           colors::ansi::BOLD_CYAN);
   if (detail == eviliso_detail_mode::All) {
     failure_table.add_column("PID", report_table_alignment::Right,
-                              colors::ansi::BOLD_CYAN);
+                             colors::ansi::BOLD_CYAN);
     failure_table.add_column("NAME", report_table_alignment::Left,
-                              colors::ansi::BOLD_CYAN);
+                             colors::ansi::BOLD_CYAN);
     failure_table.add_column("ROLE", report_table_alignment::Left,
-                              colors::ansi::BOLD_CYAN);
+                             colors::ansi::BOLD_CYAN);
   } else {
     failure_table.add_column("PROCESSES", report_table_alignment::Right,
-                              colors::ansi::BOLD_CYAN);
+                             colors::ansi::BOLD_CYAN);
   }
   failure_table.add_column("STATUS", report_table_alignment::Left,
-                            colors::ansi::BOLD_CYAN);
+                           colors::ansi::BOLD_CYAN);
   failure_table.add_column("REASON", report_table_alignment::Left,
-                            colors::ansi::BOLD_CYAN);
+                           colors::ansi::BOLD_CYAN);
   bool has_failure = false;
   if (detail == eviliso_detail_mode::All) {
     for (let const &relation : relations) {
@@ -327,7 +328,7 @@ fn append_namespace_report(String &output, bool should_color,
       cells.push({relation.role, colors::ansi::BOLD_MAGENTA});
       cells.push({"Unavailable", colors::ansi::BOLD_YELLOW});
       cells.push({relation.reason.is_empty() ? StringView{"unknown error"}
-                                                 : relation.reason.view(),
+                                             : relation.reason.view(),
                   colors::ansi::RESET});
       failure_table.add_row(cells);
     }
@@ -344,17 +345,17 @@ fn append_namespace_report(String &output, bool should_color,
       usize group_end = relation_index + 1;
       while (group_end < relations.count()) {
         let const &candidate = relations[group_end];
-        let const candidate_reason =
-            candidate.reason.is_empty() ? StringView{"unknown error"}
-                                        : candidate.reason.view();
+        let const candidate_reason = candidate.reason.is_empty()
+                                         ? StringView{"unknown error"}
+                                         : candidate.reason.view();
         if (candidate.is_available || candidate.type != first.type ||
             candidate_reason != reason)
           break;
         group_end++;
       }
       has_failure = true;
-      let const process_count = String::from(group_end - relation_index,
-                                              allocator);
+      let const process_count =
+          String::from(group_end - relation_index, allocator);
       let cells = ArrayList<report_table_cell_view>{allocator};
       cells.push({first.type, colors::ansi::BOLD_MAGENTA});
       cells.push({process_count.view(), colors::ansi::BOLD_GREEN});
@@ -809,8 +810,7 @@ fn append_cgroup_failure_report(
     let const process_id = String::from(process.process_id, allocator);
     let cells = ArrayList<report_table_cell_view>{allocator};
     cells.push({process_id.view(), colors::ansi::BOLD_GREEN});
-    cells.push({process.name.is_empty() ? StringView{"-"}
-                                          : process.name.view(),
+    cells.push({process.name.is_empty() ? StringView{"-"} : process.name.view(),
                 colors::ansi::RESET});
     cells.push({process_snapshot_status_name(process.status),
                 colors::ansi::BOLD_YELLOW});
@@ -1110,7 +1110,8 @@ fn append_remote_report(String &output, bool should_color,
     cells.reserve(3);
     cells.push({"Sockets", colors::ansi::BOLD_CYAN});
     cells.push({"unavailable", colors::ansi::BOLD_YELLOW});
-    cells.push({"platform does not expose socket records", colors::ansi::RESET});
+    cells.push(
+        {"platform does not expose socket records", colors::ansi::RESET});
     table.add_row(cells);
     append_titled_report_table(output, "Socket status failures", table,
                                should_color);

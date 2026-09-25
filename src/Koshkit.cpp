@@ -1070,8 +1070,8 @@ cold static fn show_soft_koshkit_error(const ExecContext &ec, EvalContext &cxt,
   print_error(String{message} + "\n");
 }
 
-static fn koshkit_invocation_name(const ExecContext &ec, Allocator allocator)
-    throws -> String
+static fn koshkit_invocation_name(const ExecContext &ec,
+                                  Allocator allocator) throws -> String
 {
   if (ec.is_multicall && !ec.args().is_empty())
     return String{allocator, ec.args()[0].view()};

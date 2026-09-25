@@ -12,9 +12,9 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
-#include "../base/StaticStringMap.hpp"
 #include "../Utils.hpp"
 #include "../base/Path.hpp"
+#include "../base/StaticStringMap.hpp"
 
 #include <cstdio>
 

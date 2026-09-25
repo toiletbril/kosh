@@ -18,13 +18,13 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "Platform.hpp"
-#include "base/StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Utils.hpp"
 #include "base/Arena.hpp"
 #include "base/Common.hpp"
 #include "base/Debug.hpp"
 #include "base/Path.hpp"
+#include "base/StaticStringMap.hpp"
 #include "base/Trace.hpp"
 
 namespace koshka {
@@ -104,16 +104,17 @@ fn EvalContext::snapshot_subshell_descriptor(i32 shell_fd) throws -> void
   if (execution_store().subshell_depth() == 0) return;
   for (let const &entry : m_subshell_saved_descriptors) {
     if (entry.depth == execution_store().subshell_depth() &&
-        entry.saved.shell_fd == shell_fd) {
+        entry.saved.shell_fd == shell_fd)
+    {
       return;
     }
   }
   LOG(Debug,
       "backing up descriptor %d before a subshell exec moves it at depth %zu",
       shell_fd, execution_store().subshell_depth());
-  m_subshell_saved_descriptors.push(subshell_saved_descriptor{
-      execution_store().subshell_depth(),
-      os::save_descriptor_out_of_reach(shell_fd)});
+  m_subshell_saved_descriptors.push(
+      subshell_saved_descriptor{execution_store().subshell_depth(),
+                                os::save_descriptor_out_of_reach(shell_fd)});
 }
 
 fn EvalContext::set_coprocess_descriptors(i32 read_fd, i32 write_fd) wontthrow
@@ -1800,17 +1801,18 @@ cold fn EvalContext::make_stats_string() const throws -> String
      sampled here. */
   const usize live_ast_arena_bytes =
       parse_arena() != nullptr ? parse_arena()->bytes_used() : 0;
-  usize peak_ast_arena_bytes = evaluation_metrics_store().peak_ast_arena_bytes();
+  usize peak_ast_arena_bytes =
+      evaluation_metrics_store().peak_ast_arena_bytes();
   if (live_ast_arena_bytes > peak_ast_arena_bytes)
     peak_ast_arena_bytes = live_ast_arena_bytes;
 
   stats_text += "[Stats\n";
 
   stats_text += EXPRESSION_DOUBLE_AST_INDENT;
-  stats_text += "Commands evaluated: " +
-                String::from(evaluation_metrics_store().commands_evaluated() +
-                                 1,
-                             heap_allocator());
+  stats_text +=
+      "Commands evaluated: " +
+      String::from(evaluation_metrics_store().commands_evaluated() + 1,
+                   heap_allocator());
   stats_text += '\n';
   stats_text += EXPRESSION_DOUBLE_AST_INDENT;
   stats_text +=

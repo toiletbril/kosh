@@ -9,10 +9,10 @@
 
 #include "DiagnosticsChecksInternal.hpp"
 #include "Lexer.hpp"
-#include "base/StaticStringMap.hpp"
 #include "Tokens.hpp"
 #include "Utils.hpp"
 #include "base/PackedStringKey.hpp"
+#include "base/StaticStringMap.hpp"
 
 namespace koshka {
 

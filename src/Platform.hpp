@@ -1952,8 +1952,8 @@ struct nohup_options
   StringView home{};
 };
 
-fn run_nohup(const ArrayList<String> &argv,
-             const nohup_options &options) throws -> Maybe<i32>;
+fn run_nohup(const ArrayList<String> &argv, const nohup_options &options) throws
+    -> Maybe<i32>;
 
 struct system_log_options
 {
@@ -2061,8 +2061,7 @@ struct process_substitution_options
 };
 
 fn launch_process_substitution(const process_substitution_options &options)
-    throws
-    -> process_substitution_launch;
+    throws -> process_substitution_launch;
 fn release_unused_process_substitution(opaque *cleanup) wontthrow -> void;
 
 struct fork_compound_stage_options

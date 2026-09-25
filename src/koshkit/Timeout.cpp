@@ -346,13 +346,14 @@ fn Timeout::execute(const ExecContext &ec, EvalContext &cxt,
         ResolvedCommand::from_program(Path{shell_path->view()}),
         steal(fallback_args), steal(fallback_locations));
     child = os::execute_program(
-        fallback, os::program_execution_options{
-                      .source = source != nullptr ? source->view() : StringView{},
-                      .fallback = os::script_fallback_policy::Reject,
-                      .handoff = has_controlling_terminal
-                                     ? os::terminal_handoff::BeforeStart
-                                     : os::terminal_handoff::Keep,
-                      .process_group = process_group_mode});
+        fallback,
+        os::program_execution_options{
+            .source = source != nullptr ? source->view() : StringView{},
+            .fallback = os::script_fallback_policy::Reject,
+            .handoff = has_controlling_terminal
+                           ? os::terminal_handoff::BeforeStart
+                           : os::terminal_handoff::Keep,
+            .process_group = process_group_mode});
   }
 
   os::process process_group = KOSH_INVALID_PROCESS;

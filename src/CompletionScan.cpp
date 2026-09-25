@@ -73,8 +73,7 @@ static fn previous_settled_word(StringView line, usize token_start) wontthrow
   return word;
 }
 
-using sorted_target_list =
-    SortedArrayList<String, order_comparator<String>>;
+using sorted_target_list = SortedArrayList<String, order_comparator<String>>;
 
 /* Keyed by the source file's absolute path and refreshed when the mtime moves.
    Cached targets stay sorted so prefix completion can skip non-matches. */
@@ -333,9 +332,8 @@ static fn cached_targets_for(const Path &source_file, Collector collect) throws
     return &cached->targets;
   let targets = collect();
   return &BUILD_TARGET_CACHE
-              .set(key, cached_target_list{
-                              *mtime,
-                              steal(targets).make_sorted(sort_order::ascending)})
+              .set(key, cached_target_list{*mtime, steal(targets).make_sorted(
+                                                       sort_order::ascending)})
               ->targets;
 }
 

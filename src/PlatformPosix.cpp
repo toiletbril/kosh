@@ -15,10 +15,10 @@
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"
-#include "base/StaticStringMap.hpp"
 #include "Utils.hpp"
 #include "base/Common.hpp"
 #include "base/Debug.hpp"
+#include "base/StaticStringMap.hpp"
 #include "base/Trace.hpp"
 
 #include <syslog.h>

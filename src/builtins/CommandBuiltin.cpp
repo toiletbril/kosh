@@ -109,8 +109,7 @@ fn CommandBuiltin::execute(ExecContext &ec, EvalContext &cxt) const throws
         did_find_any = true;
         continue;
       }
-      if (cxt.has_functions() &&
-          cxt.find_function(name.view()).has_value()) {
+      if (cxt.has_functions() && cxt.find_function(name.view()).has_value()) {
         if (!is_verbose) {
           ec.print_to_stdout(name + "\n");
         } else {

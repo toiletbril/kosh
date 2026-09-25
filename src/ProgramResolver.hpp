@@ -27,20 +27,18 @@ namespace utils {
 
 struct program_name_comparator
 {
-  pure fn operator()(const String &left, const String &right) const wontthrow
-      -> bool
+  pure fn operator()(const String &left,
+                     const String &right) const wontthrow->bool
   {
     return left.view() < right.view();
   }
 
-  pure fn operator()(const String &left, StringView right) const wontthrow
-      -> bool
+  pure fn operator()(const String &left, StringView right) const wontthrow->bool
   {
     return left.view() < right;
   }
 
-  pure fn operator()(StringView left, const String &right) const wontthrow
-      -> bool
+  pure fn operator()(StringView left, const String &right) const wontthrow->bool
   {
     return left < right.view();
   }

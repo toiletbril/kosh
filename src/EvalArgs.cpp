@@ -15,13 +15,13 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "Platform.hpp"
-#include "base/StaticStringMap.hpp"
 #include "Utils.hpp"
 #include "base/Arena.hpp"
 #include "base/Common.hpp"
 #include "base/Debug.hpp"
 #include "base/PackedStringKey.hpp"
 #include "base/Path.hpp"
+#include "base/StaticStringMap.hpp"
 #include "base/Trace.hpp"
 
 namespace koshka {

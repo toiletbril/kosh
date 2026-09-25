@@ -388,10 +388,9 @@ fn run_selector_program(koshka::EvalContext &context, koshka::StringView input,
 
   are_child_descriptors_owned = false;
   let const child = koshka::os::execute_program(
-      selector,
-      koshka::os::program_execution_options{
-          .fallback = koshka::os::script_fallback_policy::Reject,
-          .handoff = koshka::os::terminal_handoff::BeforeStart});
+      selector, koshka::os::program_execution_options{
+                    .fallback = koshka::os::script_fallback_policy::Reject,
+                    .handoff = koshka::os::terminal_handoff::BeforeStart});
 
   let const captured =
       koshka::os::read_fd_to_string(output_pipe->in, koshka::heap_allocator());

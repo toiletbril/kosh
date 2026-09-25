@@ -24,13 +24,13 @@
 #include "Parser.hpp"
 #include "ParserFormats.hpp"
 #include "Platform.hpp"
-#include "base/StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
 #include "Utils.hpp"
 #include "base/Arena.hpp"
 #include "base/Common.hpp"
 #include "base/Debug.hpp"
+#include "base/StaticStringMap.hpp"
 #include "base/Trace.hpp"
 
 namespace koshka {
@@ -301,8 +301,7 @@ pure fn VariableOccurrenceStateMap::find(StringView name) const wontthrow
     -> const variable_occurrence_state *
 {
   let const change = m_changes.find(name);
-  if (change.has_value())
-    return change->is_present ? &change->state : nullptr;
+  if (change.has_value()) return change->is_present ? &change->state : nullptr;
   return m_base != nullptr ? m_base->states.find(name).value_or(nullptr)
                            : nullptr;
 }
@@ -957,8 +956,7 @@ fn AnalysisContext::note_variable_assignment(
       read_location.has_value())
   {
     report_diagnostic(diagnostic_id::use_before_assign, *read_location.value(),
-                      {name},
-                      location);
+                      {name}, location);
     reads_before_assignment.erase(name);
   }
 }
@@ -1148,7 +1146,8 @@ fn AnalysisContext::apply_called_function(
     {
       let &occurrence = symbol_records->variable_occurrences[occurrence_index];
       if (occurrence.kind != variable_occurrence_kind::Reference ||
-          occurrence.function_definition_index != *selected_definition_index.value() ||
+          occurrence.function_definition_index !=
+              *selected_definition_index.value() ||
           !occurrence.has_inherited_function_path)
       {
         continue;

@@ -21,7 +21,6 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "Platform.hpp"
-#include "base/StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Utils.hpp"
 #include "base/Arena.hpp"
@@ -29,6 +28,7 @@
 #include "base/Debug.hpp"
 #include "base/PackedStringKey.hpp"
 #include "base/Path.hpp"
+#include "base/StaticStringMap.hpp"
 #include "base/Trace.hpp"
 
 FLAG_LIST_DECL();
@@ -892,11 +892,11 @@ fn kosh_main(int argc, char **argv) -> int
   if (should_be_interactive) {
     if (let const dimensions = koshka::os::get_terminal_dimensions()) {
       context.set_shell_variable(
-          "COLUMNS", koshka::String::from(dimensions->columns,
-                                          koshka::heap_allocator()));
+          "COLUMNS",
+          koshka::String::from(dimensions->columns, koshka::heap_allocator()));
       context.set_shell_variable(
-          "LINES", koshka::String::from(dimensions->rows,
-                                        koshka::heap_allocator()));
+          "LINES",
+          koshka::String::from(dimensions->rows, koshka::heap_allocator()));
     }
   }
 
@@ -1257,8 +1257,7 @@ fn kosh_main(int argc, char **argv) -> int
            return push the prompt to a fresh line, and on a clean line the
            prompt overwrites the marker so nothing shows. */
         if (should_be_interactive) {
-          if (let const dimensions =
-                  koshka::os::get_terminal_dimensions();
+          if (let const dimensions = koshka::os::get_terminal_dimensions();
               dimensions.has_value() && dimensions->columns > 0)
           {
             koshka::String eol_marker{koshka::heap_allocator()};

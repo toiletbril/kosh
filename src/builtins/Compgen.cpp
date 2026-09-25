@@ -15,10 +15,10 @@
 #include "../Eval.hpp"
 #include "../Lexer.hpp"
 #include "../Platform.hpp"
-#include "../base/StaticStringMap.hpp"
 #include "../Tokens.hpp"
 #include "../Utils.hpp"
 #include "../base/Path.hpp"
+#include "../base/StaticStringMap.hpp"
 #include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();

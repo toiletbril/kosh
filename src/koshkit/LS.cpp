@@ -13,9 +13,9 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
-#include "../base/StaticStringMap.hpp"
 #include "../Utils.hpp"
 #include "../base/Path.hpp"
+#include "../base/StaticStringMap.hpp"
 #include "../base/Trace.hpp"
 
 FLAG_LIST_DECL();
@@ -520,8 +520,8 @@ static fn render_columns(const ArrayList<listing_entry> &entries,
   if (count == 0) return;
 
   let const terminal_dimensions = os::get_terminal_dimensions();
-  let const is_terminal = !options.is_one_per_line &&
-                          terminal_dimensions.has_value();
+  let const is_terminal =
+      !options.is_one_per_line && terminal_dimensions.has_value();
   if (!is_terminal) {
     for (let const &entry : entries) {
       append_decorated_name(output, entry, options);

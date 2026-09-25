@@ -20,13 +20,13 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "Platform.hpp"
-#include "base/StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Utils.hpp"
 #include "base/Arena.hpp"
 #include "base/Common.hpp"
 #include "base/Debug.hpp"
 #include "base/Path.hpp"
+#include "base/StaticStringMap.hpp"
 #include "base/Trace.hpp"
 
 namespace koshka {
@@ -43,8 +43,7 @@ EvalContext::EvalContext(bool should_disable_path_expansion, bool should_echo,
                          bool should_error_exit, String shell_name,
                          ArrayList<String> positional_params)
     : m_variable_store(steal(positional_params)),
-      m_execution_store(shell_is_interactive),
-      m_shell_name(steal(shell_name))
+      m_execution_store(shell_is_interactive), m_shell_name(steal(shell_name))
 {
   set_no_glob(should_disable_path_expansion);
   set_echo(should_echo);
@@ -440,7 +439,8 @@ fn EvalContext::peel_caller_local_binding(StringView name) throws -> bool
   if (is_local_in_current_scope(name)) return false;
 
   for (usize frame_index = scope_store().local_scope_depth() - 1;
-       frame_index-- > 0;) {
+       frame_index-- > 0;)
+  {
     ArrayList<local_binding> &frame = scope_store().local_scopes()[frame_index];
     for (usize i = frame.count(); i-- > 0;) {
       let &binding = frame[i];
@@ -535,8 +535,7 @@ fn EvalContext::set_indexed_array(StringView name,
 fn EvalContext::publish_pipe_statuses(ArrayList<String> values) throws -> void
 {
   if (is_readonly("PIPESTATUS")) {
-    if (let current = indexed_arrays().find("PIPESTATUS");
-        current.has_value())
+    if (let current = indexed_arrays().find("PIPESTATUS"); current.has_value())
       *current.value() = steal(values);
 
     return;
@@ -945,7 +944,8 @@ fn EvalContext::is_exported(StringView name) const throws -> bool
 
   char folded[EXPORTED_NAME_FOLD_BYTES];
   let spill = String{heap_allocator()};
-  return exported_names().find(fold_exported_name(name, folded, spill))
+  return exported_names()
+      .find(fold_exported_name(name, folded, spill))
       .has_value();
 }
 
@@ -1150,10 +1150,12 @@ fn EvalContext::leave_bash_argument_frame(
 
 fn EvalContext::enter_function_scope() throws -> void
 {
-  if (scope_store().local_scope_depth() ==
-      scope_store().local_scopes().count())
-    scope_store().local_scopes().push(ArrayList<local_binding>{heap_allocator()});
-  ASSERT(scope_store().local_scopes()[scope_store().local_scope_depth()].is_empty());
+  if (scope_store().local_scope_depth() == scope_store().local_scopes().count())
+    scope_store().local_scopes().push(
+        ArrayList<local_binding>{heap_allocator()});
+  ASSERT(scope_store()
+             .local_scopes()[scope_store().local_scope_depth()]
+             .is_empty());
   scope_store().local_scope_depth()++;
   LOG(Debug, "entered function scope, local scope depth now %zu",
       scope_store().local_scope_depth());
@@ -1181,8 +1183,8 @@ fn EvalContext::leave_function_scope() throws -> void
   if (scope_store().local_scopes().count() > RETAINED_LOCAL_SCOPE_COUNT &&
       scope_store().local_scopes().count() > scope_store().local_scope_depth())
   {
-    scope_store().local_scopes().remove(
-        scope_store().local_scopes().count() - 1);
+    scope_store().local_scopes().remove(scope_store().local_scopes().count() -
+                                        1);
   }
 }
 

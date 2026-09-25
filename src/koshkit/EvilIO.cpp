@@ -12,9 +12,9 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Platform.hpp"
-#include "../base/StaticStringMap.hpp"
 #include "../Utils.hpp"
 #include "../base/Arena.hpp"
+#include "../base/StaticStringMap.hpp"
 
 FLAG_LIST_DECL();
 
@@ -357,8 +357,8 @@ fn get_process_window_status(const live_process_row &row,
                              u64 window_start_nanoseconds) wontthrow
     -> os::process_io_status
 {
-  let const boundary = find_rolling_window_boundary(
-      row.history_nanoseconds, window_start_nanoseconds);
+  let const boundary = find_rolling_window_boundary(row.history_nanoseconds,
+                                                    window_start_nanoseconds);
   let const &before = row.history[boundary.before_index];
   let const &after_boundary = row.history[boundary.after_index];
   let const &newest = row.history.back();
@@ -370,16 +370,18 @@ fn get_process_window_status(const live_process_row &row,
         row.history_nanoseconds[boundary.before_index],
         row.history_nanoseconds[boundary.after_index], boundary.timestamp);
   };
-  if (let const baseline = get_baseline(before.read_bytes,
-                                        after_boundary.read_bytes);
-      baseline.has_value()) {
+  if (let const baseline =
+          get_baseline(before.read_bytes, after_boundary.read_bytes);
+      baseline.has_value())
+  {
     if (let const delta = counter_delta(*baseline, newest.read_bytes);
         delta.has_value())
       status.read_bytes = *delta;
   }
-  if (let const baseline = get_baseline(before.written_bytes,
-                                        after_boundary.written_bytes);
-      baseline.has_value()) {
+  if (let const baseline =
+          get_baseline(before.written_bytes, after_boundary.written_bytes);
+      baseline.has_value())
+  {
     if (let const delta = counter_delta(*baseline, newest.written_bytes);
         delta.has_value())
       status.written_bytes = *delta;
@@ -389,9 +391,8 @@ fn get_process_window_status(const live_process_row &row,
   {
     let const read_baseline = get_baseline(before.read_operation_count,
                                            after_boundary.read_operation_count);
-    let const write_baseline =
-        get_baseline(before.write_operation_count,
-                     after_boundary.write_operation_count);
+    let const write_baseline = get_baseline(
+        before.write_operation_count, after_boundary.write_operation_count);
     if (read_baseline.has_value() && write_baseline.has_value()) {
       let const read_delta =
           counter_delta(*read_baseline, newest.read_operation_count);
@@ -963,10 +964,9 @@ fn run_live_process_io(const ExecContext &ec, Maybe<i64> selected_pid,
           retained.remove(position);
           continue;
         }
-        trim_rolling_history(
-            retained[position].history,
-            retained[position].history_nanoseconds,
-            rolling_window_start(now, falloff_nanoseconds));
+        trim_rolling_history(retained[position].history,
+                             retained[position].history_nanoseconds,
+                             rolling_window_start(now, falloff_nanoseconds));
       }
       last_sample_nanoseconds = now;
     }
@@ -1006,8 +1006,8 @@ struct live_disk_row
 fn make_disk_window_row(const live_disk_row &row, u64 window_start_nanoseconds,
                         Allocator allocator) throws -> disk_io_row
 {
-  let const boundary = find_rolling_window_boundary(
-      row.history_nanoseconds, window_start_nanoseconds);
+  let const boundary = find_rolling_window_boundary(row.history_nanoseconds,
+                                                    window_start_nanoseconds);
   let const &lower = row.history[boundary.before_index];
   let const &upper = row.history[boundary.after_index];
   let const &newest = row.history.back();
@@ -1024,8 +1024,7 @@ fn make_disk_window_row(const live_disk_row &row, u64 window_start_nanoseconds,
         value.has_value())
       before.*member = *value;
   };
-  do_interpolate(os::disk_io_field::ReadBytes,
-                 &os::disk_io_status::read_bytes);
+  do_interpolate(os::disk_io_field::ReadBytes, &os::disk_io_status::read_bytes);
   do_interpolate(os::disk_io_field::WrittenBytes,
                  &os::disk_io_status::written_bytes);
   do_interpolate(os::disk_io_field::ReadOperations,
@@ -1050,11 +1049,10 @@ fn make_disk_window_row(const live_disk_row &row, u64 window_start_nanoseconds,
                  &os::disk_io_status::read_retry_count);
   do_interpolate(os::disk_io_field::WriteRetries,
                  &os::disk_io_status::write_retry_count);
-  let const elapsed_nanoseconds = row.history_nanoseconds.back() >
-                                          boundary.timestamp
-                                      ? row.history_nanoseconds.back() -
-                                            boundary.timestamp
-                                      : 0;
+  let const elapsed_nanoseconds =
+      row.history_nanoseconds.back() > boundary.timestamp
+          ? row.history_nanoseconds.back() - boundary.timestamp
+          : 0;
   return make_disk_io_row(&before, newest, elapsed_nanoseconds, allocator,
                           report_sampling_mode::Rolling);
 }
@@ -1153,10 +1151,9 @@ fn run_live_disk_io(const ExecContext &ec, f64 window_seconds,
           retained.remove(position);
           continue;
         }
-        trim_rolling_history(
-            retained[position].history,
-            retained[position].history_nanoseconds,
-            rolling_window_start(now, falloff_nanoseconds));
+        trim_rolling_history(retained[position].history,
+                             retained[position].history_nanoseconds,
+                             rolling_window_start(now, falloff_nanoseconds));
       }
       last_sample_nanoseconds = now;
     }
@@ -1422,9 +1419,8 @@ fn EvilIO::execute(const ExecContext &ec, EvalContext &cxt,
     }
     live_interval_seconds = parsed.value();
   }
-  let const sample_duration_seconds = FLAG_EVILIO_CUMULATIVE.is_enabled()
-                                          ? cumulative_duration_seconds
-                                          : 1.0;
+  let const sample_duration_seconds =
+      FLAG_EVILIO_CUMULATIVE.is_enabled() ? cumulative_duration_seconds : 1.0;
   String sample_duration_label{allocator, "/S"};
   if (FLAG_EVILIO_CUMULATIVE.is_enabled() || FLAG_EVILIO_LIVE.is_enabled())
     sample_duration_label =

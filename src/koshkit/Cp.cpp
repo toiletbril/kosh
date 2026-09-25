@@ -234,11 +234,11 @@ static fn copy_path(const ExecContext &ec, EvalContext &cxt,
                                                ~os::get_file_creation_mask());
     }
     if (source_status.has_value() && should_preserve &&
-        !os::set_file_times(
-            destination,
-            {source_status->access_time, source_status->access_nanoseconds,
-             source_status->modification_time,
-             source_status->modification_nanoseconds}))
+        !os::set_file_times(destination,
+                            {source_status->access_time,
+                             source_status->access_nanoseconds,
+                             source_status->modification_time,
+                             source_status->modification_nanoseconds}))
     {
       throw Error{
           "unable to preserve timestamps for '" +
@@ -272,11 +272,11 @@ static fn copy_path(const ExecContext &ec, EvalContext &cxt,
                                              ~os::get_file_creation_mask());
   }
   if (source_status.has_value() && should_preserve &&
-      !os::set_file_times(
-          destination,
-          {source_status->access_time, source_status->access_nanoseconds,
-           source_status->modification_time,
-           source_status->modification_nanoseconds}))
+      !os::set_file_times(destination,
+                          {source_status->access_time,
+                           source_status->access_nanoseconds,
+                           source_status->modification_time,
+                           source_status->modification_nanoseconds}))
   {
     throw Error{
         "unable to preserve timestamps for '" + String{allocator, destination}

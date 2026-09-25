@@ -466,8 +466,7 @@ struct rolling_window_boundary
 pure fn find_rolling_window_boundary(const ArrayList<u64> &timestamps,
                                      u64 window_start) wontthrow
     -> rolling_window_boundary;
-pure fn interpolate_rolling_counter(u64 before, u64 after,
-                                    u64 before_timestamp,
+pure fn interpolate_rolling_counter(u64 before, u64 after, u64 before_timestamp,
                                     u64 after_timestamp,
                                     u64 target_timestamp) wontthrow
     -> Maybe<u64>;
@@ -480,9 +479,7 @@ fn trim_rolling_history(ArrayList<T> &values, ArrayList<u64> &timestamps,
                         u64 window_start_nanoseconds) throws -> void
 {
   ASSERT(values.count() == timestamps.count());
-  while (timestamps.count() > 2 &&
-         timestamps[1] <= window_start_nanoseconds)
-  {
+  while (timestamps.count() > 2 && timestamps[1] <= window_start_nanoseconds) {
     values.remove(0);
     timestamps.remove(0);
   }

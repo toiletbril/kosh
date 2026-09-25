@@ -316,8 +316,7 @@ static fn build_man_subcommand_index(EvalContext &context) throws -> void
     let const tail = name.substring(*dash + 1);
     if (tail.is_empty() || (tail[0] >= '0' && tail[0] <= '9')) return;
     if (!MAN_PAGE_FILE_PATHS.find(head).has_value()) return;
-    MAN_SUBCOMMAND_INDEX
-        .get_or_create(head, cached_subcommand_list{})
+    MAN_SUBCOMMAND_INDEX.get_or_create(head, cached_subcommand_list{})
         .values.push_managed(tail);
   });
 
@@ -557,8 +556,7 @@ static fn parse_manpage_option_entries(StringView text) throws
     if (pending_flags.is_empty()) return;
     let const desc = pending_description.view().trim_blanks();
     for (let const &flag : pending_flags)
-      if (!desc.is_empty() &&
-          !descriptions.find(flag.view()).has_value()) {
+      if (!desc.is_empty() && !descriptions.find(flag.view()).has_value()) {
         descriptions.set(flag.view(), String{desc});
       }
     pending_flags.clear();
@@ -694,8 +692,7 @@ static StringMap<String> MANPAGE_TEXT_CACHE{heap_allocator()};
 fn internal::manpage_text_for(StringView page_name, EvalContext &context) throws
     -> StringView
 {
-  if (let const cached = MANPAGE_TEXT_CACHE.find(page_name);
-      cached.has_value())
+  if (let const cached = MANPAGE_TEXT_CACHE.find(page_name); cached.has_value())
     return cached->view();
 
   let text = String{heap_allocator()};

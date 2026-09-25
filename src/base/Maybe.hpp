@@ -172,16 +172,13 @@ public:
     ASSERT(m_value != nullptr);
     return m_value;
   }
-  hot flatten mustuse pure fn operator*() wontthrow -> T *&
+  hot flatten mustuse pure fn operator*() wontthrow->T *& { return m_value; }
+  hot flatten mustuse pure fn operator*() const wontthrow->T *const &
   {
     return m_value;
   }
-  hot flatten mustuse pure fn operator*() const wontthrow -> T *const &
-  {
-    return m_value;
-  }
-  hot flatten mustuse pure fn operator->() wontthrow -> T * { return value(); }
-  hot flatten mustuse pure fn operator->() const wontthrow -> T *
+  hot flatten mustuse pure fn operator->() wontthrow->T * { return value(); }
+  hot flatten mustuse pure fn operator->() const wontthrow->T *
   {
     return value();
   }

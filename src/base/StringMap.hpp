@@ -117,7 +117,8 @@ public:
   {
     if (m_capacity == 0) return None;
     let const found = probe(key, hash_bytes(key)).found;
-    return found == NO_INDEX ? None : Maybe<const Value *>{&m_slots[found].value};
+    return found == NO_INDEX ? None
+                             : Maybe<const Value *>{&m_slots[found].value};
   }
 
   hot flatten mustuse fn find(StringView key) wontthrow -> Maybe<Value *>

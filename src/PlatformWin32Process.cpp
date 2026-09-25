@@ -111,8 +111,8 @@ fn run_nice(const ArrayList<String> &argv, i32 increment) throws -> Maybe<i32>
   return static_cast<i32>(result->exit_status);
 }
 
-fn run_nohup(const ArrayList<String> &argv,
-             const nohup_options &options) throws -> Maybe<i32>
+fn run_nohup(const ArrayList<String> &argv, const nohup_options &options) throws
+    -> Maybe<i32>
 {
   if (argv.is_empty()) return None;
 
@@ -831,8 +831,8 @@ static pure fn is_batch_program(StringView path) wontthrow -> bool
          utils::ascii_to_lower(suffix[3]) == 't';
 }
 
-fn execute_program(ExecContext &ec,
-                   const program_execution_options &options) -> process
+fn execute_program(ExecContext &ec, const program_execution_options &options)
+    -> process
 {
   let const allow_script_fallback =
       options.fallback == script_fallback_policy::Allow;
@@ -845,8 +845,8 @@ fn execute_program(ExecContext &ec,
       options.process_group != process_group_mode::NewBackground;
   let const job_lifetime =
       options.process_group == process_group_mode::NewLeaderOwned
-                               ? timeout_job_lifetime::LeaderOwned
-                               : timeout_job_lifetime::DescendantOwned;
+          ? timeout_job_lifetime::LeaderOwned
+          : timeout_job_lifetime::DescendantOwned;
   let const should_hand_off_controlling_terminal_before_start =
       options.handoff == terminal_handoff::BeforeStart;
   let const should_start_suspended =
@@ -1125,9 +1125,8 @@ static fn send_internal_pipe(StringView path, StringView content,
   }
 }
 
-fn launch_process_substitution(
-    const process_substitution_options &options) throws
-    -> process_substitution_launch
+fn launch_process_substitution(const process_substitution_options &options)
+    throws -> process_substitution_launch
 {
   let const command_writes_pipe =
       options.direction == process_substitution_direction::CommandWrites;
@@ -1395,12 +1394,11 @@ fn launch_compound_stage(const compound_stage_options &options) throws
         "A compound command in a pipeline is not supported on this platform"};
 
   unused(options.process_group_id);
-  let child =
-      spawn_subshell_stage(options.source, options.in_fd, options.out_fd,
-                           options.err_fd, true, options.bootstrap,
-                           options.shell_name, options.previous_exit_status,
-                           options.shell_process_id, options.subshell_depth,
-                           options.mood, options.process_group);
+  let child = spawn_subshell_stage(
+      options.source, options.in_fd, options.out_fd, options.err_fd, true,
+      options.bootstrap, options.shell_name, options.previous_exit_status,
+      options.shell_process_id, options.subshell_depth, options.mood,
+      options.process_group);
   if (!child.has_value())
     throw ErrorWithLocation{steal(options.location),
                             "Could not spawn the compound pipeline stage"};
@@ -2064,12 +2062,12 @@ fn format_local_time(StringView format, i64 epoch) throws -> String
 fn read_child_cpu_times() wontthrow -> child_cpu_times
 {
   child_cpu_times result{};
-  result.user_seconds = static_cast<double>(
-                     InterlockedCompareExchange64(&CHILD_USER_TICKS, 0, 0)) /
-                 10000000.0;
+  result.user_seconds = static_cast<double>(InterlockedCompareExchange64(
+                            &CHILD_USER_TICKS, 0, 0)) /
+                        10000000.0;
   result.system_seconds = static_cast<double>(InterlockedCompareExchange64(
-                       &CHILD_SYSTEM_TICKS, 0, 0)) /
-                   10000000.0;
+                              &CHILD_SYSTEM_TICKS, 0, 0)) /
+                          10000000.0;
   return result;
 }
 

@@ -19,13 +19,13 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "Platform.hpp"
-#include "base/StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Utils.hpp"
 #include "base/Arena.hpp"
 #include "base/Common.hpp"
 #include "base/Debug.hpp"
 #include "base/Path.hpp"
+#include "base/StaticStringMap.hpp"
 #include "base/Trace.hpp"
 
 namespace koshka {
@@ -473,7 +473,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       }
       case dynamic_var::KOSH_GIT_BRANCH: {
         if (evaluation_metrics_store().git_branch_command_index() !=
-            evaluation_metrics_store().command_evaluation_index()) {
+            evaluation_metrics_store().command_evaluation_index())
+        {
           evaluation_metrics_store().git_branch() = utils::current_git_branch();
           evaluation_metrics_store().git_branch_command_index() =
               evaluation_metrics_store().command_evaluation_index();
@@ -484,7 +485,8 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
       case dynamic_var::KOSH_GIT_AHEAD:
       case dynamic_var::KOSH_GIT_BEHIND: {
         if (evaluation_metrics_store().git_counts_command_index() !=
-            evaluation_metrics_store().command_evaluation_index()) {
+            evaluation_metrics_store().command_evaluation_index())
+        {
           utils::git_status(evaluation_metrics_store().git_branch(),
                             evaluation_metrics_store().git_ahead_count(),
                             evaluation_metrics_store().git_behind_count());
@@ -497,8 +499,9 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         switch (info->kind) {
         case dynamic_var::KOSH_GIT_AHEAD:
           return evaluation_metrics_store().git_ahead_count() > 0
-                     ? String::from(evaluation_metrics_store().git_ahead_count(),
-                                    heap_allocator())
+                     ? String::from(
+                           evaluation_metrics_store().git_ahead_count(),
+                           heap_allocator())
                      : String{heap_allocator()};
         case dynamic_var::KOSH_GIT_BEHIND:
           return evaluation_metrics_store().git_behind_count() > 0
@@ -581,7 +584,7 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         case dynamic_var::BASH_SUBSHELL:
           return String::from(
               static_cast<i64>(execution_store().subshell_depth()),
-                              heap_allocator());
+              heap_allocator());
         case dynamic_var::BASH_SOURCE:
           return String{heap_allocator(), bash_source_frame_at(0)};
         case dynamic_var::BASH_LINENO:

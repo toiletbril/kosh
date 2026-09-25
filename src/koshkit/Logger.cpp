@@ -110,9 +110,9 @@ fn Logger::execute(const ExecContext &ec, EvalContext &cxt,
         "invalid priority '" + String{priority} + "'");
     return 1;
   }
-  if (!os::write_system_log(
-          {tag, priority, message.view(), FLAG_LOGGER_PID.is_enabled(),
-           FLAG_LOGGER_STDERR.is_enabled()}))
+  if (!os::write_system_log({tag, priority, message.view(),
+                             FLAG_LOGGER_PID.is_enabled(),
+                             FLAG_LOGGER_STDERR.is_enabled()}))
   {
     let const location = FLAG_LOGGER_PRIORITY.is_set()
                              ? FLAG_LOGGER_PRIORITY.value_location()

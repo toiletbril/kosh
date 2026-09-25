@@ -397,8 +397,7 @@ public:
   pure fn is_warning_suppressed(suppressible_warning which) const wontthrow
       -> bool
   {
-    return (m_suppressed_warnings &
-            (u32{1} << static_cast<u32>(which))) != 0;
+    return (m_suppressed_warnings & (u32{1} << static_cast<u32>(which))) != 0;
   }
 
   fn option_mutations() wontthrow -> shell_option_mutations &
@@ -431,12 +430,14 @@ public:
     return m_was_mood_set_explicitly;
   }
 
-  fn restore_snapshot_state(
-      u8 init_moods_sourcing, u8 initialized_moods,
-      bool was_mood_set_explicitly, u64 mood_mutation_revision,
-      u64 warning_mutation_revision, u64 diagnostics_mutation_revision,
-      u64 annoying_diagnostics_mutation_revision,
-      shell_option_mutations option_mutations) wontthrow -> void
+  fn restore_snapshot_state(u8 init_moods_sourcing, u8 initialized_moods,
+                            bool was_mood_set_explicitly,
+                            u64 mood_mutation_revision,
+                            u64 warning_mutation_revision,
+                            u64 diagnostics_mutation_revision,
+                            u64 annoying_diagnostics_mutation_revision,
+                            shell_option_mutations option_mutations) wontthrow
+      -> void
   {
     m_init_moods_sourcing = init_moods_sourcing;
     m_initialized_moods = initialized_moods;
@@ -652,10 +653,7 @@ public:
   fn git_ahead_count() wontthrow -> i32 & { return m_git_ahead_count; }
   fn git_ahead_count() const wontthrow -> i32 & { return m_git_ahead_count; }
   fn git_behind_count() wontthrow -> i32 & { return m_git_behind_count; }
-  fn git_behind_count() const wontthrow -> i32 &
-  {
-    return m_git_behind_count;
-  }
+  fn git_behind_count() const wontthrow -> i32 & { return m_git_behind_count; }
 
 private:
   usize m_expressions_executed_last{0};
@@ -1369,8 +1367,7 @@ public:
   {
     return m_runtime_control_store;
   }
-  pure fn runtime_control_store() const wontthrow
-      -> const RuntimeControlStore &
+  pure fn runtime_control_store() const wontthrow -> const RuntimeControlStore &
   {
     return m_runtime_control_store;
   }
@@ -1400,8 +1397,7 @@ public:
   {
     return m_prompt_command_store;
   }
-  pure fn prompt_command_store() const wontthrow
-      -> const PromptCommandStore &
+  pure fn prompt_command_store() const wontthrow -> const PromptCommandStore &
   {
     return m_prompt_command_store;
   }
@@ -1945,8 +1941,7 @@ public:
     trap_store().m_has_err_trap =
         trap_store().actions().find(StringView{"ERR", 3}).has_value();
 
-    let const child_action =
-        trap_store().actions().find(StringView{"CHLD", 4});
+    let const child_action = trap_store().actions().find(StringView{"CHLD", 4});
     os::set_child_trap_armed(child_action.has_value() &&
                              child_action->count() > 0);
   }
@@ -2236,8 +2231,8 @@ public:
   {
     if (scope_store().local_scope_depth() == 0) return;
 
-    for (let const &binding : scope_store().local_scopes()[
-             scope_store().local_scope_depth() - 1])
+    for (let const &binding :
+         scope_store().local_scopes()[scope_store().local_scope_depth() - 1])
       callback(binding.name.view());
   }
 
@@ -2249,11 +2244,11 @@ public:
   template <typename Callback>
   fn for_each_alias_name(Callback callback) const throws -> void
   {
-    scope_store().aliases().for_each(
-        [&](StringView name, const String &value) throws {
-      unused(value);
-      callback(name);
-        });
+    scope_store().aliases().for_each([&](StringView name, const String &value)
+                                         throws {
+                                           unused(value);
+                                           callback(name);
+                                         });
   }
 
   fn snapshot_state() throws -> eval_state_snapshot;
@@ -2604,22 +2599,16 @@ public:
     m_runtime.set_annoying_diagnostics_enabled(
         defining_runtime.is_annoying_diagnostics_enabled());
     apply_strictness_for_mood();
-    return function_runtime_state{previous,
-                                  RuntimeState::capture(*this),
-                                  runtime_control_store().option_mutations(),
-                                  runtime_control_store()
-                                      .option_mutations()
-                                      .revision,
-                                  runtime_control_store()
-                                      .mood_mutation_revision(),
-                                  runtime_control_store()
-                                      .warning_mutation_revision(),
-                                  runtime_control_store()
-                                      .diagnostics_mutation_revision(),
-                                  runtime_control_store()
-                                      .annoying_diagnostics_mutation_revision(),
-                                  runtime_control_store()
-                                      .was_mood_set_explicitly()};
+    return function_runtime_state{
+        previous,
+        RuntimeState::capture(*this),
+        runtime_control_store().option_mutations(),
+        runtime_control_store().option_mutations().revision,
+        runtime_control_store().mood_mutation_revision(),
+        runtime_control_store().warning_mutation_revision(),
+        runtime_control_store().diagnostics_mutation_revision(),
+        runtime_control_store().annoying_diagnostics_mutation_revision(),
+        runtime_control_store().was_mood_set_explicitly()};
   }
 
   fn leave_definition_state(
@@ -2633,8 +2622,7 @@ public:
           runtime_control_store().init_moods_sourcing_mask(),
           runtime_control_store().initialized_moods_mask(),
           state.was_mood_set_explicitly, state.mood_mutation_revision,
-          state.warning_mutation_revision,
-          state.diagnostics_mutation_revision,
+          state.warning_mutation_revision, state.diagnostics_mutation_revision,
           state.annoying_diagnostics_mutation_revision,
           state.previous_shell_option_mutations);
       return;
@@ -2643,7 +2631,8 @@ public:
     let const finished = RuntimeState::capture(*this);
     let changed_options = state.entered.shell_options ^ finished.shell_options;
     if (state.mood_mutation_revision !=
-        runtime_control_store().mood_mutation_revision()) {
+        runtime_control_store().mood_mutation_revision())
+    {
       changed_options |= RuntimeState::option_mask(shell_option_id::Nounset);
       changed_options |= RuntimeState::option_mask(shell_option_id::Pipefail);
       changed_options |= RuntimeState::option_mask(shell_option_id::Failglob);

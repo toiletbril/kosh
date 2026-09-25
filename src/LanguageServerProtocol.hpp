@@ -22,9 +22,9 @@
 #include "Parser.hpp"
 #include "ParserFormats.hpp"
 #include "Platform.hpp"
-#include "base/StaticStringMap.hpp"
 #include "Utils.hpp"
 #include "base/Path.hpp"
+#include "base/StaticStringMap.hpp"
 
 namespace koshka::language_server {
 

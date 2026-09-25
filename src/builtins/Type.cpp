@@ -123,8 +123,7 @@ fn Type::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     {
       word = "alias";
       alias_value = alias;
-    } else if (cxt.has_functions() &&
-               cxt.find_function(name).has_value()) {
+    } else if (cxt.has_functions() && cxt.find_function(name).has_value()) {
       word = "function";
     } else if (let const kind = search_builtin(name.view());
                kind.has_value() &&

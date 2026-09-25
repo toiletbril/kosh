@@ -12,8 +12,8 @@
 #include "../Eval.hpp"
 #include "../Koshkit.hpp"
 #include "../Lexer.hpp"
-#include "../base/StaticStringMap.hpp"
 #include "../Utils.hpp"
+#include "../base/StaticStringMap.hpp"
 
 FLAG_LIST_DECL();
 

@@ -22,13 +22,13 @@
 #include "Optimizer.hpp"
 #include "Parser.hpp"
 #include "Platform.hpp"
-#include "base/StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "Tokens.hpp"
 #include "Utils.hpp"
 #include "base/Arena.hpp"
 #include "base/Common.hpp"
 #include "base/Debug.hpp"
+#include "base/StaticStringMap.hpp"
 #include "base/Trace.hpp"
 
 namespace koshka {
@@ -1251,7 +1251,7 @@ fn SimpleCommand::analyze(AnalysisContext &actx,
       /* The pair is reported once for each assignment, so the name is dropped
          after the first split-eligible read reaches it. */
       if (!quoted_value_name.is_empty()) {
-            let const assignment_location = *quoted_value_assignment.value();
+        let const assignment_location = *quoted_value_assignment.value();
         actx.report_diagnostic(diagnostic_id::sc2089, assignment_location,
                                {quoted_value_name});
         actx.report_diagnostic(diagnostic_id::sc2090, arg_location,

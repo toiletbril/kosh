@@ -1466,8 +1466,7 @@ pure fn find_rolling_window_boundary(const ArrayList<u64> &timestamps,
     -> rolling_window_boundary
 {
   ASSERT(!timestamps.is_empty());
-  if (window_start <= timestamps[0])
-    return {0, 0, timestamps[0]};
+  if (window_start <= timestamps[0]) return {0, 0, timestamps[0]};
 
   usize before = 0;
   while (before + 1 < timestamps.count() &&
@@ -1480,8 +1479,7 @@ pure fn find_rolling_window_boundary(const ArrayList<u64> &timestamps,
   return {before, before + 1, window_start};
 }
 
-pure fn interpolate_rolling_counter(u64 before, u64 after,
-                                    u64 before_timestamp,
+pure fn interpolate_rolling_counter(u64 before, u64 after, u64 before_timestamp,
                                     u64 after_timestamp,
                                     u64 target_timestamp) wontthrow
     -> Maybe<u64>
@@ -1493,8 +1491,8 @@ pure fn interpolate_rolling_counter(u64 before, u64 after,
 
   let const elapsed = after_timestamp - before_timestamp;
   let const passed = target_timestamp - before_timestamp;
-  return before + static_cast<u64>(static_cast<u128>(after - before) * passed /
-                                   elapsed);
+  return before +
+         static_cast<u64>(static_cast<u128>(after - before) * passed / elapsed);
 }
 
 pure fn rolling_window_start(u64 now_nanoseconds,

@@ -659,29 +659,30 @@ fn get_network_window_status(const live_network_row &row,
                              Allocator allocator) throws
     -> os::network_interface_statistics_entry
 {
-  let const boundary = find_rolling_window_boundary(
-      row.history_nanoseconds, window_start_nanoseconds);
+  let const boundary = find_rolling_window_boundary(row.history_nanoseconds,
+                                                    window_start_nanoseconds);
   let const &before = row.history[boundary.before_index];
   let const &after_boundary = row.history[boundary.after_index];
   let sampled = row.history.back();
   sampled.interface_name = String{allocator, row.interface_name.view()};
   let const &newest = row.history.back();
-  let const do_sample = [&](os::network_statistics_field field,
-                            u64 os::network_interface_statistics_entry::*member) {
-    if (!before.has_field(field) || !after_boundary.has_field(field)) {
-      sampled.available_fields &= ~static_cast<u32>(field);
-      return;
-    }
-    let const baseline = interpolate_rolling_counter(
-        before.*member, after_boundary.*member,
-        row.history_nanoseconds[boundary.before_index],
-        row.history_nanoseconds[boundary.after_index], boundary.timestamp);
-    if (!baseline.has_value()) {
-      sampled.available_fields &= ~static_cast<u32>(field);
-      return;
-    }
-    sampled.*member = network_counter_delta(*baseline, newest.*member);
-  };
+  let const do_sample =
+      [&](os::network_statistics_field field,
+          u64 os::network_interface_statistics_entry::*member) {
+        if (!before.has_field(field) || !after_boundary.has_field(field)) {
+          sampled.available_fields &= ~static_cast<u32>(field);
+          return;
+        }
+        let const baseline = interpolate_rolling_counter(
+            before.*member, after_boundary.*member,
+            row.history_nanoseconds[boundary.before_index],
+            row.history_nanoseconds[boundary.after_index], boundary.timestamp);
+        if (!baseline.has_value()) {
+          sampled.available_fields &= ~static_cast<u32>(field);
+          return;
+        }
+        sampled.*member = network_counter_delta(*baseline, newest.*member);
+      };
   do_sample(os::network_statistics_field::ReceiveBytes,
             &os::network_interface_statistics_entry::receive_bytes);
   do_sample(os::network_statistics_field::TransmitBytes,
@@ -807,10 +808,9 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
           retained.remove(position);
           continue;
         }
-        trim_rolling_history(
-            retained[position].history,
-            retained[position].history_nanoseconds,
-            rolling_window_start(now, falloff_nanoseconds));
+        trim_rolling_history(retained[position].history,
+                             retained[position].history_nanoseconds,
+                             rolling_window_start(now, falloff_nanoseconds));
       }
       last_sample_nanoseconds = now;
     }

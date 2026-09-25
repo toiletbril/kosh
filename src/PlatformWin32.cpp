@@ -16,10 +16,10 @@
 #include "Eval.hpp"
 #include "EvalVariablesInternal.hpp"
 #include "Platform.hpp"
-#include "base/StaticStringMap.hpp"
 #include "Utils.hpp"
 #include "base/Common.hpp"
 #include "base/Debug.hpp"
+#include "base/StaticStringMap.hpp"
 #include "base/Trace.hpp"
 
 #include <fcntl.h>
@@ -240,8 +240,8 @@ fn write_system_log(const system_log_options &options) wontthrow -> bool
 
   WORD event_type = EVENTLOG_INFORMATION_TYPE;
   let const dot = options.priority.find_character('.');
-  let const severity = dot.has_value() ? options.priority.substring(*dot + 1)
-                                       : options.priority;
+  let const severity =
+      dot.has_value() ? options.priority.substring(*dot + 1) : options.priority;
   static constexpr static_string_entry<WORD> EVENT_TYPES[] = {
       {SSK("alert"),   EVENTLOG_ERROR_TYPE      },
       {SSK("crit"),    EVENTLOG_ERROR_TYPE      },

@@ -206,10 +206,10 @@ fn execute_context(ExecContext &&ec, EvalContext &cxt,
               .source = source != nullptr ? source->view() : StringView{},
               .fallback = is_async ? os::script_fallback_policy::Reject
                                    : os::script_fallback_policy::Allow,
-              .process_group =
-                  is_async            ? os::process_group_mode::NewBackground
-                  : is_foreground_job ? os::process_group_mode::New
-                                      : os::process_group_mode::Inherit});
+              .process_group = is_async ? os::process_group_mode::NewBackground
+                               : is_foreground_job
+                                   ? os::process_group_mode::New
+                                   : os::process_group_mode::Inherit});
   if (p == KOSH_INVALID_PROCESS) {
     LOG(Debug, "running the file as a shell script in this process");
     const mimic_mood mode = cxt.mood();
@@ -470,8 +470,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
       let const process_group =
           !is_async ? os::process_group_mode::Inherit
                     : os::background_process_group_mode(process_group_id);
-      let forked_child = os::try_fork_compound_stage(
-          os::fork_compound_stage_options{
+      let forked_child =
+          os::try_fork_compound_stage(os::fork_compound_stage_options{
               .in_fd = ec.in_fd,
               .out_fd = ec.out_fd,
               .err_fd = ec.err_fd,
@@ -557,8 +557,8 @@ fn execute_contexts_with_pipes(ArrayList<ExecContext> &&ecs, EvalContext &cxt,
               bootstrap = cxt.make_subshell_bootstrap();
               has_bootstrap = true;
             }
-            let const launch = os::launch_compound_stage(
-                os::compound_stage_options{
+            let const launch =
+                os::launch_compound_stage(os::compound_stage_options{
                     .source = stage_source.view(),
                     .in_fd = ec.in_fd,
                     .out_fd = stage_out,

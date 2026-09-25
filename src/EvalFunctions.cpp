@@ -14,11 +14,11 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "Platform.hpp"
-#include "base/StaticStringMap.hpp"
 #include "Utils.hpp"
 #include "base/Common.hpp"
 #include "base/Debug.hpp"
 #include "base/PackedStringKey.hpp"
+#include "base/StaticStringMap.hpp"
 #include "base/Trace.hpp"
 
 namespace koshka {
@@ -412,7 +412,8 @@ fn EvalContext::run_named_trap(StringView condition,
   let was_pipe_status_restored = false;
   defer
   {
-    trap_store().m_last_trap_action_status = execution_store().last_exit_status();
+    trap_store().m_last_trap_action_status =
+        execution_store().last_exit_status();
     execution_store().last_exit_status() = saved_exit_status;
 
     if (!was_pipe_status_restored) {
@@ -448,8 +449,7 @@ fn EvalContext::restore_trap_pipe_statuses(
       return;
     }
 
-    if (let current = indexed_arrays().find("PIPESTATUS");
-        current.has_value())
+    if (let current = indexed_arrays().find("PIPESTATUS"); current.has_value())
     {
       *current.value() = steal(saved_pipe_statuses);
       return;

@@ -29,8 +29,8 @@ struct order_comparator
 
   explicit order_comparator(sort_order order) : order(order) {}
 
-  mustuse pure fn operator()(const T &left, const T &right) const wontthrow
-      -> bool
+  mustuse pure fn operator()(const T &left,
+                             const T &right) const wontthrow->bool
   {
     return order == sort_order::ascending ? left < right : right < left;
   }
@@ -173,7 +173,8 @@ public:
     if constexpr (std::is_same_v<value_type, wanted_type> &&
                   (std::is_arithmetic_v<value_type> ||
                    std::is_enum_v<value_type>) &&
-                  sizeof(value_type) < sizeof(u64)) {
+                  sizeof(value_type) < sizeof(u64))
+    {
       constexpr usize LANES = sizeof(u64) / sizeof(value_type);
       usize element_index = 0;
       for (; element_index + LANES <= m_length; element_index += LANES) {
@@ -195,7 +196,8 @@ public:
     if constexpr (std::is_same_v<value_type, wanted_type> &&
                   std::is_arithmetic_v<
                       typename array_list_find_scalar<value_type>::type> &&
-                  sizeof(value_type) == sizeof(u64)) {
+                  sizeof(value_type) == sizeof(u64))
+    {
       using scalar_type = typename array_list_find_scalar<value_type>::type;
       using vector_type = scalar_type __attribute__((vector_size(16)));
       let const scalar_wanted = static_cast<scalar_type>(wanted);
@@ -243,8 +245,7 @@ public:
   {
     ASSERT(m_length > 0, "pop_back on an empty list");
     m_length--;
-    if constexpr (!std::is_trivially_destructible_v<T>)
-      m_data[m_length].~T();
+    if constexpr (!std::is_trivially_destructible_v<T>) m_data[m_length].~T();
   }
 
   fn truncate(usize kept_count) wontthrow -> void
@@ -274,14 +275,14 @@ public:
         m_data[i] = steal(m_data[i + 1]);
     }
     m_length--;
-    if constexpr (!std::is_trivially_destructible_v<T>)
-      m_data[m_length].~T();
+    if constexpr (!std::is_trivially_destructible_v<T>) m_data[m_length].~T();
   }
 
   fn clear() wontthrow -> void
   {
     if constexpr (!std::is_trivially_destructible_v<T>)
-      for (usize i = 0; i < m_length; i++) m_data[i].~T();
+      for (usize i = 0; i < m_length; i++)
+        m_data[i].~T();
     m_length = 0;
   }
 
@@ -419,18 +420,18 @@ public:
   }
 
   template <class Compare>
-  mustuse cold fn make_sorted(Compare compare) && throws
-      -> SortedArrayList<T, std::decay_t<Compare>>;
+      mustuse cold fn make_sorted(Compare compare) &&
+      throws -> SortedArrayList<T, std::decay_t<Compare>>;
 
   template <class Compare>
-  mustuse cold fn make_sorted(Compare compare) const & throws
-      -> SortedArrayList<T, std::decay_t<Compare>>;
+      mustuse cold fn make_sorted(Compare compare) const
+      & throws -> SortedArrayList<T, std::decay_t<Compare>>;
 
-  mustuse cold fn make_sorted(sort_order order) && throws
-      -> SortedArrayList<T, order_comparator<T>>;
+  mustuse cold fn make_sorted(sort_order order) &&
+      throws -> SortedArrayList<T, order_comparator<T>>;
 
-  mustuse cold fn make_sorted(sort_order order) const & throws
-      -> SortedArrayList<T, order_comparator<T>>;
+  mustuse cold fn make_sorted(sort_order order) const
+      & throws -> SortedArrayList<T, order_comparator<T>>;
 
 private:
   /* A default list is heap-backed and empty, so it can serve as the value a
@@ -555,7 +556,8 @@ private:
   fn destroy_all() wontthrow -> void
   {
     if constexpr (!std::is_trivially_destructible_v<T>)
-      for (usize i = 0; i < m_length; i++) m_data[i].~T();
+      for (usize i = 0; i < m_length; i++)
+        m_data[i].~T();
     if (m_data != nullptr) m_allocator.free_array(m_data, m_capacity);
     m_data = nullptr;
     m_length = 0;
@@ -606,7 +608,7 @@ public:
         m_compare(steal(other.m_compare))
   {}
 
-  fn operator=(const SortedArrayList &other) throws -> SortedArrayList &
+  fn operator=(const SortedArrayList &other) throws->SortedArrayList &
   {
     if (this != &other) {
       Base::operator=(static_cast<const Base &>(other));
@@ -616,7 +618,8 @@ public:
   }
 
   fn operator=(SortedArrayList &&other) noexcept(
-      std::is_nothrow_move_assignable_v<Compare>) -> SortedArrayList &
+      std::is_nothrow_move_assignable_v<Compare>)
+      ->SortedArrayList &
   {
     if (this != &other) {
       Base::operator=(steal(static_cast<Base &>(other)));
@@ -639,8 +642,7 @@ public:
   hot mustuse pure fn find(const Wanted &wanted) const throws -> Maybe<usize>
   {
     let const index = lower_bound(wanted);
-    if (index < Base::count() &&
-        !m_compare(wanted, Base::operator[](index)))
+    if (index < Base::count() && !m_compare(wanted, Base::operator[](index)))
       return index;
     return None;
   }
@@ -680,32 +682,32 @@ private:
 };
 
 template <class T>
-mustuse cold auto ArrayList<T>::make_sorted(sort_order order) && throws
-    -> SortedArrayList<T, order_comparator<T>>
+    mustuse cold auto ArrayList<T>::make_sorted(sort_order order) &&
+    throws -> SortedArrayList<T, order_comparator<T>>
 {
   return SortedArrayList<T, order_comparator<T>>{steal(*this), order};
 }
 
 template <class T>
-mustuse cold auto ArrayList<T>::make_sorted(sort_order order) const & throws
-    -> SortedArrayList<T, order_comparator<T>>
+    mustuse cold auto ArrayList<T>::make_sorted(sort_order order) const
+    & throws -> SortedArrayList<T, order_comparator<T>>
 {
   return SortedArrayList<T, order_comparator<T>>{clone(), order};
 }
 
 template <class T>
-template <class Compare>
-mustuse cold auto ArrayList<T>::make_sorted(Compare compare) && throws
-    -> SortedArrayList<T, std::decay_t<Compare>>
+    template <class Compare>
+    mustuse cold auto ArrayList<T>::make_sorted(Compare compare) &&
+    throws -> SortedArrayList<T, std::decay_t<Compare>>
 {
   using sorted_type = SortedArrayList<T, std::decay_t<Compare>>;
   return sorted_type{steal(*this), steal(compare)};
 }
 
 template <class T>
-template <class Compare>
-mustuse cold auto ArrayList<T>::make_sorted(Compare compare) const & throws
-    -> SortedArrayList<T, std::decay_t<Compare>>
+    template <class Compare>
+    mustuse cold auto ArrayList<T>::make_sorted(Compare compare) const
+    & throws -> SortedArrayList<T, std::decay_t<Compare>>
 {
   using sorted_type = SortedArrayList<T, std::decay_t<Compare>>;
   return sorted_type{clone(), steal(compare)};

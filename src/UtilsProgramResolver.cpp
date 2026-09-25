@@ -399,8 +399,7 @@ pure fn directory_listing_generation(const Path &directory) wontthrow -> u64
 static fn sort_and_deduplicate_names(ArrayList<String> names) throws
     -> SortedArrayList<String, program_name_comparator>
 {
-  let sorted_names =
-      steal(names).make_sorted(program_name_comparator{});
+  let sorted_names = steal(names).make_sorted(program_name_comparator{});
   usize unique_count = 0;
   for (usize index = 0; index < sorted_names.count(); index++) {
     if (unique_count > 0 &&
@@ -695,8 +694,7 @@ fn ProgramResolver::rebuild_path_command_index(CompletionRefresh refresh) throws
       DEBUG_EXECUTABLE_PROBE_COUNT++;
 #endif
       if (!full_path->is_executable()) continue;
-      if (stem.length != entry.name.length())
-        command_names.push(String{stem});
+      if (stem.length != entry.name.length()) command_names.push(String{stem});
       command_names.push(steal(normalized_name));
     }
   }
@@ -864,8 +862,7 @@ fn ProgramResolver::revalidate_command_prefix(StringView prefix) throws -> void
       }
 
       if (stem_matches) regular_names.push(String{stem});
-      if (full_name_matches)
-        regular_names.push(String{normalized_name.view()});
+      if (full_name_matches) regular_names.push(String{normalized_name.view()});
 
 #if !defined NDEBUG
       DEBUG_EXECUTABLE_PROBE_COUNT++;
@@ -1001,16 +998,15 @@ fn ProgramResolver::get_status(StringView name, StatusLookup lookup) throws
       m_regular_names.find(normalized_name.view()).has_value();
   if (!is_cached_runnable && !is_cached_regular) return Status::Missing;
 
-  let const cached_status = is_cached_runnable ? Status::Runnable
-                                               : Status::Blocked;
+  let const cached_status =
+      is_cached_runnable ? Status::Runnable : Status::Blocked;
   let const paths = search(normalized_name.view(), SearchMode::First,
                            Requirement::Regular, CachePolicy::Bypass);
-  let const current_status = paths.is_empty()
-                                 ? Status::Missing
-                                 : (paths[0].is_executable() ? Status::Runnable
-                                                             : Status::Blocked);
-  if (current_status != cached_status)
-    mark_command_name_indexes_stale();
+  let const current_status =
+      paths.is_empty()
+          ? Status::Missing
+          : (paths[0].is_executable() ? Status::Runnable : Status::Blocked);
+  if (current_status != cached_status) mark_command_name_indexes_stale();
 
   return current_status;
 }
@@ -1202,10 +1198,10 @@ hot fn ProgramResolver::search(StringView program_name, SearchMode search_mode,
   let const stem =
       normalized_name.substring_of_length(0, name_info.stem_length);
 
-  if (let const cached = m_execution_cache.find(stem); cached.has_value())
-  {
+  if (let const cached = m_execution_cache.find(stem); cached.has_value()) {
     let result = ArrayList<Path>{heap_allocator()};
-    let const path = find_cached_program_path(*cached.value(), name_info.extension);
+    let const path =
+        find_cached_program_path(*cached.value(), name_info.extension);
     if (path != nullptr) {
       if (cache_policy != CachePolicy::RememberUnchecked &&
           (!path->is_regular_file() || !path->is_executable()))

@@ -1046,8 +1046,8 @@ fn File::execute(const ExecContext &ec, EvalContext &cxt,
 
     let const read_byte_count =
         sample_byte_count < 64 * 1024 ? sample_byte_count : usize{64 * 1024};
-    let reader = SourceBatchReader{ec, sample_sources, allocator,
-                                   read_byte_count, false, true};
+    let reader = SourceBatchReader{
+        ec, sample_sources, allocator, read_byte_count, false, true};
     let chunks = ArrayList<SourceBatchReader::Chunk>{allocator};
     loop
     {

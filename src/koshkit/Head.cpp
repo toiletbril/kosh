@@ -160,8 +160,7 @@ static fn read_regular_all_but_last(os::descriptor fd, u64 file_size,
     results.clear();
     buffers.clear();
     byte_counts.clear();
-    while (next_offset < prefix_end &&
-           byte_counts.count() < batch_block_count)
+    while (next_offset < prefix_end && byte_counts.count() < batch_block_count)
     {
       let const remaining = prefix_end - next_offset;
       let const byte_count = remaining > block_byte_count
@@ -177,8 +176,7 @@ static fn read_regular_all_but_last(os::descriptor fd, u64 file_size,
 
     batch.execute(results);
     if (os::INTERRUPT_REQUESTED) return String{allocator};
-    for (usize result_index = 0; result_index < results.count();
-         result_index++)
+    for (usize result_index = 0; result_index < results.count(); result_index++)
     {
       let const &read_result = results[result_index];
       if (read_result.error_number != 0) {
@@ -189,10 +187,9 @@ static fn read_regular_all_but_last(os::descriptor fd, u64 file_size,
         return read_all_but_last(fd, drop_count, allocator, unit);
     }
 
-    for (usize result_index = 0; result_index < results.count();
-         result_index++)
-      result.append(StringView{buffers[result_index].begin(),
-                               byte_counts[result_index]});
+    for (usize result_index = 0; result_index < results.count(); result_index++)
+      result.append(
+          StringView{buffers[result_index].begin(), byte_counts[result_index]});
   }
 
   return result;

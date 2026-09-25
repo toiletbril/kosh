@@ -226,16 +226,14 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
       return os::launch_process_substitution(os::process_substitution_options{
           .source = substitution_source.view(),
           .source_traces_enabled = should_print_source_traces(),
-          .bootstrap =
-              should_launch_fresh_evaluator ? &bootstrap : nullptr,
+          .bootstrap = should_launch_fresh_evaluator ? &bootstrap : nullptr,
           .shell_name = shell_name(),
           .previous_exit_status = last_exit_status(),
           .shell_process_id = os::get_shell_process_id(),
           .subshell_depth = get_subshell_depth() + 1,
-          .direction =
-              command_writes_the_pipe
-                  ? os::process_substitution_direction::CommandWrites
-                  : os::process_substitution_direction::CommandReads,
+          .direction = command_writes_the_pipe
+                           ? os::process_substitution_direction::CommandWrites
+                           : os::process_substitution_direction::CommandReads,
           .mood = mood()});
     } catch (const ErrorBase &error) {
       let const location = segment.get_source_location(
@@ -500,8 +498,8 @@ fn EvalContext::run_captured_substitution(const Expression *ast,
     };
 
     koshka::flush();
-    let const forked_child = os::try_fork_compound_stage(
-        os::fork_compound_stage_options{
+    let const forked_child =
+        os::try_fork_compound_stage(os::fork_compound_stage_options{
             .out_fd = pipe->out,
             .location = previous_location,
             .diagnostic_source = previous_source != nullptr

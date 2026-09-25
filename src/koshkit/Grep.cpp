@@ -266,8 +266,8 @@ fn Grep::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_print_names = !should_suppress_names && sources.count() > 1;
   let output = String{allocator};
   let line = String{allocator};
-  let reader = SourceBatchReader{ec,        sources, allocator,
-                                 GREP_READ_BYTE_COUNT, true, should_recurse};
+  let reader = SourceBatchReader{
+      ec, sources, allocator, GREP_READ_BYTE_COUNT, true, should_recurse};
   let chunks = ArrayList<SourceBatchReader::Chunk>{allocator};
   ArrayList<usize> source_line_numbers{allocator};
   source_line_numbers.reserve(sources.count());

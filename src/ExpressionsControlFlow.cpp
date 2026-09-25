@@ -90,8 +90,7 @@ fn CompoundCommand::evaluate_async(EvalContext &cxt) const throws -> i64
   let const launch = os::launch_compound_stage(os::compound_stage_options{
       .source = command_text,
       .location = source_location(),
-      .diagnostic_source =
-          source != nullptr ? source->view() : StringView{},
+      .diagnostic_source = source != nullptr ? source->view() : StringView{},
       .bootstrap = should_launch_fresh_evaluator ? &bootstrap : nullptr,
       .shell_name = cxt.shell_name(),
       .previous_exit_status = cxt.last_exit_status(),
@@ -1524,8 +1523,7 @@ fn CoprocCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
       .in_fd = toward_child->in,
       .out_fd = away_from_child->out,
       .location = source_location(),
-      .diagnostic_source =
-          source != nullptr ? source->view() : StringView{},
+      .diagnostic_source = source != nullptr ? source->view() : StringView{},
       .bootstrap = should_launch_fresh_evaluator ? &bootstrap : nullptr,
       .shell_name = cxt.shell_name(),
       .previous_exit_status = cxt.last_exit_status(),

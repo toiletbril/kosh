@@ -15,11 +15,11 @@
 #include "Errors.hpp"
 #include "Eval.hpp"
 #include "Platform.hpp"
-#include "base/StaticStringMap.hpp"
 #include "Utils.hpp"
 #include "base/Arena.hpp"
 #include "base/Common.hpp"
 #include "base/Debug.hpp"
+#include "base/StaticStringMap.hpp"
 #include "base/Trace.hpp"
 
 namespace koshka {
@@ -499,11 +499,10 @@ fn EvalContext::associative_values(StringView name) const throws
   let values = ArrayList<String>{heap_allocator()};
   if (is_bash_aliases_special(name)) {
     values.reserve(scope_store().aliases().count());
-    scope_store().aliases().for_each(
-        [&](StringView key, const String &value) {
+    scope_store().aliases().for_each([&](StringView key, const String &value) {
       unused(key);
       values.push_managed(value.view());
-        });
+    });
     return values;
   }
 
@@ -558,8 +557,7 @@ fn EvalContext::unset_array_element(StringView name,
     return;
   }
 
-  if (let array = indexed_arrays().find(name); array.has_value())
-  {
+  if (let array = indexed_arrays().find(name); array.has_value()) {
     let const index = evaluate_arithmetic(subscript);
     let const array_count = static_cast<i64>(array->count());
     const i64 resolved =
@@ -672,11 +670,12 @@ fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
   }
 
   scope_store().local_scopes()[scope_store().local_scope_depth() - 1].push(
-      local_binding{
-      String{name}, steal(previous_value), previous_special_definition_location,
-      steal(previous_array), steal(previous_keys), steal(previous_values),
-      steal(previous_sparse_indices), steal(previous_sparse_values),
-          previous_attributes, previous_was_associative, previous_was_exported});
+      local_binding{String{name}, steal(previous_value),
+                    previous_special_definition_location, steal(previous_array),
+                    steal(previous_keys), steal(previous_values),
+                    steal(previous_sparse_indices),
+                    steal(previous_sparse_values), previous_attributes,
+                    previous_was_associative, previous_was_exported});
 
   if (should_inherit_value && was_bash_directory_stack_special)
     set_indexed_array(name, steal(inherited_directory_stack));
@@ -1017,10 +1016,10 @@ fn EvalContext::array_element_is_set(StringView name,
       return true;
     }
     return resolved >= 0 &&
-           sparse_array_values().find(
-               sparse_array_key(name, static_cast<usize>(resolved),
-                                scratch_allocator())
-                   .view())
+           sparse_array_values()
+               .find(sparse_array_key(name, static_cast<usize>(resolved),
+                                      scratch_allocator())
+                         .view())
                .has_value();
   }
   return index == 0 && get_variable_value(name).has_value();

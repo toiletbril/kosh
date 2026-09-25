@@ -12,9 +12,9 @@
 #include "Errors.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
-#include "base/StaticStringMap.hpp"
 #include "Toiletline.hpp"
 #include "base/Debug.hpp"
+#include "base/StaticStringMap.hpp"
 
 namespace koshka {
 

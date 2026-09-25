@@ -118,10 +118,9 @@ fn Tput::execute(const ExecContext &ec, EvalContext &cxt,
   if (capability == "cols" || capability == "lines") {
     let const dimensions =
         os::get_terminal_dimensions(ec.out_fd.value_or(KOSH_STDOUT));
-    if (!dimensions.has_value())
-      return 1;
+    if (!dimensions.has_value()) return 1;
     let output = String::from(capability == "cols" ? dimensions->columns
-                                                    : dimensions->rows,
+                                                   : dimensions->rows,
                               cxt.scratch_allocator());
     output += '\n';
     ec.print_to_stdout(output);

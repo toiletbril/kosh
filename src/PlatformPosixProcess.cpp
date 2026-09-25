@@ -264,10 +264,10 @@ hot fn execute_program(ExecContext &ec,
   if (new_process_group) {
     ASSERT(options.process_group != process_group_mode::Join ||
            options.process_group_id > 0);
-    posix_spawnattr_setpgroup(
-        &attr, options.process_group == process_group_mode::Join
-                   ? static_cast<pid_t>(options.process_group_id)
-                   : 0);
+    posix_spawnattr_setpgroup(&attr,
+                              options.process_group == process_group_mode::Join
+                                  ? static_cast<pid_t>(options.process_group_id)
+                                  : 0);
     spawn_flags |= POSIX_SPAWN_SETPGROUP;
   }
   posix_spawnattr_setflags(&attr, spawn_flags);
@@ -293,8 +293,7 @@ hot fn execute_program(ExecContext &ec,
   if (spawn_error != 0)
     return spawn_failure_child(ec.source_location(), ec.program_path(),
                                spawn_error, options.source,
-                               options.process_group_id,
-                               options.process_group);
+                               options.process_group_id, options.process_group);
 
   return child_pid;
 }
@@ -532,9 +531,8 @@ fn try_fork_job_process() throws -> Maybe<process>
 
 fn can_fork_evaluator() wontthrow -> bool { return true; }
 
-fn launch_process_substitution(
-    const process_substitution_options &options) throws
-    -> process_substitution_launch
+fn launch_process_substitution(const process_substitution_options &options)
+    throws -> process_substitution_launch
 {
   unused(options.source);
   unused(options.mood);
@@ -1205,11 +1203,10 @@ fn read_child_cpu_times() wontthrow -> child_cpu_times
   struct rusage usage{};
   if (getrusage(RUSAGE_CHILDREN, &usage) != 0) return result;
   result.user_seconds = static_cast<double>(usage.ru_utime.tv_sec) +
-                        static_cast<double>(usage.ru_utime.tv_usec) /
-                            1000000.0;
-  result.system_seconds = static_cast<double>(usage.ru_stime.tv_sec) +
-                          static_cast<double>(usage.ru_stime.tv_usec) /
-                              1000000.0;
+                        static_cast<double>(usage.ru_utime.tv_usec) / 1000000.0;
+  result.system_seconds =
+      static_cast<double>(usage.ru_stime.tv_sec) +
+      static_cast<double>(usage.ru_stime.tv_usec) / 1000000.0;
   return result;
 }
 
@@ -1467,8 +1464,8 @@ fn run_nice(const ArrayList<String> &argv, i32 increment) throws -> Maybe<i32>
   return None;
 }
 
-fn run_nohup(const ArrayList<String> &argv,
-             const nohup_options &options) throws -> Maybe<i32>
+fn run_nohup(const ArrayList<String> &argv, const nohup_options &options) throws
+    -> Maybe<i32>
 {
   if (argv.is_empty()) return None;
   let const raw_argv = make_os_args(argv);

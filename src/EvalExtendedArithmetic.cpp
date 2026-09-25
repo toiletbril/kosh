@@ -813,8 +813,8 @@ fn ArithmeticValue::to_string(Allocator allocator) const throws -> String
          chunk_position++)
     {
       if ((chunk_position & 1023u) == 0) throw_if_arithmetic_interrupted();
-      let const division = os::divide_u128_by_u64(
-          chunks[chunk_position], carry, DECIMAL_CHUNK_BASE);
+      let const division = os::divide_u128_by_u64(chunks[chunk_position], carry,
+                                                  DECIMAL_CHUNK_BASE);
       carry = division.quotient;
       chunks[chunk_position] = division.remainder;
     }
