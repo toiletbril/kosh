@@ -100,6 +100,31 @@ struct linux_unix_socket_peer
   u64 peer_identity{0};
 };
 
+struct linux_unix_socket_peer_comparator
+{
+  pure fn operator()(const linux_unix_socket_peer &left,
+                     const linux_unix_socket_peer &right) const wontthrow
+      -> bool
+  {
+    return left.identity < right.identity;
+  }
+
+  pure fn operator()(u64 left, const linux_unix_socket_peer &right) const
+      wontthrow -> bool
+  {
+    return left < right.identity;
+  }
+
+  pure fn operator()(const linux_unix_socket_peer &left, u64 right) const
+      wontthrow -> bool
+  {
+    return left.identity < right;
+  }
+};
+
+using linux_unix_socket_peer_list =
+    SortedArrayList<linux_unix_socket_peer, linux_unix_socket_peer_comparator>;
+
 static fn linux_socket_proc_path(StringView suffix, Allocator allocator) throws
     -> String
 {
@@ -118,12 +143,14 @@ static fn linux_socket_proc_path(StringView suffix, Allocator allocator) throws
 }
 
 static fn linux_unix_socket_peers(Allocator allocator) throws
-    -> ArrayList<linux_unix_socket_peer>
+    -> linux_unix_socket_peer_list
 {
   let peers = ArrayList<linux_unix_socket_peer>{allocator};
   let const descriptor =
       ::socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_SOCK_DIAG);
-  if (descriptor < 0) return peers;
+  if (descriptor < 0)
+    return linux_unix_socket_peer_list{
+        allocator, linux_unix_socket_peer_comparator{}};
   defer { ::close(descriptor); };
 
   struct
@@ -143,7 +170,8 @@ static fn linux_unix_socket_peers(Allocator allocator) throws
   if (::sendto(descriptor, &message, message.header.nlmsg_len, 0,
                reinterpret_cast<struct sockaddr *>(&kernel),
                sizeof(kernel)) < 0)
-    return peers;
+    return linux_unix_socket_peer_list{
+        allocator, linux_unix_socket_peer_comparator{}};
 
   let const deadline_nanos = monotonic_nanos() + 1000000000;
   bool is_done = false;
@@ -213,32 +241,17 @@ static fn linux_unix_socket_peers(Allocator allocator) throws
     }
   }
   if (!is_done || !is_valid)
-    return ArrayList<linux_unix_socket_peer>{allocator};
-  peers.sort([](const linux_unix_socket_peer &left,
-                const linux_unix_socket_peer &right) {
-    return left.identity < right.identity;
-  });
-  return peers;
+    return linux_unix_socket_peer_list{
+        allocator, linux_unix_socket_peer_comparator{}};
+  return steal(peers).make_sorted(linux_unix_socket_peer_comparator{});
 }
 
 static pure fn linux_unix_peer_identity(
-    const ArrayList<linux_unix_socket_peer> &peers, u64 identity) wontthrow
+    const linux_unix_socket_peer_list &peers, u64 identity) wontthrow
     -> u64
 {
-  usize first = 0;
-  usize count = peers.count();
-  while (count != 0) {
-    let const step = count / 2;
-    let const position = first + step;
-    if (peers[position].identity < identity) {
-      first = position + 1;
-      count -= step + 1;
-    } else {
-      count = step;
-    }
-  }
-  if (first < peers.count() && peers[first].identity == identity)
-    return peers[first].peer_identity;
+  if (let const index = peers.find(identity); index.has_value())
+    return peers[*index].peer_identity;
   return 0;
 }
 
