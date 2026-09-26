@@ -132,12 +132,10 @@ fn read_entire_standard_input() throws -> String
   return steal(*contents);
 }
 
-fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
-                     char delimiter, u64 deadline_nanos, bool *was_timed_out,
-                     Allocator allocator, bool *did_read_fail) throws
-    -> Maybe<String>
+fn read_line_from_fd(os::descriptor fd, char delimiter, u64 deadline_nanos,
+                     Allocator allocator) throws -> read_line_result
 {
-  if (did_read_fail != nullptr) *did_read_fail = false;
+  let result = read_line_result{};
   let line = String{allocator};
   bool has_read_any_byte = false;
   let const should_read_chunks = os::descriptor_is_seekable(fd);
@@ -147,7 +145,7 @@ fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
     if (deadline_nanos != 0) {
       let const now_nanos = os::monotonic_nanos();
       if (now_nanos >= deadline_nanos) {
-        if (was_timed_out != nullptr) *was_timed_out = true;
+        result.was_timed_out = true;
         break;
       }
       let const remaining_nanos_unsigned = deadline_nanos - now_nanos;
@@ -157,7 +155,7 @@ fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
               : remaining_nanos_unsigned);
       let const readable = os::wait_for_fd_readable(fd, remaining_nanos);
       if (readable != 1) {
-        if (readable == 0 && was_timed_out != nullptr) *was_timed_out = true;
+        if (readable == 0) result.was_timed_out = true;
         break;
       }
     }
@@ -165,7 +163,7 @@ fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
     let const requested_count = should_read_chunks ? sizeof(buffer) : 1;
     let const read_count = os::read_fd(fd, buffer, requested_count);
     if (!read_count.has_value()) {
-      if (did_read_fail != nullptr) *did_read_fail = true;
+      result.did_read_fail = true;
       break;
     }
     if (*read_count == 0) break;
@@ -182,23 +180,22 @@ fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
     if (delimiter_position < *read_count) {
       let const unread_count = *read_count - delimiter_position - 1;
       if (unread_count > 0 && !os::rewind_descriptor(fd, unread_count)) {
-        if (did_read_fail != nullptr) *did_read_fail = true;
-        was_delimiter_terminated = false;
-        return None;
+        result.did_read_fail = true;
+        return result;
       }
-      was_delimiter_terminated = true;
-      return line;
+      result.was_delimiter_terminated = true;
+      result.line = steal(line);
+      return result;
     }
   }
 
   /* The loop fell out at end of input, so no delimiter ended the line. The read
      builtin maps an unterminated final line to a non-zero status while still
      assigning the bytes it read, the way dash does. */
-  was_delimiter_terminated = false;
+  if (!has_read_any_byte) return result;
 
-  if (!has_read_any_byte) return None;
-
-  return line;
+  result.line = steal(line);
+  return result;
 }
 
 BufferedLineReader::BufferedLineReader(os::descriptor descriptor)

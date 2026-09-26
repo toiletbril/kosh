@@ -117,8 +117,8 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   /* The skipped lines are read and dropped before any line is stored, so -s
      does not count against -n. */
   for (i64 skipped = 0; skipped < skip_count; skipped++) {
-    bool was_terminated = false;
-    if (!utils::read_line_from_fd(read_fd, was_terminated, delimiter)) break;
+    let const skipped_line = utils::read_line_from_fd(read_fd, delimiter);
+    if (!skipped_line.line.has_value()) break;
   }
 
   let lines = ArrayList<String>{heap_allocator()};
@@ -132,13 +132,11 @@ fn Mapfile::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       break;
     }
 
-    bool was_newline_terminated = false;
-    let const read =
-        utils::read_line_from_fd(read_fd, was_newline_terminated, delimiter);
-    if (!read) break;
+    let const read = utils::read_line_from_fd(read_fd, delimiter);
+    if (!read.line.has_value()) break;
 
-    let element = String{read->view()};
-    if (!should_strip_newline && was_newline_terminated) {
+    let element = String{read.line->view()};
+    if (!should_strip_newline && read.was_delimiter_terminated) {
       element.push(delimiter);
     }
 

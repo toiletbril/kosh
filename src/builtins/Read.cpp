@@ -246,9 +246,11 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
     if (output_count >= max_bytes) was_newline_terminated = true;
     was_read_successful = output_count > 0 || was_newline_terminated;
   } else {
-    let read_line = utils::read_line_from_fd(
-        read_fd, was_newline_terminated, delimiter, deadline_nanos,
-        &was_timed_out, cxt.scratch_allocator());
+    let read_line_result = utils::read_line_from_fd(
+        read_fd, delimiter, deadline_nanos, cxt.scratch_allocator());
+    was_newline_terminated = read_line_result.was_delimiter_terminated;
+    was_timed_out = read_line_result.was_timed_out;
+    let read_line = steal(read_line_result.line);
     if (read_line.has_value()) {
       was_read_successful = true;
 
@@ -265,9 +267,11 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         while (was_newline_terminated && do_trailing_backslash_count() % 2 == 1)
         {
           accumulated.pop_back();
-          let const continued = utils::read_line_from_fd(
-              read_fd, was_newline_terminated, delimiter, deadline_nanos,
-              &was_timed_out, cxt.scratch_allocator());
+          let continued_result = utils::read_line_from_fd(
+              read_fd, delimiter, deadline_nanos, cxt.scratch_allocator());
+          was_newline_terminated = continued_result.was_delimiter_terminated;
+          was_timed_out = was_timed_out || continued_result.was_timed_out;
+          let continued = steal(continued_result.line);
           if (!continued.has_value()) break;
           accumulated.append(continued->view());
         }

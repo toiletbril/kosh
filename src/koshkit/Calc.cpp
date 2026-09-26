@@ -233,8 +233,8 @@ fn run_repl(const ExecContext &ec, EvalContext &cxt,
       line = steal(result.text);
     } else {
       if (is_terminal) koshka::print_error("calc> ");
-      bool was_delimiter_terminated = false;
-      line = utils::read_line_from_fd(input_fd, was_delimiter_terminated);
+      let line_result = utils::read_line_from_fd(input_fd);
+      line = steal(line_result.line);
       if (!line.has_value() || os::INTERRUPT_REQUESTED) {
         break;
       }

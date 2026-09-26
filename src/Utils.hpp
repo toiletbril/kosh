@@ -423,11 +423,18 @@ fn read_entire_standard_input() throws -> String;
 /* Returns None at end of input with no bytes read. The delimiter defaults to a
    newline, and read -d passes the first byte of its argument, or a NUL for an
    empty argument. */
-fn read_line_from_fd(os::descriptor fd, bool &was_delimiter_terminated,
-                     char delimiter = '\n', u64 deadline_nanos = 0,
-                     bool *was_timed_out = nullptr,
-                     Allocator allocator = heap_allocator(),
-                     bool *did_read_fail = nullptr) throws -> Maybe<String>;
+struct read_line_result
+{
+  Maybe<String> line;
+  bool was_delimiter_terminated{false};
+  bool was_timed_out{false};
+  bool did_read_fail{false};
+};
+
+fn read_line_from_fd(os::descriptor fd, char delimiter = '\n',
+                     u64 deadline_nanos = 0,
+                     Allocator allocator = heap_allocator()) throws
+    -> read_line_result;
 
 class BufferedLineReader
 {

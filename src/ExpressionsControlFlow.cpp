@@ -704,18 +704,16 @@ fn SelectLoop::evaluate_status_impl(EvalContext &cxt) const throws
     }
     koshka::print_error(cxt.get_variable_value("PS3").value_or(String{"#? "}));
 
-    bool was_newline_terminated = false;
-    let const input =
-        utils::read_line_from_fd(KOSH_STDIN, was_newline_terminated);
+    let const input = utils::read_line_from_fd(KOSH_STDIN);
     /* End of input ends the loop, and bash echoes a newline to standard output
        the way a terminal end-of-file does. */
-    if (!input) {
+    if (!input.line.has_value()) {
       koshka::print("\n");
       result.status = 1;
       break;
     }
 
-    let const &reply = *input;
+    let const &reply = *input.line;
     LOG(All, "the select prompt read the reply '%s'", reply.c_str());
     cxt.set_shell_variable("REPLY", reply.view());
     if (reply.is_empty()) {
