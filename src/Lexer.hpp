@@ -34,6 +34,12 @@ enum class heredoc_source_mapping : u8
   Transformed,
 };
 
+enum class debug_word_collection_mode : u8
+{
+  Disabled,
+  Enabled,
+};
+
 class ParseSession
 {
 public:
@@ -80,12 +86,14 @@ public:
 
   pure fn should_collect_debug_words() const wontthrow -> bool
   {
-    return m_should_collect_debug_words;
+    return m_debug_word_collection_mode ==
+           debug_word_collection_mode::Enabled;
   }
 
-  fn set_should_collect_debug_words(bool should_collect) wontthrow -> void
+  fn set_debug_word_collection_mode(debug_word_collection_mode mode) wontthrow
+      -> void
   {
-    m_should_collect_debug_words = should_collect;
+    m_debug_word_collection_mode = mode;
   }
 
   pure fn should_collect_analysis_metadata() const wontthrow -> bool
@@ -122,7 +130,8 @@ private:
   AllocationKind m_allocation_kind{AllocationKind::Syntax};
   u32 m_source_name_index{0};
   mimic_mood m_mood{mimic_mood::Default};
-  bool m_should_collect_debug_words{false};
+  debug_word_collection_mode m_debug_word_collection_mode{
+      debug_word_collection_mode::Disabled};
   bool m_should_collect_analysis_metadata{false};
   bool m_should_collect_shellcheck_directives{false};
 };
@@ -184,11 +193,12 @@ class Lexer
 {
 public:
   Lexer(StringView source, BumpArena &arena,
-        bool should_collect_debug_words = false,
         Maybe<StringView> filename = None,
         mimic_mood mood = mimic_mood::Default,
         ParseSession::AllocationKind allocation_kind =
-            ParseSession::AllocationKind::Syntax);
+            ParseSession::AllocationKind::Syntax,
+        debug_word_collection_mode debug_words =
+            debug_word_collection_mode::Disabled);
   ~Lexer();
 
   pure fn mood() const wontthrow -> mimic_mood

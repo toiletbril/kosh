@@ -516,8 +516,7 @@ fn Server::publish_diagnostics(Document &document) throws -> bool
   let const filename = document.path.has_value() ? document.path->text().view()
                                                  : document.uri.view();
   let parser = Parser{
-      Lexer{document.shell_source(), m_ast_arena, false, filename,
-            m_context.mood()}
+      Lexer{document.shell_source(), m_ast_arena, filename, m_context.mood()}
   };
   parser.set_should_collect_analysis_metadata(true);
   let rendered_errors = ArrayList<String>{heap_allocator()};

@@ -383,7 +383,7 @@ static fn edit_fc_commands(const ExecContext &ec, EvalContext &cxt,
       cxt.parse_arena()->release(ast_mark);
     };
     let parser = Parser{
-        Lexer{edited->view(), *cxt.parse_arena(), false, None, cxt.mood()}
+        Lexer{edited->view(), *cxt.parse_arena(), None, cxt.mood()}
     };
     unused(parser.construct_ast());
   }

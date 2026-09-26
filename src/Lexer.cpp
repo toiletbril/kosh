@@ -200,15 +200,16 @@ hot pure fn is_special_parameter_char(char ch) wontthrow -> bool
 } /* namespace lexer */
 
 Lexer::Lexer(StringView source, BumpArena &arena,
-             bool should_collect_debug_words, Maybe<StringView> filename,
-             mimic_mood mood, ParseSession::AllocationKind allocation_kind)
+             Maybe<StringView> filename, mimic_mood mood,
+             ParseSession::AllocationKind allocation_kind,
+             debug_word_collection_mode debug_words)
     : m_source(source), m_parse_session(arena)
 {
   m_parse_session.set_arena(arena, allocation_kind);
   m_parse_session.set_source_name_index(
       filename.has_value() ? intern_source_name(*filename) : 0);
   m_parse_session.set_mood(mood);
-  m_parse_session.set_should_collect_debug_words(should_collect_debug_words);
+  m_parse_session.set_debug_word_collection_mode(debug_words);
   LOG(Debug, "starting a lexer over %zu bytes of source", m_source.length);
 }
 

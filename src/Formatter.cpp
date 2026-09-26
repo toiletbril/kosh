@@ -815,10 +815,10 @@ fn append_long_string_warnings(StringView source,
 
     let warning_name = filename.has_value() ? *filename : StringView{"<stdin>"};
     warnings.push(String{heap_allocator(),
-                         warning_name + ":" +
+                             warning_name + ":" +
                              String::from(line, heap_allocator()) + ":" +
                              String::from(column, heap_allocator()) +
-                             ": warning: unbreakable word exceeds 78 columns; "
+                             ": Warning: unbreakable word exceeds 78 columns; "
                              "consider making it "
                              "shorter or splitting it"});
   }
@@ -1726,7 +1726,7 @@ fn validate_formatted_source(StringView source, BumpArena &arena,
     if (function_mark.has_value()) function_arena->release(*function_mark);
   };
   let parser = Parser{
-      Lexer{source, arena, false, None, mood}
+      Lexer{source, arena, None, mood}
   };
   let const *ast = parser.construct_ast(errors, nullptr);
   if (ast_output != nullptr && errors.is_empty()) {

@@ -528,8 +528,7 @@ static fn run_script_contents(
       /* The whole file is scanned first, because analysis resolves a call to a
          function the source defines further down. */
       let scan_parser = Parser{
-          Lexer{script_contents.view(), ast_arena, false, filename,
-                context.mood()}
+          Lexer{script_contents.view(), ast_arena, filename, context.mood()}
       };
       scan_parser.set_should_collect_analysis_metadata(true);
 
@@ -558,8 +557,11 @@ static fn run_script_contents(
       LOG(Debug, "parsing a chunk of %zu bytes", script_contents.count());
 
       let p = Parser{
-          Lexer{script_contents.view(), ast_arena, context.show_lexed_words(),
-                filename, context.mood()}
+          Lexer{script_contents.view(), ast_arena, filename, context.mood(),
+                ParseSession::AllocationKind::Syntax,
+                context.show_lexed_words()
+                    ? debug_word_collection_mode::Enabled
+                    : debug_word_collection_mode::Disabled}
       };
       p.set_should_collect_analysis_metadata(run_analysis);
 
@@ -632,8 +634,7 @@ static fn run_script_contents(
 
       if (should_stream_units) {
         let unit_parser = Parser{
-            Lexer{script_contents.view(), ast_arena, false, filename,
-                  context.mood()}
+            Lexer{script_contents.view(), ast_arena, filename, context.mood()}
         };
         /* A function body and a subshell carry their own definitions on the
            node, and the walk seeds them when it enters. */
@@ -678,8 +679,7 @@ static fn run_script_contents(
         ast_arena.release(preflight_mark);
         ast = nullptr;
         let execution_parser = Parser{
-            Lexer{script_contents.view(), ast_arena, false, filename,
-                  context.mood()}
+            Lexer{script_contents.view(), ast_arena, filename, context.mood()}
         };
         let const was_terminal_exec_allowed = context.terminal_exec_allowed();
         defer { context.set_terminal_exec_allowed(was_terminal_exec_allowed); };

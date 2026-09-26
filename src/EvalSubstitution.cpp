@@ -102,7 +102,7 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
   let const ast_mark = parse_arena()->mark();
   defer { parse_arena()->release(ast_mark); };
   let lexer = Lexer{source.substring_of_length(i, source.length - i),
-                    *parse_arena(), false, None, mood()};
+                    *parse_arena(), None, mood()};
   Token *name = lexer.next_shell_token();
   if (name == nullptr || name->kind() != Token::Kind::Word) {
     return None;
@@ -161,8 +161,7 @@ fn EvalContext::capture_command_substitution(
   };
 
   let parser = Parser{
-      Lexer{normalized_source.view(), *parse_arena(), false, steal(filename),
-            mood()}
+      Lexer{normalized_source.view(), *parse_arena(), steal(filename), mood()}
   };
   const Expression *ast;
   try {
@@ -206,7 +205,7 @@ fn EvalContext::setup_process_substitution(const WordSegment &segment) throws
     if (did_push_source_frame) source_store().m_source_frames.pop_back();
   };
   let parser = Parser{
-      Lexer{substitution_source.view(), *parse_arena(), false, None, mood()}
+      Lexer{substitution_source.view(), *parse_arena(), None, mood()}
   };
   const Expression *ast;
   try {
@@ -390,8 +389,7 @@ fn EvalContext::capture_command_substitution(const WordSegment &segment) throws
                                     ? ParseSession::AllocationKind::FunctionBody
                                     : ParseSession::AllocationKind::Syntax;
     let parser = Parser{
-        Lexer{segment.text.view(), *cache_arena, false, None, mood(),
-              allocation_kind}
+        Lexer{segment.text.view(), *cache_arena, None, mood(), allocation_kind}
     };
     try {
       cache.substitution_ast = parser.construct_ast();
@@ -770,8 +768,7 @@ fn EvalContext::capture_function_substitution(const WordSegment &segment) throws
                                     ? ParseSession::AllocationKind::FunctionBody
                                     : ParseSession::AllocationKind::Syntax;
     let parser = Parser{
-        Lexer{segment.text.view(), *cache_arena, false, None, mood(),
-              allocation_kind}
+        Lexer{segment.text.view(), *cache_arena, None, mood(), allocation_kind}
     };
     try {
       cache.substitution_ast = parser.construct_ast();

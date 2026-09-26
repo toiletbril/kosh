@@ -283,7 +283,7 @@ fn EvalContext::run_mimicked_script(ExecContext &ec, mimic_mood mode,
     source_store().m_source_frames.pop_back();
   };
   let parser = Parser{
-      Lexer{contents->view(), *parse_arena(), false, script_filename, mood()}
+      Lexer{contents->view(), *parse_arena(), script_filename, mood()}
   };
 
   let params = ArrayList<String>{heap_allocator()};
@@ -562,7 +562,7 @@ fn EvalContext::run_source(StringView source, StringView origin,
       retained_source = cached_body->get_source();
     } else {
       let parser = Parser{
-          Lexer{source, *parse_arena(), false, filename, mood()}
+          Lexer{source, *parse_arena(), filename, mood()}
       };
 
       let const parsed_ast = parser.construct_ast();
