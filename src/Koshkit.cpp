@@ -1113,8 +1113,10 @@ static fn koshkit_invocation_name(const ExecContext &ec,
 {
   if (ec.is_multicall && !ec.args().is_empty())
     return String{allocator, ec.args()[0].view()};
-  if (ec.args().count() > 1)
+  if (ec.program() == "koshkit" && ec.args().count() > 1)
     return String{allocator, "koshkit "} + ec.args()[1].view();
+  if (!ec.args().is_empty())
+    return String{allocator, "koshkit "} + ec.args()[0].view();
   return String{allocator, ec.program()};
 }
 
