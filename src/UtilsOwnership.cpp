@@ -38,13 +38,16 @@ static fn parse_numeric_id(StringView text) wontthrow -> Maybe<u32>
 
 static fn change_path_ownership_recursive(
     const ExecContext &ec, EvalContext &cxt, StringView utility_name,
-    const Path &path, i64 owner_id, i64 group_id, bool should_recurse,
+    const Path &path, i64 owner_id, i64 group_id,
+    ownership_traversal_mode traversal_mode,
     bool should_follow_symlink, bool should_follow_nested_symlinks,
     ArrayList<ownership_directory_identity> &active_directories,
     const os::file_status *known_path_status = nullptr,
     const os::file_status *known_followed_status = nullptr,
     bool was_followed_status_queried = false) throws -> bool
 {
+  let const is_recursive =
+      traversal_mode == ownership_traversal_mode::Recursive;
   os::file_status path_status{};
   if (known_path_status != nullptr) {
     path_status = *known_path_status;
@@ -68,7 +71,7 @@ static fn change_path_ownership_recursive(
     return false;
   }
 
-  if (!should_recurse) return true;
+  if (!is_recursive) return true;
   if (is_symlink && !should_follow_symlink) return true;
 
   os::file_status followed_status{};
@@ -176,7 +179,8 @@ static fn change_path_ownership_recursive(
 
     if (!change_path_ownership_recursive(
             ec, cxt, utility_name, child_paths[child_position], owner_id,
-            group_id, true, should_follow_nested_symlinks,
+            group_id, ownership_traversal_mode::Recursive,
+            should_follow_nested_symlinks,
             should_follow_nested_symlinks, active_directories, child_status,
             known_child_followed_status, was_child_followed_status_queried))
       did_succeed = false;
@@ -203,12 +207,15 @@ fn resolve_group_id(StringView text) throws -> Maybe<u32>
 
 fn change_path_ownership(const ExecContext &ec, EvalContext &cxt,
                          StringView utility_name, const Path &path,
-                         i64 owner_id, i64 group_id, bool should_recurse,
+                         i64 owner_id, i64 group_id,
+                         ownership_traversal_mode traversal_mode,
                          bool should_not_dereference,
                          usize command_line_follow_position,
                          usize follow_position, usize physical_position) throws
     -> bool
 {
+  let const is_recursive =
+      traversal_mode == ownership_traversal_mode::Recursive;
   let traversal_position = command_line_follow_position;
   if (follow_position > traversal_position)
     traversal_position = follow_position;
@@ -223,12 +230,12 @@ fn change_path_ownership(const ExecContext &ec, EvalContext &cxt,
        traversal_position != 0);
   let const should_follow_argument =
       !should_not_dereference &&
-      (!should_recurse || should_follow_command_line);
+      (!is_recursive || should_follow_command_line);
   let active_directories =
       ArrayList<ownership_directory_identity>{heap_allocator()};
 
   return change_path_ownership_recursive(
-      ec, cxt, utility_name, path, owner_id, group_id, should_recurse,
+      ec, cxt, utility_name, path, owner_id, group_id, traversal_mode,
       should_follow_argument, should_follow_nested, active_directories);
 }
 
