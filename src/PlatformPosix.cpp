@@ -1096,6 +1096,12 @@ fn default_network_interface(Allocator allocator) throws -> Maybe<String>
 
 #if defined __APPLE__
 
+enum class socket_address_side : u8
+{
+  Local,
+  Peer,
+};
+
 static pure fn socket_state_of(int state) wontthrow -> network_socket_state
 {
   switch (state) {
@@ -1114,21 +1120,32 @@ static pure fn socket_state_of(int state) wontthrow -> network_socket_state
   }
 }
 
-static fn socket_address(const struct in_sockinfo &info, bool is_local,
-                         network_address_family family) throws -> String
+static fn socket_address(const struct in_sockinfo &info,
+                         network_address_family family,
+                         socket_address_side side) throws -> String
 {
   char buffer[INET6_ADDRSTRLEN]{};
   const opaque *address = nullptr;
   int native_family = AF_INET;
   if (family == network_address_family::IPv4) {
-    address =
-        is_local
-            ? static_cast<const opaque *>(&info.insi_laddr.ina_46.i46a_addr4)
-            : static_cast<const opaque *>(&info.insi_faddr.ina_46.i46a_addr4);
+    switch (side) {
+    case socket_address_side::Local:
+      address = static_cast<const opaque *>(&info.insi_laddr.ina_46.i46a_addr4);
+      break;
+    case socket_address_side::Peer:
+      address = static_cast<const opaque *>(&info.insi_faddr.ina_46.i46a_addr4);
+      break;
+    }
   } else {
     native_family = AF_INET6;
-    address = is_local ? static_cast<const opaque *>(&info.insi_laddr.ina_6)
-                       : static_cast<const opaque *>(&info.insi_faddr.ina_6);
+    switch (side) {
+    case socket_address_side::Local:
+      address = static_cast<const opaque *>(&info.insi_laddr.ina_6);
+      break;
+    case socket_address_side::Peer:
+      address = static_cast<const opaque *>(&info.insi_faddr.ina_6);
+      break;
+    }
   }
 
   if (::inet_ntop(native_family, address, buffer, sizeof(buffer)) == nullptr) {
@@ -1199,8 +1216,8 @@ fn network_sockets(network_socket_process_mode process_mode) throws
                                 ? info.soi_proto.pri_tcp.tcpsi_ini
                                 : info.soi_proto.pri_in;
       let entry = network_socket_entry{
-          socket_address(internet, true, family),
-          socket_address(internet, false, family),
+          socket_address(internet, family, socket_address_side::Local),
+          socket_address(internet, family, socket_address_side::Peer),
           info.soi_so,
           0,
           info.soi_rcv.sbi_cc,
