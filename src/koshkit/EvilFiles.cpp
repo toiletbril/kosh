@@ -408,6 +408,7 @@ fn EvilFiles::execute(
       if (widths.command > command_limit) widths.command = command_limit;
     }
   }
+  output += "  ";
   append_report_text(output, "Open files", colors::ansi::BOLD_BLUE,
                      should_color);
   output += '\n';
@@ -532,7 +533,7 @@ fn EvilFiles::execute(
   }
 
   ec.print_to_stdout(output);
-  if (!warnings.is_empty()) show_warning(warnings.view());
+  if (!warnings.is_empty()) show_report_warning(warnings.view());
   return 0;
 }
 

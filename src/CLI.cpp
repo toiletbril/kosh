@@ -1671,4 +1671,20 @@ fn show_warning(StringView warning) throws -> void
   show_message(Warning{warning}.to_string());
 }
 
+fn show_report_warning(StringView warning) throws -> void
+{
+  if (warning.is_empty()) return;
+
+  print_error("\n");
+  show_warning(warning);
+}
+
+fn show_report_warnings(const ArrayList<String> &warnings) throws -> void
+{
+  if (warnings.is_empty()) return;
+
+  print_error("\n");
+  for (let const &warning : warnings) show_warning(warning.view());
+}
+
 } /* namespace koshka */

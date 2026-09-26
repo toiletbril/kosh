@@ -181,7 +181,8 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
       skipped_warning += " due to permission denied.";
     }
     ec.print_to_stdout(output);
-    if (!skipped_warning.is_empty()) show_warning(skipped_warning.view());
+    if (!skipped_warning.is_empty())
+      show_report_warning(skipped_warning.view());
     return mounts.is_empty() ? 1 : 0;
   }
 

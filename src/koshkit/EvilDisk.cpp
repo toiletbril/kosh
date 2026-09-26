@@ -629,10 +629,11 @@ fn EvilDisk::execute(
     warning += " filesystem";
     if (skipped_permission_count != 1) warning += "s";
     warning += " due to permission denied";
-    show_warning(warning.view());
+    show_report_warning(warning.view());
+    for (let const &warning : warnings) show_warning(warning.view());
+  } else {
+    show_report_warnings(warnings);
   }
-  for (let const &warning : warnings)
-    show_warning(warning.view());
 
   return status;
 }

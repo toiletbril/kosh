@@ -488,6 +488,8 @@ fn trim_rolling_history(ArrayList<T> &values, ArrayList<u64> &timestamps,
 
 fn show_message(StringView err) throws -> void;
 fn show_warning(StringView warning) throws -> void;
+fn show_report_warning(StringView warning) throws -> void;
+fn show_report_warnings(const ArrayList<String> &warnings) throws -> void;
 
 /* Arm a one-shot leading newline on the next show_message, so a diagnostic
    raised while the editor sits mid-line starts on its own line instead of

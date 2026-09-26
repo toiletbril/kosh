@@ -986,11 +986,8 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
     has_tcp_statistics = append_tcp_report(output, warnings, allocator,
                                            color_mode);
 
-  if (!warnings.is_empty()) output += "\n";
   ec.print_to_stdout(output);
-  for (let const &warning : warnings) {
-    show_warning(warning.view());
-  }
+  show_report_warnings(warnings);
 
   return address_count == 0 && traffic_count == 0 && !has_tcp_statistics ? 1
                                                                          : 0;
