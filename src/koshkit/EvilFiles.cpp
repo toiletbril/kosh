@@ -384,7 +384,7 @@ fn EvilFiles::execute(
   }
 
   if (rows.is_empty()) {
-    if (!warnings.is_empty()) show_warning(Warning{warnings.view()});
+    if (!warnings.is_empty()) show_warning(warnings.view());
     return 1;
   }
 

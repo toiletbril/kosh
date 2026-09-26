@@ -293,11 +293,6 @@ fn EvilDisk::execute(
   let filesystems = ArrayList<os::mounted_filesystem>{allocator};
   if (operands.is_empty()) {
     filesystems = os::mounted_filesystems();
-    filesystems.sort([](const os::mounted_filesystem &left,
-                        const os::mounted_filesystem &right) {
-      if (left.target != right.target) return left.target < right.target;
-      return left.source < right.source;
-    });
   } else {
     filesystems.reserve(operands.count());
     for (let const &operand : operands) {
@@ -306,15 +301,22 @@ fn EvilDisk::execute(
                                               String{allocator}});
     }
   }
+  let const sorted_filesystems =
+      steal(filesystems).make_sorted([](const os::mounted_filesystem &left,
+                                         const os::mounted_filesystem &right) {
+        if (left.target != right.target) return left.target < right.target;
+        return left.source < right.source;
+      });
 
   let rows = ArrayList<disk_row>{allocator};
-  rows.reserve(filesystems.count());
+  rows.reserve(sorted_filesystems.count());
   i32 status = 0;
   usize skipped_permission_count = 0;
-  for (usize filesystem_index = 0; filesystem_index < filesystems.count();
+  for (usize filesystem_index = 0;
+       filesystem_index < sorted_filesystems.count();
        filesystem_index++)
   {
-    let const &mounted = filesystems[filesystem_index];
+    let const &mounted = sorted_filesystems[filesystem_index];
     os::filesystem_status filesystem{};
     if (!os::stat_filesystem(mounted.target.view(), filesystem)) {
       if (operands.is_empty() && os::last_system_error_is_permission_denied()) {
@@ -385,12 +387,13 @@ fn EvilDisk::execute(
                              should_color);
 
   let disk_snapshot = os::read_disk_io_snapshot(allocator);
-  disk_snapshot.disks.sort(
-      [](const os::disk_io_status &left, const os::disk_io_status &right) {
-        return left.name < right.name;
-      });
+  let const sorted_disks =
+      steal(disk_snapshot.disks).make_sorted(
+          [](const os::disk_io_status &left, const os::disk_io_status &right) {
+            return left.name < right.name;
+          });
   bool has_failure_counters = false;
-  for (let const &disk : disk_snapshot.disks) {
+  for (let const &disk : sorted_disks) {
     if (disk.has_field(os::disk_io_field::ReadErrors) ||
         disk.has_field(os::disk_io_field::WriteErrors) ||
         disk.has_field(os::disk_io_field::ReadRetries) ||
@@ -415,7 +418,7 @@ fn EvilDisk::execute(
                      colors::ansi::BOLD_CYAN);
     table.add_column("WRITE RETRIES", report_table_alignment::Right,
                      colors::ansi::BOLD_CYAN);
-    for (let const &disk : disk_snapshot.disks) {
+    for (let const &disk : sorted_disks) {
       const u64 counters[] = {
           disk.read_error_count,
           disk.write_error_count,
@@ -630,7 +633,7 @@ fn EvilDisk::execute(
     if (skipped_permission_count != 1) warning += "s";
     warning += " due to permission denied";
     show_report_warning(warning.view());
-    for (let const &warning : warnings) show_warning(Warning{warning.view()});
+    for (let const &warning : warnings) show_warning(warning.view());
   } else {
     show_report_warnings(warnings);
   }

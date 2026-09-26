@@ -180,17 +180,17 @@ fn append_network_interface_report(String &output,
                                    evilnet_color_mode color_mode) throws -> usize
 {
   let const should_color = color_mode == evilnet_color_mode::Colored;
-  let addresses = os::network_interface_addresses();
-  addresses.sort([](const os::network_interface_address &left,
-                    const os::network_interface_address &right) {
-    if (left.interface_name.view() != right.interface_name.view()) {
-      return left.interface_name.view() < right.interface_name.view();
-    }
+  let const addresses = os::network_interface_addresses().make_sorted(
+      [](const os::network_interface_address &left,
+         const os::network_interface_address &right) {
+        if (left.interface_name.view() != right.interface_name.view()) {
+          return left.interface_name.view() < right.interface_name.view();
+        }
 
-    if (left.family != right.family) return left.family < right.family;
+        if (left.family != right.family) return left.family < right.family;
 
-    return left.address.view() < right.address.view();
-  });
+        return left.address.view() < right.address.view();
+      });
 
   let table = ReportTable{addresses.allocator()};
   table.add_column("NAME", report_table_alignment::Left,
