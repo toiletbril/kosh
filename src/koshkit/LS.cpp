@@ -796,14 +796,15 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
                        options.is_recursive || options.is_tree;
 
   let const allocator = cxt.scratch_allocator();
-  ArrayList<StringView> targets{allocator};
+  ArrayList<StringView> unsorted_targets{allocator};
   if (operands.is_empty())
-    targets.push(StringView{"."});
+    unsorted_targets.push(StringView{"."});
   else
     for (let const &operand : operands)
-      targets.push(operand.view());
+      unsorted_targets.push(operand.view());
 
-  targets.sort();
+  let const targets =
+      steal(unsorted_targets).make_sorted(sort_order::ascending);
 
   let target_paths = ArrayList<Path>{allocator};
   let target_statuses = ArrayList<os::file_status>{allocator};
@@ -883,9 +884,11 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
     }
   }
 
-  file_target_indices.sort();
-  dir_targets.sort();
-  for (let const target_index : file_target_indices) {
+  let const sorted_file_target_indices =
+      steal(file_target_indices).make_sorted(sort_order::ascending);
+  let const sorted_dir_targets =
+      steal(dir_targets).make_sorted(sort_order::ascending);
+  for (let const target_index : sorted_file_target_indices) {
     let entry = listing_entry{allocator};
     entry.name = String{allocator, targets[target_index]};
     set_entry_status(entry, target_statuses[target_index]);
@@ -896,7 +899,7 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const should_print_headers =
       options.is_recursive || options.is_tree ||
-      file_entries.count() + dir_targets.count() > 1;
+      file_entries.count() + sorted_dir_targets.count() > 1;
 
   if (!file_entries.is_empty()) {
     prepare_entries(file_entries, options, StringView{}, true, allocator, true);
@@ -905,7 +908,7 @@ fn LS::execute(const ExecContext &ec, EvalContext &cxt,
   }
 
   bool has_printed_block = !file_entries.is_empty();
-  for (let const &target : dir_targets) {
+  for (let const &target : sorted_dir_targets) {
     if (os::INTERRUPT_REQUESTED) break;
     if (!options.is_tree) {
       render_directory_block(target, options, 0, should_print_headers,
