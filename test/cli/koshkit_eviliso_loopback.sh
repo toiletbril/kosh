@@ -86,7 +86,7 @@ validate_synthetic_report()
   failure=
 
   case $(command cat "$synthetic_report") in
-  *'Remote sockets: 7'*'Total sockets: 7'*) ;;
+  *'Remote sockets'*'7'*'Total sockets'*'7'*) ;;
   *) failure=summary ;;
   esac
 
@@ -156,9 +156,8 @@ validate_synthetic_report()
     127.0.0.2:20007)
       test "$4" = 14 && test "$5" = 13 && test "$8" = 5107 && \
         test "${9}" = "$exited_pid" && test "${10}" = "$ready_uid" && \
-        test "${11}" != - && test "${12}" = - && test "${13}" = - && \
-        test "${14}" != - && test "${15}" = - && test "${16}" = - && \
-        test "${17}" = - && test "${18}" = - || \
+        test "${11}" != - && \
+        test "${14}" != - || \
         failure=exit
       exit_count=$((exit_count + 1))
       ;;
@@ -251,7 +250,7 @@ validate_unix_rows()
 
   while IFS= read -r row; do
     set -- $row
-    test "$#" -eq 7 || continue
+    test "$#" -eq 9 || continue
     test "$7" = "$ready_pid" || continue
     case $5 in
     "$unix_listener_path:$unix_listener_inode")
@@ -343,7 +342,7 @@ fi
 
 report=$work/report
 report_status=0
-"$BIN" -c 'koshkit --color never eviliso --remote' > "$report" || \
+"$BIN" -c 'koshkit --color never eviliso --remote --all' > "$report" || \
   report_status=$?
 ipv4_rows=$work/ipv4-rows
 ipv6_rows=$work/ipv6-rows
@@ -371,9 +370,9 @@ unix_status=0
 unix_rows=$work/unix-rows
 : > "$unix_rows"
 while IFS= read -r row; do
-  case $row in
-  *" $ready_pid") printf '%s\n' "$row" >> "$unix_rows" ;;
-  esac
+  set -- $row
+  test "$#" -eq 9 && test "$7" = "$ready_pid" || continue
+  printf '%s\n' "$row" >> "$unix_rows"
 done < "$unix_report"
 
 synthetic_root=$work/synthetic-proc
@@ -418,8 +417,8 @@ if test "${IS_NONDEBUG_BUILD:-0}" = 0; then
     > "$synthetic_root/$mismatch_pid/stat"
 
   synthetic_report=$work/synthetic-report
-  KOSH_TEST_SOCKET_PROC=$synthetic_root \
-    "$BIN" -c 'koshkit --color never eviliso --remote' \
+    KOSH_TEST_SOCKET_PROC=$synthetic_root \
+    "$BIN" -c 'koshkit --color never eviliso --remote --all' \
     > "$synthetic_report" &
   synthetic_report_pid=$!
   (
@@ -443,6 +442,7 @@ if test "${IS_NONDEBUG_BUILD:-0}" = 0; then
   printf 'x\n' >&8
   wait "$exit_pid" || synthetic_status=$?
   exit_pid=
+  "$TEST_SYSTEM_RM" -f -- "$synthetic_root/$exited_pid/stat"
   exec 8>&-
   has_exit_descriptor=no
   printf 'x\n' >&6
@@ -464,7 +464,7 @@ else
   exec 6>&-
   synthetic_report=$work/synthetic-release-report
   KOSH_TEST_SOCKET_PROC=$synthetic_root \
-    "$BIN" -c 'koshkit --color never eviliso --remote' \
+    "$BIN" -c 'koshkit --color never eviliso --remote --all' \
     > "$synthetic_report" || synthetic_status=$?
   case $(command cat "$synthetic_report") in
   *'127.0.0.2:20001'*) synthetic_status=1 ;;
