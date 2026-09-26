@@ -488,9 +488,10 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
         if (evaluation_metrics_store().git_counts_command_index() !=
             evaluation_metrics_store().command_evaluation_index())
         {
-          utils::git_status(evaluation_metrics_store().git_branch(),
-                            evaluation_metrics_store().git_ahead_count(),
-                            evaluation_metrics_store().git_behind_count());
+          let status = utils::git_status(heap_allocator());
+          evaluation_metrics_store().git_branch() = steal(status.branch);
+          evaluation_metrics_store().git_ahead_count() = status.ahead_count;
+          evaluation_metrics_store().git_behind_count() = status.behind_count;
           evaluation_metrics_store().git_branch_command_index() =
               evaluation_metrics_store().command_evaluation_index();
           evaluation_metrics_store().git_counts_command_index() =

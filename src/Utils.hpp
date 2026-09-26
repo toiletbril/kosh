@@ -405,9 +405,18 @@ fn read_git_ref_sha(const Path &git_dir, StringView ref_name) throws -> String;
 fn git_upstream_ref(const Path &git_dir, StringView branch_name) throws
     -> String;
 
-fn git_ahead_behind_counts(i32 &ahead_count, i32 &behind_count) throws -> void;
-fn git_status(String &branch, i32 &ahead_count, i32 &behind_count) throws
-    -> void;
+struct git_status_result
+{
+  explicit git_status_result(Allocator allocator) : branch(allocator) {}
+
+  String branch;
+  i32 ahead_count{0};
+  i32 behind_count{0};
+};
+
+fn git_ahead_behind_counts(Allocator allocator = heap_allocator()) throws
+    -> git_status_result;
+fn git_status(Allocator allocator = heap_allocator()) throws -> git_status_result;
 
 fn read_entire_standard_input() throws -> String;
 

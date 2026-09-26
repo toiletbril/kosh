@@ -419,26 +419,22 @@ fn git_upstream_ref(const Path &git_dir, StringView branch_name) throws
   return result;
 }
 
-fn git_ahead_behind_counts(i32 &ahead_count, i32 &behind_count) throws -> void
+fn git_ahead_behind_counts(Allocator allocator) throws -> git_status_result
 {
-  let branch = String{heap_allocator()};
-  git_status(branch, ahead_count, behind_count);
+  return git_status(allocator);
 }
 
-fn git_status(String &branch, i32 &ahead_count, i32 &behind_count) throws
-    -> void
+fn git_status(Allocator allocator) throws -> git_status_result
 {
-  branch.clear();
-  ahead_count = 0;
-  behind_count = 0;
+  let result = git_status_result{allocator};
 
   let const git_dir = resolve_git_directory();
-  if (git_dir.text().is_empty()) return;
+  if (git_dir.text().is_empty()) return result;
 
   let git_head = git_dir.clone();
   git_head.push_component("HEAD");
   let const head_content = git_head.read_entire_file();
-  if (!head_content.has_value()) return;
+  if (!head_content.has_value()) return result;
 
   let head_text = head_content->view();
   while (!head_text.is_empty() && (head_text[head_text.length - 1] == '\n' ||
@@ -447,35 +443,32 @@ fn git_status(String &branch, i32 &ahead_count, i32 &behind_count) throws
     head_text = head_text.substring_of_length(0, head_text.length - 1);
   }
   let const ref_prefix = StringView{"ref: refs/heads/"};
-  branch = head_text.starts_with(ref_prefix)
-               ? String{head_text.substring(ref_prefix.length)}
-               : String{head_text.substring_of_length(
-                     0, head_text.length < 7 ? head_text.length : 7)};
-  if (branch.is_empty()) return;
+  result.branch = head_text.starts_with(ref_prefix)
+                      ? String{head_text.substring(ref_prefix.length)}
+                      : String{head_text.substring_of_length(
+                            0, head_text.length < 7 ? head_text.length : 7)};
+  if (result.branch.is_empty()) return result;
 
-  let const local_ref = StringView{"refs/heads/"} + branch.view();
+  let const local_ref = StringView{"refs/heads/"} + result.branch.view();
   let const local_sha = read_git_ref_sha(git_dir, local_ref.view());
-  if (local_sha.is_empty()) return;
+  if (local_sha.is_empty()) return result;
 
-  let const upstream = git_upstream_ref(git_dir, branch.view());
-  if (upstream.is_empty()) return;
+  let const upstream = git_upstream_ref(git_dir, result.branch.view());
+  if (upstream.is_empty()) return result;
 
   let const upstream_sha = read_git_ref_sha(git_dir, upstream.view());
-  if (upstream_sha.is_empty()) return;
+  if (upstream_sha.is_empty()) return result;
 
-  ahead_count = 0;
-  behind_count = 0;
-
-  if (local_sha == upstream_sha) return;
+  if (local_sha == upstream_sha) return result;
 
   let const path_env = os::get_environment_variable("PATH");
-  if (!path_env.has_value()) return;
+  if (!path_env.has_value()) return result;
   let path_resolver = ProgramResolver{*path_env};
   let const git_results =
       path_resolver.search("git", ProgramResolver::SearchMode::First,
                            ProgramResolver::Requirement::Regular,
                            ProgramResolver::CachePolicy::Bypass);
-  if (git_results.is_empty()) return;
+  if (git_results.is_empty()) return result;
   let const git_path = String{heap_allocator(), git_results[0].view()};
 
   let count_argv = ArrayList<String>{heap_allocator()};
@@ -500,12 +493,14 @@ fn git_status(String &branch, i32 &ahead_count, i32 &behind_count) throws
   if (count_output.has_value()) {
     let const separator = count_output->view().find_character('\t');
     if (separator.has_value()) {
-      ahead_count = do_parse_count(
+      result.ahead_count = do_parse_count(
           count_output->view().substring_of_length(0, *separator));
-      behind_count =
+      result.behind_count =
           do_parse_count(count_output->view().substring(*separator + 1));
     }
   }
+
+  return result;
 }
 
 } /* namespace utils */
