@@ -185,7 +185,7 @@ fn Retry::execute(const ExecContext &ec, EvalContext &cxt,
       line += String::from(attempt_limit, allocator).view();
       line += " failed with status ";
       line += String::from(status, allocator).view();
-      show_warning(line.view());
+      show_warning(Warning{line.view()});
     }
 
     if (delay_seconds > 0.0 && !sleep_interruptibly(delay_seconds)) {

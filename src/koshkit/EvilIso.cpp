@@ -1157,8 +1157,8 @@ fn append_remote_report(String &output, bool should_color,
     return left.process_id < right.process_id;
   });
 
-  let socket_identities = ArrayList<u64>{allocator};
-  let remote_identities = ArrayList<u64>{allocator};
+  let socket_identities_unsorted = ArrayList<u64>{allocator};
+  let remote_identities_unsorted = ArrayList<u64>{allocator};
   usize zero_identity_count = 0;
   usize remote_zero_identity_count = 0;
   for (let const &socket : sockets) {
@@ -1167,12 +1167,14 @@ fn append_remote_report(String &output, bool should_color,
       zero_identity_count++;
       if (is_remote) remote_zero_identity_count++;
     } else {
-      socket_identities.push(socket.identity);
-      if (is_remote) remote_identities.push(socket.identity);
+      socket_identities_unsorted.push(socket.identity);
+      if (is_remote) remote_identities_unsorted.push(socket.identity);
     }
   }
-  socket_identities.sort();
-  remote_identities.sort();
+  let const socket_identities =
+      steal(socket_identities_unsorted).make_sorted(sort_order::ascending);
+  let const remote_identities =
+      steal(remote_identities_unsorted).make_sorted(sort_order::ascending);
   let const do_count_unique = [](const ArrayList<u64> &identities) {
     usize count = 0;
     u64 previous = 0;
