@@ -25,10 +25,10 @@ namespace {
 
 fn name_matches_glob(StringView glob, StringView filename,
                      const Bitset &glob_active, usize mask_offset,
-                     utils::extglob_mode mode, bool should_ignore_case,
-                     Allocator allocator) throws -> bool
+                     utils::extglob_mode mode, Allocator allocator,
+                     os::case_sensitivity sensitivity) throws -> bool
 {
-  if (!should_ignore_case)
+  if (sensitivity == os::case_sensitivity::Sensitive)
     return utils::glob_matches(glob, filename, glob_active, mask_offset, mode);
 
   /* The glob arrives already lowered from the caller, so only the per-entry
@@ -127,7 +127,10 @@ fn EvalContext::expand_path_once(const glob_field &field,
     }
 
     return name_matches_glob(match_glob, filename, field.glob_active,
-                             stem_start, extglob, nocaseglob_is_on, scratch);
+                             stem_start, extglob, scratch,
+                             nocaseglob_is_on
+                                 ? os::case_sensitivity::Insensitive
+                                 : os::case_sensitivity::Sensitive);
   };
   let const do_append_entry = [&](StringView filename) throws -> void {
     add_expansion();
