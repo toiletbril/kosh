@@ -115,6 +115,28 @@ struct evilnet_sort_resolution
   String matches{heap_allocator()};
 };
 
+struct evilnet_statistics_comparator
+{
+  evilnet_sort_key selected;
+  Maybe<usize> spec_index;
+
+  pure fn operator()(
+      const os::network_interface_statistics_entry &left,
+      const os::network_interface_statistics_entry &right) const wontthrow
+      -> bool
+  {
+    if (selected == evilnet_sort_key::Name || !spec_index.has_value())
+      return left.interface_name.view() < right.interface_name.view();
+    let const &spec = EVILNET_SORT_SPECS[*spec_index];
+    let const left_available = left.has_field(spec.field);
+    let const right_available = right.has_field(spec.field);
+    if (left_available != right_available) return left_available;
+    if (left_available && left.*(spec.member) != right.*(spec.member))
+      return left.*(spec.member) > right.*(spec.member);
+    return left.interface_name.view() < right.interface_name.view();
+  }
+};
+
 fn resolve_evilnet_sort_key(StringView value, Allocator allocator) throws
     -> evilnet_sort_resolution
 {
@@ -136,9 +158,13 @@ fn resolve_evilnet_sort_key(StringView value, Allocator allocator) throws
   return result;
 }
 
+using sorted_network_statistics =
+    SortedArrayList<os::network_interface_statistics_entry,
+                    evilnet_statistics_comparator>;
+
 fn sort_network_statistics(
-    ArrayList<os::network_interface_statistics_entry> &statistics,
-    Maybe<evilnet_sort_key> sort_key) throws -> void
+    ArrayList<os::network_interface_statistics_entry> statistics,
+    Maybe<evilnet_sort_key> sort_key) throws -> sorted_network_statistics
 {
   let const selected = sort_key.value_or(evilnet_sort_key::Name);
   let spec_index = Maybe<usize>{None};
@@ -151,19 +177,8 @@ fn sort_network_statistics(
       break;
     }
   }
-  statistics.sort([selected, spec_index](
-                      const os::network_interface_statistics_entry &left,
-                      const os::network_interface_statistics_entry &right) {
-    if (selected == evilnet_sort_key::Name || !spec_index.has_value())
-      return left.interface_name.view() < right.interface_name.view();
-    let const &spec = EVILNET_SORT_SPECS[*spec_index];
-    let const left_available = left.has_field(spec.field);
-    let const right_available = right.has_field(spec.field);
-    if (left_available != right_available) return left_available;
-    if (left_available && left.*(spec.member) != right.*(spec.member))
-      return left.*(spec.member) > right.*(spec.member);
-    return left.interface_name.view() < right.interface_name.view();
-  });
+  return steal(statistics).make_sorted(
+      evilnet_statistics_comparator{selected, spec_index});
 }
 
 pure fn family_name(os::network_address_family family) wontthrow -> StringView
@@ -355,8 +370,8 @@ fn append_network_traffic_report(String &output, ArrayList<String> &warnings,
                                  Maybe<evilnet_sort_key> sort_key,
                                  evilnet_color_mode color_mode) throws -> usize
 {
-  let statistics = os::read_network_interface_statistics();
-  sort_network_statistics(statistics, sort_key);
+  let const statistics =
+      sort_network_statistics(os::read_network_interface_statistics(), sort_key);
   let const default_interface = os::default_network_interface(allocator);
   return append_network_traffic_statistics_report(output, warnings, allocator,
                                                   statistics, {},
@@ -839,14 +854,16 @@ fn run_live_network_traffic(const ExecContext &ec, Allocator allocator,
       statistics.push(
           get_network_window_status(row, window_start, frame_allocator));
     }
-    sort_network_statistics(statistics, sort_key);
+    let const sorted_statistics =
+        sort_network_statistics(steal(statistics), sort_key);
     let output = String{frame_allocator};
     let warnings = ArrayList<String>{frame_allocator};
     if (is_terminal) output += "\x1b[H\x1b[2J";
     append_live_controls_bar(output, sample_label.view(), refresh_label.view(),
                              should_color);
     append_network_traffic_statistics_report(
-        output, warnings, frame_allocator, statistics, duration_suffix.view(),
+        output, warnings, frame_allocator, sorted_statistics,
+        duration_suffix.view(),
         default_interface, color_mode);
     if (!warnings.is_empty()) output += "\n";
     for (let const &warning : warnings) {
@@ -970,12 +987,13 @@ fn EvilNet::execute(const ExecContext &ec, EvalContext &cxt,
       }
       let const after = os::read_network_interface_statistics();
       let sampled = sample_network_statistics(before, after, allocator);
-      sort_network_statistics(sampled, sort_key);
+      let const sorted_sampled =
+          sort_network_statistics(steal(sampled), sort_key);
       let const default_interface = os::default_network_interface(allocator);
       let duration_suffix = String{allocator, "/"};
       duration_suffix += format_live_duration(window_seconds, allocator).view();
       traffic_count = append_network_traffic_statistics_report(
-          output, warnings, allocator, sampled, duration_suffix.view(),
+          output, warnings, allocator, sorted_sampled, duration_suffix.view(),
           default_interface, color_mode);
     } else {
       traffic_count = append_network_traffic_report(output, warnings, allocator,
