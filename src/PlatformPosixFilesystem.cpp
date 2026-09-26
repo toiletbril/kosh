@@ -354,6 +354,25 @@ cold fn list_directory_typed(StringView dir, Allocator allocator) throws
   return list_directory_typed_handle(handle, allocator);
 }
 
+cold fn list_directory_for_batch(StringView dir, Allocator allocator) throws
+    -> directory_batch_listing
+{
+#if defined __linux__
+  let const directory = open_file_descriptor(dir, file_open_mode::Read);
+  if (!directory.has_value()) return {None, None};
+
+  let children = list_directory_typed(*directory, allocator);
+  if (!children.has_value()) {
+    unused(close_fd(*directory));
+    return {None, None};
+  }
+
+  return {steal(children), directory};
+#else
+  return {list_directory_typed(dir, allocator), None};
+#endif
+}
+
 #if defined __linux__
 
 cold fn list_directory_typed(descriptor directory, Allocator allocator) throws

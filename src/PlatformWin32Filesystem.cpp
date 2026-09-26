@@ -654,6 +654,12 @@ cold fn list_directory_typed(StringView dir, Allocator allocator) throws
   return entries;
 }
 
+cold fn list_directory_for_batch(StringView dir, Allocator allocator) throws
+    -> directory_batch_listing
+{
+  return {list_directory_typed(dir, allocator), None};
+}
+
 cold fn list_directory_status(StringView dir, Allocator allocator) throws
     -> Maybe<ArrayList<directory_status_entry>>
 {

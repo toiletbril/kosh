@@ -969,6 +969,12 @@ struct directory_status_entry
   bool has_status{false};
 };
 
+struct directory_batch_listing
+{
+  Maybe<ArrayList<Path::directory_child>> children;
+  Maybe<descriptor> directory;
+};
+
 /* Two observations describe the same untouched file. The device and file
    identity is compared only when both observations carry it, because a
    filesystem that reports no identity would otherwise never match. */
@@ -1483,6 +1489,8 @@ cold fn list_directory_typed(StringView dir) throws
     -> Maybe<ArrayList<Path::directory_child>>;
 cold fn list_directory_typed(StringView dir, Allocator allocator) throws
     -> Maybe<ArrayList<Path::directory_child>>;
+cold fn list_directory_for_batch(StringView dir, Allocator allocator) throws
+    -> directory_batch_listing;
 #if defined __linux__
 cold fn list_directory_typed(descriptor directory, Allocator allocator) throws
     -> Maybe<ArrayList<Path::directory_child>>;

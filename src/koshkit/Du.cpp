@@ -320,21 +320,13 @@ static fn total_size(const ExecContext &ec, EvalContext &cxt, const Path &path,
       let const list_mark = list_arena.mark();
       defer { list_arena.release(list_mark); };
       let const frame_index = directory_queue[directory_index];
-#if defined __linux__
-      let const directory = os::open_file_descriptor(
-          frames[frame_index].path.view(), os::file_open_mode::Read);
+      let const listing = os::list_directory_for_batch(
+          frames[frame_index].path.view(), list_allocator);
+      let const directory = listing.directory;
       defer {
         if (directory.has_value()) unused(os::close_fd(*directory));
       };
-      let children = directory.has_value()
-                         ? os::list_directory_typed(*directory, list_allocator)
-                         : Path::read_directory_typed(frames[frame_index].path,
-                                                      list_allocator);
-#else
-      const Maybe<os::descriptor> directory = None;
-      let children =
-          Path::read_directory_typed(frames[frame_index].path, list_allocator);
-#endif
+      let const &children = listing.children;
       if (!children.has_value()) {
         report_soft_koshkit_util_error(
             ec, cxt, "du",
