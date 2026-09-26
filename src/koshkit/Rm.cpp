@@ -34,6 +34,12 @@ namespace koshka {
 
 namespace koshkit {
 
+enum class removal_prompt_mode : u8
+{
+  Never,
+  Always,
+};
+
 static pure fn effective_entry_kind(
     const os::directory_status_entry &entry) wontthrow -> Path::entry_kind
 {
@@ -87,7 +93,8 @@ fn remove_path(StringView path, Allocator allocator, removal_mode mode) throws
 
 static fn remove_path_with_prompt(
     const ExecContext &ec, EvalContext &cxt, StringView utility_name,
-    StringView path, bool should_prompt, Allocator allocator, removal_mode mode,
+    StringView path, Allocator allocator, removal_mode mode,
+    removal_prompt_mode prompt_mode,
     Path::entry_kind known_kind = Path::entry_kind::Unknown) throws -> bool
 {
   let const is_recursive = mode == removal_mode::Recursive;
@@ -114,7 +121,7 @@ static fn remove_path_with_prompt(
         let child = Path{path, allocator};
         child.append(entry.child.name.view());
         if (!remove_path_with_prompt(ec, cxt, utility_name, child.view(),
-                                     should_prompt, allocator, mode,
+                                     allocator, mode, prompt_mode,
                                      effective_entry_kind(entry)))
           did_succeed = false;
       }
@@ -126,7 +133,7 @@ static fn remove_path_with_prompt(
       did_succeed = false;
     }
 
-    if (should_prompt &&
+    if (prompt_mode == removal_prompt_mode::Always &&
         !confirm_koshkit_action(ec, "rm: remove '" + String{path} + "'? "))
       return did_succeed;
     if (!os::remove_directory(path)) {
@@ -138,7 +145,7 @@ static fn remove_path_with_prompt(
 
     return did_succeed;
   }
-  if (should_prompt &&
+  if (prompt_mode == removal_prompt_mode::Always &&
       !confirm_koshkit_action(ec, "rm: remove '" + String{path} + "'? "))
     return true;
   if (os::remove_file(path)) return true;
@@ -151,7 +158,8 @@ static fn remove_path_with_prompt(
 
 static fn report_dry_run_removal(
     const ExecContext &ec, EvalContext &cxt, StringView utility_name,
-    StringView path, bool should_prompt, Allocator allocator, removal_mode mode,
+    StringView path, Allocator allocator, removal_mode mode,
+    removal_prompt_mode prompt_mode,
     Path::entry_kind known_kind = Path::entry_kind::Unknown) throws -> bool
 {
   let const is_recursive = mode == removal_mode::Recursive;
@@ -179,7 +187,7 @@ static fn report_dry_run_removal(
         let child = Path{path, allocator};
         child.append(entry.child.name.view());
         if (!report_dry_run_removal(ec, cxt, utility_name, child.view(),
-                                    should_prompt, allocator, mode,
+                                    allocator, mode, prompt_mode,
                                     effective_entry_kind(entry)))
           did_succeed = false;
         if (os::INTERRUPT_REQUESTED) return false;
@@ -195,7 +203,7 @@ static fn report_dry_run_removal(
 
   if (os::INTERRUPT_REQUESTED) return false;
 
-  if (should_prompt &&
+  if (prompt_mode == removal_prompt_mode::Always &&
       !confirm_koshkit_action(ec, "rm: remove '" + String{path} + "'? "))
     return did_succeed;
 
@@ -249,6 +257,8 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
   let const should_prompt = FLAG_RM_INTERACTIVE.is_enabled() &&
                             (!should_force || FLAG_RM_INTERACTIVE.position() >
                                                   FLAG_RM_FORCE.position());
+  let const prompt_mode = should_prompt ? removal_prompt_mode::Always
+                                        : removal_prompt_mode::Never;
   let const is_recursive =
       FLAG_RM_RECURSIVE_R.is_enabled() || FLAG_RM_RECURSIVE_UPPER.is_enabled();
   let const is_dry_run = FLAG_RM_DRY_RUN.is_enabled();
@@ -290,17 +300,19 @@ fn Rm::execute(const ExecContext &ec, EvalContext &cxt,
     }
     if (is_dry_run) {
       if (!report_dry_run_removal(ec, cxt, args[0].view(), operand.view(),
-                                  should_prompt, allocator,
+                                  allocator,
                                   is_recursive ? removal_mode::Recursive
-                                               : removal_mode::SinglePath))
+                                               : removal_mode::SinglePath,
+                                  prompt_mode))
         status = 1;
       if (os::INTERRUPT_REQUESTED) return 130;
       continue;
     }
 
     if (!remove_path_with_prompt(
-            ec, cxt, args[0].view(), operand.view(), should_prompt, allocator,
-            is_recursive ? removal_mode::Recursive : removal_mode::SinglePath))
+            ec, cxt, args[0].view(), operand.view(), allocator,
+            is_recursive ? removal_mode::Recursive : removal_mode::SinglePath,
+            prompt_mode))
     {
       if (os::INTERRUPT_REQUESTED) return 130;
       status = 1;
