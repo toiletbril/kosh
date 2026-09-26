@@ -325,7 +325,7 @@ static fn run_compgen_actions(EvalContext &cxt, u32 action_mask,
 
   if (do_wants(compgen_action::ArrayVar)) {
     shell_variable_names.for_each([&](StringView name) throws {
-      if (cxt.lookup_indexed_array(name) == nullptr &&
+      if (!cxt.lookup_indexed_array(name).has_value() &&
           !cxt.is_associative_array(name))
       {
         return;

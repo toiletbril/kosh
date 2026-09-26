@@ -1159,10 +1159,10 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
     let const is_uppercase = is_uppercase_variable(name);
     let const is_read_only = is_readonly(name);
     let const is_exported_value = is_exported(name);
-    let const *indexed = lookup_indexed_array(name);
+    let const indexed = lookup_indexed_array(name);
     let const is_associative = is_associative_array(name);
     let const value = get_variable_value(name);
-    if (indexed == nullptr && !is_associative && is_exported_value &&
+    if (!indexed.has_value() && !is_associative && is_exported_value &&
         !is_integer && !is_lowercase && !is_uppercase && !is_read_only)
     {
       let const environment_value = os::get_environment_variable(name);
@@ -1170,26 +1170,26 @@ fn EvalContext::make_subshell_bootstrap() const throws -> os::subshell_bootstrap
     }
 
     source += is_associative       ? "declare -A"
-              : indexed != nullptr ? "declare -a"
+              : indexed.has_value() ? "declare -a"
                                    : "declare -";
     if (is_integer) source.push('i');
     if (is_lowercase) source.push('l');
     if (is_uppercase) source.push('u');
     if (is_exported_value) source.push('x');
-    if (indexed == nullptr && !is_associative && !is_integer && !is_lowercase &&
+    if (!indexed.has_value() && !is_associative && !is_integer && !is_lowercase &&
         !is_uppercase && !is_exported_value)
     {
       source.push('-');
     }
     source.push(' ');
     source.append(name);
-    if (indexed == nullptr && !is_associative && value.has_value()) {
+    if (!indexed.has_value() && !is_associative && value.has_value()) {
       source.push('=');
       append_shell_quoted_arg(source, value->view());
     }
     source.push('\n');
 
-    if (indexed != nullptr || is_associative) {
+    if (indexed.has_value() || is_associative) {
       let const subscripts = collect_array_subscripts(name);
       let const values = collect_array_elements(name);
       ASSERT(subscripts.count() == values.count());

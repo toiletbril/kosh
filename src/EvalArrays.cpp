@@ -181,7 +181,7 @@ fn EvalContext::assign_indexed_array_elements(
     if (update_mode == assignment_update_mode::Append)
       running_index = bash_directory_stack_element_count();
   } else if (update_mode == assignment_update_mode::Append) {
-    if (let const *array = lookup_indexed_array(name); array != nullptr)
+    if (let const array = lookup_indexed_array(name); array.has_value())
       running_index = array->count();
     if (sparse_array_names().contains(name))
       for_each_sparse_index(sparse_array_values(), name, scratch_allocator(),
@@ -375,9 +375,9 @@ fn EvalContext::assign_array_element(StringView name, StringView subscript,
       return get_bash_directory_stack_element(resolved_index,
                                               scratch_allocator());
 
-    if (let const *array = lookup_indexed_array(name);
-        array != nullptr && resolved_index < array->count())
-      return String{(*array)[resolved_index].view()};
+    if (let const array = lookup_indexed_array(name);
+        array.has_value() && resolved_index < array->count())
+      return String{array->operator[](resolved_index).view()};
 
     if (sparse_array_names().contains(name)) {
       let const key =
@@ -615,10 +615,10 @@ fn EvalContext::declare_local(StringView name, bool should_inherit_value) throws
      is taken since the body may overwrite the stored array in place. */
   let previous_array = Maybe<ArrayList<String>>{};
   if (indexed_arrays().count() != 0)
-    if (let const *array = lookup_indexed_array(name); array != nullptr) {
+    if (let const array = lookup_indexed_array(name); array.has_value()) {
       let copy = ArrayList<String>{heap_allocator()};
       copy.reserve(array->count());
-      for (let const &element : *array)
+      for (let const &element : *array.value())
         copy.push_managed(element.view());
       previous_array = steal(copy);
     }
@@ -754,7 +754,7 @@ fn EvalContext::array_element_count(StringView name) const throws -> usize
   }
 
   usize element_count = 0;
-  if (let const *array = lookup_indexed_array(name); array != nullptr)
+  if (let const array = lookup_indexed_array(name); array.has_value())
     element_count = array->count();
 
   if (sparse_array_names().contains(name)) {
@@ -881,12 +881,12 @@ fn EvalContext::apply_array_subscript(
     return String{heap_allocator()};
   }
 
-  const ArrayList<String> *array = lookup_indexed_array(name);
+  let const array = lookup_indexed_array(name);
 
   /* The single-string return loses the per-element split of a quoted
      "${a[@]}", the same limitation the positional "$@" has. */
   if (subscript == "@" || subscript == "*") {
-    if (array == nullptr) return expand_variable(name);
+    if (!array.has_value()) return expand_variable(name);
     let separator = ' ';
     let has_separator = true;
     if (subscript == "*") {
@@ -898,13 +898,13 @@ fn EvalContext::apply_array_subscript(
       if (i > 0 && has_separator) {
         out.push(separator);
       }
-      out.append((*array)[i].view());
+      out.append(array->operator[](i).view());
     }
     return out;
   }
 
   i64 index = evaluate_arithmetic(subscript, source_location);
-  if (array == nullptr) {
+  if (!array.has_value()) {
     /* A scalar reads as a one-element array, so ${name[0]} is the value and any
        other index is empty. */
     if (index == 0) return expand_variable(name);
@@ -925,7 +925,7 @@ fn EvalContext::apply_array_subscript(
     return String{scratch_allocator()};
   }
   return String{scratch_allocator(),
-                (*array)[static_cast<usize>(index)].view()};
+                array->operator[](static_cast<usize>(index)).view()};
 }
 
 fn EvalContext::collect_array_elements(StringView name) const throws
@@ -959,11 +959,10 @@ fn EvalContext::collect_array_elements(StringView name) const throws
   if (is_associative_array(name)) return associative_values(name);
 
   let out = ArrayList<String>{heap_allocator()};
-  if (const ArrayList<String> *array = lookup_indexed_array(name);
-      array != nullptr)
+  if (let const array = lookup_indexed_array(name); array.has_value())
   {
     out.reserve(array->count());
-    for (let const &element : *array)
+    for (let const &element : *array.value())
       out.push_managed(element.view());
     if (sparse_array_names().contains(name)) {
       let sparse = collect_sparse_array_entries(sparse_array_values(), name,
@@ -1004,8 +1003,7 @@ fn EvalContext::array_element_is_set(StringView name,
     return lookup_associative_element(name, key.view()).has_value();
   }
   let const index = evaluate_arithmetic(subscript);
-  if (const ArrayList<String> *array = lookup_indexed_array(name);
-      array != nullptr)
+  if (let const array = lookup_indexed_array(name); array.has_value())
   {
     let const array_count = static_cast<i64>(array->count());
     /* A negative index counts from the highest set index, so [[ -v a[-1] ]]
@@ -1071,7 +1069,7 @@ fn EvalContext::collect_array_subscripts(StringView name) const throws
       out.push(String::from(index, heap_allocator()));
     return out;
   }
-  if (let const *array = lookup_indexed_array(name); array != nullptr) {
+  if (let const array = lookup_indexed_array(name); array.has_value()) {
     out.reserve(array->count());
     for (usize i = 0; i < array->count(); i++)
       out.push(String::from(i, heap_allocator()));

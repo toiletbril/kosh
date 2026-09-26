@@ -786,8 +786,8 @@ static fn bc_evaluate_function_call(StringView statement, const ExecContext &ec,
                           .trim_blanks();
       let translated = String{cxt.scratch_allocator(), "__bc_"};
       translated += source_name;
-      if (let const *array = cxt.lookup_indexed_array(translated.view());
-          array != nullptr)
+      if (let const array = cxt.lookup_indexed_array(translated.view());
+          array.has_value())
         argument.array = array->clone();
     } else {
       argument.scalar = bc_evaluate_text(source, cxt, runtime, ec);

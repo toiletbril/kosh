@@ -364,9 +364,9 @@ fn append_variable_declaration(EvalContext &cxt, StringView name,
 {
   let const is_directory_stack = cxt.is_bash_directory_stack_special(name);
   let const is_argument_array = cxt.is_bash_argument_array(name);
-  let const *elements = cxt.lookup_indexed_array(name);
+  let const elements = cxt.lookup_indexed_array(name);
 
-  if (elements != nullptr || is_directory_stack || is_argument_array) {
+  if (elements.has_value() || is_directory_stack || is_argument_array) {
     let line = String{cxt.scratch_allocator(), "declare -a"};
     if (cxt.is_integer_variable(name)) line += 'i';
     if (cxt.is_lowercase_variable(name)) line += 'l';
@@ -376,7 +376,7 @@ fn append_variable_declaration(EvalContext &cxt, StringView name,
     line.append(name);
     line += "=(";
 
-    let element_count = elements != nullptr ? elements->count() : 0;
+    let element_count = elements.has_value() ? elements->count() : 0;
     if (is_directory_stack) {
       element_count = cxt.bash_directory_stack_element_count();
     } else if (is_argument_array) {
@@ -409,7 +409,7 @@ fn append_variable_declaration(EvalContext &cxt, StringView name,
             e, cxt.scratch_allocator());
         element = argument_array_element.view();
       } else {
-        element = (*elements)[e].view();
+        element = elements->operator[](e).view();
       }
 
       line += quote_for_declare(element);

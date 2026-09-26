@@ -233,7 +233,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (should_mark_uppercase_attribute && !cxt.is_uppercase_variable(name)) {
         return false;
       }
-      if (should_make_indexed && cxt.lookup_indexed_array(name) == nullptr &&
+      if (should_make_indexed && !cxt.lookup_indexed_array(name).has_value() &&
           !cxt.is_bash_directory_stack_special(name) &&
           !cxt.is_bash_argument_array(name))
       {
@@ -338,7 +338,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       continue;
     }
 
-    if (should_make_associative && (cxt.lookup_indexed_array(name) != nullptr ||
+    if (should_make_associative && (cxt.lookup_indexed_array(name).has_value() ||
                                     cxt.is_bash_directory_stack_special(name) ||
                                     cxt.is_bash_argument_array(name)))
     {
@@ -389,7 +389,7 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
       if (equals.has_value()) cxt.set_shell_variable(name, value);
       cxt.declare_associative_array(name);
     } else if (should_make_indexed) {
-      if (cxt.lookup_indexed_array(name) == nullptr &&
+      if (!cxt.lookup_indexed_array(name).has_value() &&
           !cxt.is_bash_directory_stack_special(name) &&
           !cxt.is_bash_argument_array(name))
       {

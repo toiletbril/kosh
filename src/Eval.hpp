@@ -1632,9 +1632,9 @@ public:
     return m_variable_store.variable_attributes();
   }
   pure fn lookup_indexed_array(StringView name) const wontthrow
-      -> const ArrayList<String> *
+      -> Maybe<const ArrayList<String> *>
   {
-    return indexed_arrays().find(name).value_or(nullptr);
+    return indexed_arrays().find(name);
   }
 
   /* The bash associative arrays. The values live in one flat map under a

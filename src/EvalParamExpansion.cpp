@@ -1170,7 +1170,7 @@ fn EvalContext::apply_parameter_transform_to_value(StringView text, char op,
     }
     return out;
   case 'a':
-    if (lookup_indexed_array(name) != nullptr) out.push('a');
+    if (lookup_indexed_array(name).has_value()) out.push('a');
     if (is_associative_array(name)) out.push('A');
     if (is_integer_variable(name)) out.push('i');
     if (is_readonly(name)) out.push('r');

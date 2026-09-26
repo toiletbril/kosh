@@ -962,12 +962,11 @@ fn EvalContext::expand_wordlist_to_fields(StringView wordlist,
     expansion_source.push(')');
     run_source(expansion_source.view(), "a -W word list", None, None, nullptr,
                nullptr, return_handling::Propagate);
-    if (const ArrayList<String> *expanded =
-            lookup_indexed_array("t__wordlist_fields");
-        expanded != nullptr)
+    if (let const expanded = lookup_indexed_array("t__wordlist_fields");
+        expanded.has_value())
     {
       fields.reserve(expanded->count());
-      for (let const &word : *expanded)
+      for (let const &word : *expanded.value())
         fields.push_managed(word.view());
     }
   } catch (const ErrorBase &error) {
