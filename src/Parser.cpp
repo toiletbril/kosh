@@ -69,7 +69,9 @@ fn Parser::take_analysis_scope_definitions() throws
 fn Parser::record_analysis_scope_definition(StringView name,
                                             bool is_alias) throws -> void
 {
-  if (!m_should_collect_analysis_scopes) return;
+  if (m_analysis_scope_collection_mode !=
+      analysis_metadata_collection_mode::Enabled)
+    return;
 
   m_analysis_scope_definitions.push(
       analysis_scope_definition{String{name}, is_alias});
@@ -78,7 +80,9 @@ fn Parser::record_analysis_scope_definition(StringView name,
 fn Parser::record_analysis_alias_definitions(
     const ArrayList<const Token *> &args) throws -> void
 {
-  if (!m_should_collect_analysis_scopes || args.is_empty()) {
+  if (m_analysis_scope_collection_mode !=
+          analysis_metadata_collection_mode::Enabled ||
+      args.is_empty()) {
     return;
   }
 
@@ -268,11 +272,15 @@ flatten fn Parser::construct_ast() throws -> Expression *
 
 fn Parser::construct_next_top_level_ast() throws -> Expression *
 {
-  if (m_should_collect_analysis_metadata)
-    m_lexer.set_should_collect_shellcheck_directives(true);
+  if (m_analysis_metadata_collection_mode ==
+      analysis_metadata_collection_mode::Enabled)
+    m_lexer.set_shellcheck_directive_collection_mode(
+        shellcheck_directive_collection_mode::Enabled);
   let const first_token = m_lexer.peek_shell_token();
-  if (m_should_collect_analysis_metadata)
-    m_lexer.set_should_collect_shellcheck_directives(false);
+  if (m_analysis_metadata_collection_mode ==
+      analysis_metadata_collection_mode::Enabled)
+    m_lexer.set_shellcheck_directive_collection_mode(
+        shellcheck_directive_collection_mode::Disabled);
   if (first_token->kind() == Token::Kind::EndOfFile) return nullptr;
 
   m_should_stop_after_top_level_unit = true;
@@ -401,8 +409,10 @@ cold fn Parser::construct_ast(
     /* An unterminated quote or here-document is raised by the token read
        itself, so the scan for the next command records it and stops. */
     Token *token = nullptr;
-    if (m_should_collect_analysis_metadata)
-      m_lexer.set_should_collect_shellcheck_directives(true);
+    if (m_analysis_metadata_collection_mode ==
+        analysis_metadata_collection_mode::Enabled)
+      m_lexer.set_shellcheck_directive_collection_mode(
+          shellcheck_directive_collection_mode::Enabled);
     try {
       token = m_lexer.peek_shell_token();
     } catch (const ErrorWithLocationAndDetails &e) {
@@ -410,8 +420,10 @@ cold fn Parser::construct_ast(
     } catch (const ErrorWithLocation &e) {
       record_parse_error(e, errors, context, diagnostic_sink);
     }
-    if (m_should_collect_analysis_metadata)
-      m_lexer.set_should_collect_shellcheck_directives(false);
+    if (m_analysis_metadata_collection_mode ==
+        analysis_metadata_collection_mode::Enabled)
+      m_lexer.set_shellcheck_directive_collection_mode(
+          shellcheck_directive_collection_mode::Disabled);
     if (token == nullptr) break;
 
     last_location = token->source_location();
@@ -458,8 +470,10 @@ cold fn Parser::construct_next_top_level_ast(
   loop
   {
     Token *token = nullptr;
-    if (m_should_collect_analysis_metadata)
-      m_lexer.set_should_collect_shellcheck_directives(true);
+    if (m_analysis_metadata_collection_mode ==
+        analysis_metadata_collection_mode::Enabled)
+      m_lexer.set_shellcheck_directive_collection_mode(
+          shellcheck_directive_collection_mode::Enabled);
     try {
       token = m_lexer.peek_shell_token();
     } catch (const ErrorWithLocationAndDetails &e) {
@@ -467,8 +481,10 @@ cold fn Parser::construct_next_top_level_ast(
     } catch (const ErrorWithLocation &e) {
       record_parse_error(e, errors, context, diagnostic_sink);
     }
-    if (m_should_collect_analysis_metadata)
-      m_lexer.set_should_collect_shellcheck_directives(false);
+    if (m_analysis_metadata_collection_mode ==
+        analysis_metadata_collection_mode::Enabled)
+      m_lexer.set_shellcheck_directive_collection_mode(
+          shellcheck_directive_collection_mode::Disabled);
 
     if (token == nullptr || token->kind() == Token::Kind::EndOfFile)
       return nullptr;
@@ -561,22 +577,28 @@ hot fn Parser::parse_command_list(u64 terminator_mask) throws -> Expression *
          allows it before the ! negation, and -p or --posix selects the POSIX
          report. */
       Token *maybe_time = nullptr;
-      if (m_should_collect_analysis_metadata) {
+      if (m_analysis_metadata_collection_mode ==
+          analysis_metadata_collection_mode::Enabled) {
         let const should_collect_directives =
             next_cond == CompoundListCondition::Kind::None;
-        m_lexer.set_should_collect_shellcheck_directives(
-            should_collect_directives);
+        m_lexer.set_shellcheck_directive_collection_mode(
+            should_collect_directives
+                ? shellcheck_directive_collection_mode::Enabled
+                : shellcheck_directive_collection_mode::Disabled);
         maybe_time = m_lexer.peek_shell_token();
         let directives = m_lexer.take_shellcheck_directives();
-        m_lexer.set_should_collect_shellcheck_directives(false);
+        m_lexer.set_shellcheck_directive_collection_mode(
+            shellcheck_directive_collection_mode::Disabled);
         while (!directives.is_empty() &&
                maybe_time->kind() == Token::Kind::Newline)
         {
           m_lexer.advance_past_last_peek();
-          m_lexer.set_should_collect_shellcheck_directives(true);
+          m_lexer.set_shellcheck_directive_collection_mode(
+              shellcheck_directive_collection_mode::Enabled);
           maybe_time = m_lexer.peek_shell_token();
           let following_directives = m_lexer.take_shellcheck_directives();
-          m_lexer.set_should_collect_shellcheck_directives(false);
+          m_lexer.set_shellcheck_directive_collection_mode(
+              shellcheck_directive_collection_mode::Disabled);
           for (let const &directive : following_directives)
             directives.push(directive);
         }

@@ -1657,7 +1657,8 @@ fn expressions::internal::analyze_followed_source(
       Lexer{contents->view(), *actx.eval_context->parse_arena(),
             canonical_path->text().view(), actx.eval_context->mood()}
   };
-  parser.set_should_collect_analysis_metadata(true);
+  parser.set_analysis_metadata_collection_mode(
+      analysis_metadata_collection_mode::Enabled);
 
   let parse_errors = ArrayList<String>{heap_allocator()};
   let const child_diagnostic_start =

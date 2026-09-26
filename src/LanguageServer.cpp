@@ -518,7 +518,8 @@ fn Server::publish_diagnostics(Document &document) throws -> bool
   let parser = Parser{
       Lexer{document.shell_source(), m_ast_arena, filename, m_context.mood()}
   };
-  parser.set_should_collect_analysis_metadata(true);
+  parser.set_analysis_metadata_collection_mode(
+      analysis_metadata_collection_mode::Enabled);
   let rendered_errors = ArrayList<String>{heap_allocator()};
   let diagnostics = ArrayList<source_diagnostic>{heap_allocator()};
   let followed_paths = HashSet{heap_allocator()};

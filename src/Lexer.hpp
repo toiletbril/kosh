@@ -40,6 +40,18 @@ enum class debug_word_collection_mode : u8
   Enabled,
 };
 
+enum class analysis_metadata_collection_mode : u8
+{
+  Disabled,
+  Enabled,
+};
+
+enum class shellcheck_directive_collection_mode : u8
+{
+  Disabled,
+  Enabled,
+};
+
 class ParseSession
 {
 public:
@@ -98,23 +110,26 @@ public:
 
   pure fn should_collect_analysis_metadata() const wontthrow -> bool
   {
-    return m_should_collect_analysis_metadata;
+    return m_analysis_metadata_collection_mode ==
+           analysis_metadata_collection_mode::Enabled;
   }
 
-  fn set_should_collect_analysis_metadata(bool should_collect) wontthrow -> void
+  fn set_analysis_metadata_collection_mode(
+      analysis_metadata_collection_mode mode) wontthrow -> void
   {
-    m_should_collect_analysis_metadata = should_collect;
+    m_analysis_metadata_collection_mode = mode;
   }
 
   pure fn should_collect_shellcheck_directives() const wontthrow -> bool
   {
-    return m_should_collect_shellcheck_directives;
+    return m_shellcheck_directive_collection_mode ==
+           shellcheck_directive_collection_mode::Enabled;
   }
 
-  fn set_should_collect_shellcheck_directives(bool should_collect) wontthrow
-      -> void
+  fn set_shellcheck_directive_collection_mode(
+      shellcheck_directive_collection_mode mode) wontthrow -> void
   {
-    m_should_collect_shellcheck_directives = should_collect;
+    m_shellcheck_directive_collection_mode = mode;
   }
 
   fn set_arena(BumpArena &arena, AllocationKind allocation_kind) wontthrow
@@ -132,8 +147,10 @@ private:
   mimic_mood m_mood{mimic_mood::Default};
   debug_word_collection_mode m_debug_word_collection_mode{
       debug_word_collection_mode::Disabled};
-  bool m_should_collect_analysis_metadata{false};
-  bool m_should_collect_shellcheck_directives{false};
+  analysis_metadata_collection_mode m_analysis_metadata_collection_mode{
+      analysis_metadata_collection_mode::Disabled};
+  shellcheck_directive_collection_mode m_shellcheck_directive_collection_mode{
+      shellcheck_directive_collection_mode::Disabled};
 };
 
 struct heredoc_contents
@@ -249,14 +266,15 @@ public:
   fn drop_peek_cache() wontthrow -> void;
   fn advance_past_last_peek() throws -> usize;
 
-  fn set_should_collect_shellcheck_directives(bool should_collect) wontthrow
-      -> void
+  fn set_shellcheck_directive_collection_mode(
+      shellcheck_directive_collection_mode mode) wontthrow -> void
   {
-    m_parse_session.set_should_collect_shellcheck_directives(should_collect);
+    m_parse_session.set_shellcheck_directive_collection_mode(mode);
   }
-  fn set_should_collect_analysis_metadata(bool should_collect) wontthrow -> void
+  fn set_analysis_metadata_collection_mode(
+      analysis_metadata_collection_mode mode) wontthrow -> void
   {
-    m_parse_session.set_should_collect_analysis_metadata(should_collect);
+    m_parse_session.set_analysis_metadata_collection_mode(mode);
   }
   fn take_shellcheck_directives() throws
       -> ArrayList<shellcheck_directive_span>;

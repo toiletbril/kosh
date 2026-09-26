@@ -530,7 +530,8 @@ static fn run_script_contents(
       let scan_parser = Parser{
           Lexer{script_contents.view(), ast_arena, filename, context.mood()}
       };
-      scan_parser.set_should_collect_analysis_metadata(true);
+      scan_parser.set_analysis_metadata_collection_mode(
+          analysis_metadata_collection_mode::Enabled);
 
       let const scan_mark = ast_arena.mark();
       loop
@@ -563,7 +564,9 @@ static fn run_script_contents(
                     ? debug_word_collection_mode::Enabled
                     : debug_word_collection_mode::Disabled}
       };
-      p.set_should_collect_analysis_metadata(run_analysis);
+      p.set_analysis_metadata_collection_mode(
+          run_analysis ? analysis_metadata_collection_mode::Enabled
+                       : analysis_metadata_collection_mode::Disabled);
 
       ast = p.construct_ast(parse_errors, &context, diagnostic_sink);
 
@@ -638,7 +641,8 @@ static fn run_script_contents(
         };
         /* A function body and a subshell carry their own definitions on the
            node, and the walk seeds them when it enters. */
-        unit_parser.set_should_collect_analysis_scopes(true);
+        unit_parser.set_analysis_scope_collection_mode(
+            analysis_metadata_collection_mode::Enabled);
 
         let units = StreamedAnalysisUnits{unit_parser, ast_arena, parse_errors,
                                           context, diagnostic_sink};

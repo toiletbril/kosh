@@ -62,15 +62,17 @@ public:
     return m_lexer.take_heredoc_terminator_misses();
   }
 
-  fn set_should_collect_analysis_metadata(bool should_collect) wontthrow -> void
+  fn set_analysis_metadata_collection_mode(
+      analysis_metadata_collection_mode mode) wontthrow -> void
   {
-    m_should_collect_analysis_metadata = should_collect;
-    m_should_collect_analysis_scopes = should_collect;
-    m_lexer.set_should_collect_analysis_metadata(should_collect);
+    m_analysis_metadata_collection_mode = mode;
+    m_analysis_scope_collection_mode = mode;
+    m_lexer.set_analysis_metadata_collection_mode(mode);
   }
-  fn set_should_collect_analysis_scopes(bool should_collect) wontthrow -> void
+  fn set_analysis_scope_collection_mode(
+      analysis_metadata_collection_mode mode) wontthrow -> void
   {
-    m_should_collect_analysis_scopes = should_collect;
+    m_analysis_scope_collection_mode = mode;
   }
   fn take_analysis_scope_definitions() throws
       -> ArrayList<analysis_scope_definition>;
@@ -87,8 +89,10 @@ private:
   u16 m_command_depth{0};
   bool m_should_stop_after_top_level_unit{false};
   bool m_has_parsed_source_command{false};
-  bool m_should_collect_analysis_metadata{false};
-  bool m_should_collect_analysis_scopes{false};
+  analysis_metadata_collection_mode m_analysis_metadata_collection_mode{
+      analysis_metadata_collection_mode::Disabled};
+  analysis_metadata_collection_mode m_analysis_scope_collection_mode{
+      analysis_metadata_collection_mode::Disabled};
   ArrayList<shellcheck_suppression> m_shellcheck_suppressions{heap_allocator()};
 
   /* A scope owns the tail from its mark, which the enclosing parse function
