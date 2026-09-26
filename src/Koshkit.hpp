@@ -634,8 +634,15 @@ enum class copy_file_result : u8
   WriteFailed,
 };
 
+enum class copy_force_mode : u8
+{
+  Normal,
+  Force,
+};
+
 fn copy_file_contents(StringView source, StringView destination,
-                      bool should_force) throws -> copy_file_result;
+                      copy_force_mode force_mode) throws
+    -> copy_file_result;
 fn make_directories(const Path &directory, u32 mode) wontthrow -> bool;
 fn read_named_or_stdin(const ExecContext &ec, StringView path) throws
     -> Maybe<String>;

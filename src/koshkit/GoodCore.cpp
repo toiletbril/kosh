@@ -111,7 +111,8 @@ fn copy_into_root(const Path &stage, StringView source) throws -> bool
   destination.append(relative);
   if (!make_directories(destination.parent(), 0700)) return false;
 
-  return copy_file_contents(source, destination.view(), false) ==
+  return copy_file_contents(source, destination.view(),
+                            copy_force_mode::Normal) ==
          copy_file_result::Success;
 }
 
@@ -396,7 +397,8 @@ fn GoodCore::execute(
       return 1;
     }
 
-    if (copy_file_contents(source.view(), core.view(), false) !=
+    if (copy_file_contents(source.view(), core.view(),
+                           copy_force_mode::Normal) !=
         copy_file_result::Success)
     {
       report_soft_koshkit_error(ec, cxt, "cannot copy core file",

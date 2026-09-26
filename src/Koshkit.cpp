@@ -302,7 +302,8 @@ fn read_fd_to_string(os::descriptor fd) throws -> Maybe<String>
 }
 
 fn copy_file_contents(StringView source, StringView destination,
-                      bool should_force) throws -> copy_file_result
+                      copy_force_mode force_mode) throws
+    -> copy_file_result
 {
   let const source_descriptor =
       os::open_file_descriptor(source, os::file_open_mode::Read);
@@ -311,7 +312,8 @@ fn copy_file_contents(StringView source, StringView destination,
 
   let destination_descriptor =
       os::open_file_descriptor(destination, os::file_open_mode::Truncate);
-  if (!destination_descriptor.has_value() && should_force &&
+  if (!destination_descriptor.has_value() &&
+      force_mode == copy_force_mode::Force &&
       os::remove_file(destination))
   {
     destination_descriptor =
