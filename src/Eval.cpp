@@ -178,9 +178,9 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
   }
 
   if (m_confined_write_depth > 0) [[unlikely]] {
-    let const *previous = lookup_shell_variable(name);
+    let const previous = lookup_shell_variable(name);
     let saved = Maybe<String>{};
-    if (previous != nullptr) saved = String{previous->view()};
+    if (previous.has_value()) saved = String{previous->view()};
     let const saved_definition = special_variable_definition_location(name);
 
     m_confined_write_log.push(
@@ -382,12 +382,12 @@ fn EvalContext::seed_shell_identity_variables(bool is_bash_identity) throws
     return;
   }
   LOG(Info, "clearing the bash identity variables for a non-bash mood");
-  if (lookup_shell_variable("BASH_VERSION") != nullptr ||
+  if (lookup_shell_variable("BASH_VERSION").has_value() ||
       os::has_environment_variable("BASH_VERSION"))
   {
     force_unset_shell_variable("BASH_VERSION");
   }
-  if (lookup_shell_variable("BASH") != nullptr ||
+  if (lookup_shell_variable("BASH").has_value() ||
       os::has_environment_variable("BASH"))
   {
     force_unset_shell_variable("BASH");

@@ -677,8 +677,8 @@ hot fn EvalContext::expand_word(const Word &word) throws
             break;
           }
         if (is_plain_name)
-          if (let const *stored = lookup_shell_variable(segment_text);
-              stored != nullptr)
+          if (let const stored = lookup_shell_variable(segment_text);
+              stored.has_value())
           {
             if (segment.is_in_double_quotes)
               do_append_run(stored->view(), false);

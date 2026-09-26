@@ -408,8 +408,8 @@ fn EvalContext::expand_modifier_word_worker(
       /* A nested reference obeys set -u the way a top level reference does. A
          stored name resolves without the extra dynamic-value lookup and copy.
        */
-      let const *stored = lookup_shell_variable(name);
-      if (stored != nullptr) {
+      let const stored = lookup_shell_variable(name);
+      if (stored.has_value()) {
         do_emit_run(stored->view(), !is_in_double_quote);
       } else {
         let value = get_variable_value(name);
@@ -609,7 +609,7 @@ hot fn EvalContext::apply_parameter_expansion(
           scratch_allocator());
     }
 
-    if (let const *stored = lookup_shell_variable(name); stored != nullptr)
+    if (let const stored = lookup_shell_variable(name); stored.has_value())
       return String::from(stored->count(), scratch_allocator());
     let const value = get_variable_value(name);
     if (!value.has_value()) report_unset_reference(name);
@@ -717,7 +717,7 @@ hot fn EvalContext::apply_parameter_expansion(
   if (rest.is_empty()) {
     /* A plain reference reports under set -u, a modifier form such as ${x:-w}
        handles the unset case itself. */
-    if (let const *stored = lookup_shell_variable(name); stored != nullptr)
+    if (let const stored = lookup_shell_variable(name); stored.has_value())
       return String{scratch_allocator(), stored->view()};
     let value = get_variable_value(name);
     if (!value.has_value()) report_unset_reference(name);

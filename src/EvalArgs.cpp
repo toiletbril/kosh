@@ -731,8 +731,8 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
                 for (usize i = 1; is_plain_name && i < spec.length; i++)
                   if (!lexer::is_variable_name(spec[i])) is_plain_name = false;
                 if (is_plain_name)
-                  if (let const *stored = lookup_shell_variable(spec);
-                      stored != nullptr)
+                  if (let const stored = lookup_shell_variable(spec);
+                      stored.has_value())
                   {
                     value += stored->view();
                     break;

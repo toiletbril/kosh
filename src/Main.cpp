@@ -820,14 +820,14 @@ fn kosh_main(int argc, char **argv) -> int
   context.set_shell_variable("KOSH_COMMIT", KOSH_COMMIT_HASH);
   context.set_shell_variable("KOSH_BUILD_MODE", KOSH_BUILD_MODE);
   context.set_shell_variable("KOSH_OS", KOSH_OS_INFO);
-  if (context.lookup_shell_variable("KOSH_HISTORY_FILE") == nullptr) {
+  if (!context.lookup_shell_variable("KOSH_HISTORY_FILE").has_value()) {
     if (let const history_path = toiletline::get_history_path();
         history_path.has_value())
     {
       context.set_shell_variable("KOSH_HISTORY_FILE", history_path->text());
     }
   }
-  if (context.lookup_shell_variable("KOSH_HISTORY_SIZE") == nullptr)
+  if (!context.lookup_shell_variable("KOSH_HISTORY_SIZE").has_value())
     context.set_shell_variable("KOSH_HISTORY_SIZE", "4096");
   context.mark_exported("KOSH_HISTORY_FILE");
   context.mark_exported("KOSH_HISTORY_SIZE");

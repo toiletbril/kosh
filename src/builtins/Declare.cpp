@@ -396,8 +396,8 @@ fn Declare::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         let values = ArrayList<String>{heap_allocator()};
         if (equals.has_value())
           values.push(String{heap_allocator(), value});
-        else if (let const *scalar = cxt.lookup_shell_variable(name);
-                 scalar != nullptr)
+        else if (let const scalar = cxt.lookup_shell_variable(name);
+                 scalar.has_value())
           values.push(String{heap_allocator(), scalar->view()});
         cxt.set_indexed_array(name, steal(values));
       }

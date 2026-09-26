@@ -1758,14 +1758,14 @@ public:
       -> Maybe<String>;
 
   hot fn lookup_shell_variable(StringView name) const wontthrow
-      -> const String *
+      -> Maybe<const String *>
   {
-    return m_variable_store.shell_variables().find(name).value_or(nullptr);
+    return m_variable_store.shell_variables().find(name);
   }
   fn get_history_limit(StringView name, usize fallback) const wontthrow -> usize
   {
-    let const *value = lookup_shell_variable(name);
-    if (value == nullptr) return fallback;
+    let const value = lookup_shell_variable(name);
+    if (!value.has_value()) return fallback;
     let const parsed = value->view().to<i64>();
     if (parsed.is_error() || parsed.value() < 0) return fallback;
     return static_cast<usize>(parsed.value());

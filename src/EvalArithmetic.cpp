@@ -266,8 +266,8 @@ public:
     if (m_is_skipping) return ArithmeticValue{};
 
     ASSERT(context != nullptr);
-    if (let const *stored = context->lookup_shell_variable(name);
-        stored != nullptr)
+    if (let const stored = context->lookup_shell_variable(name);
+        stored.has_value())
     {
       return evaluate_operand_value(stored->view());
     }
@@ -1929,8 +1929,8 @@ static fn arith_read_variable(EvalContext *context, StringView name,
     -> ArithmeticValue
 {
   ASSERT(context != nullptr);
-  if (let const *stored = context->lookup_shell_variable(name);
-      stored != nullptr)
+  if (let const stored = context->lookup_shell_variable(name);
+      stored.has_value())
   {
     return evaluate_named_value_operand(context, stored->view(), is_exact,
                                         arena);
