@@ -141,29 +141,26 @@ fn append_network_socket_report(String &output,
                                 Allocator allocator, bool should_color) throws
     -> bool
 {
-  let sockets = os::network_sockets(
+  let sockets_unsorted = os::network_sockets(
       options.should_show_processes
           ? os::network_socket_process_mode::WithProcesses
           : os::network_socket_process_mode::WithoutProcesses);
-  sockets.sort([](const os::network_socket_entry &left,
-                  const os::network_socket_entry &right) {
-    if (left.protocol != right.protocol) return left.protocol < right.protocol;
-    if (left.family != right.family) return left.family < right.family;
-    if (left.local_address != right.local_address) {
-      return left.local_address < right.local_address;
-    }
-    if (left.local_port != right.local_port) {
-      return left.local_port < right.local_port;
-    }
-    if (left.peer_address != right.peer_address) {
-      return left.peer_address < right.peer_address;
-    }
-    if (left.peer_port != right.peer_port) {
-      return left.peer_port < right.peer_port;
-    }
+  let const sockets = steal(sockets_unsorted).make_sorted(
+      [](const os::network_socket_entry &left,
+         const os::network_socket_entry &right) {
+        if (left.protocol != right.protocol) return left.protocol < right.protocol;
+        if (left.family != right.family) return left.family < right.family;
+        if (left.local_address != right.local_address)
+          return left.local_address < right.local_address;
+        if (left.local_port != right.local_port)
+          return left.local_port < right.local_port;
+        if (left.peer_address != right.peer_address)
+          return left.peer_address < right.peer_address;
+        if (left.peer_port != right.peer_port)
+          return left.peer_port < right.peer_port;
 
-    return left.process_id < right.process_id;
-  });
+        return left.process_id < right.process_id;
+      });
 
   let const processes =
       options.should_show_processes

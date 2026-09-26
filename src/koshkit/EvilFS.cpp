@@ -56,15 +56,15 @@ fn EvilFS::execute(const ExecContext &ec, EvalContext &cxt,
     return 1;
   }
 
-  let mounts = os::mounted_filesystems();
-  mounts.sort([](const os::mounted_filesystem &left,
-                 const os::mounted_filesystem &right) {
-    if (left.target.view() != right.target.view()) {
-      return left.target.view() < right.target.view();
-    }
+  let const mounts = os::mounted_filesystems().make_sorted(
+      [](const os::mounted_filesystem &left,
+         const os::mounted_filesystem &right) {
+        if (left.target.view() != right.target.view()) {
+          return left.target.view() < right.target.view();
+        }
 
-    return left.source.view() < right.source.view();
-  });
+        return left.source.view() < right.source.view();
+      });
 
   let const allocator = cxt.scratch_allocator();
   let output = String{allocator};

@@ -683,11 +683,12 @@ fn Evil::execute(const ExecContext &ec, EvalContext &cxt,
                       colors::ansi::BOLD_CYAN, should_color);
 
   let const addresses = os::network_interface_addresses();
-  let interface_names = ArrayList<StringView>{allocator};
-  interface_names.reserve(addresses.count());
+  let interface_names_unsorted = ArrayList<StringView>{allocator};
+  interface_names_unsorted.reserve(addresses.count());
   for (let const &address : addresses)
-    interface_names.push(address.interface_name.view());
-  interface_names.sort();
+    interface_names_unsorted.push(address.interface_name.view());
+  let const interface_names =
+      steal(interface_names_unsorted).make_sorted(sort_order::ascending);
 
   usize interface_count = 0;
   StringView previous_interface;
