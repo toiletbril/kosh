@@ -141,12 +141,13 @@ fn Fuser::execute(const ExecContext &ec, EvalContext &cxt,
     return 1;
   }
   if (users.is_empty() && status == 0) status = 1;
-  users.sort([](const os::process_file_user &left,
-                const os::process_file_user &right) {
-    if (left.query_position != right.query_position)
-      return left.query_position < right.query_position;
-    return left.pid < right.pid;
-  });
+  let const sorted_users =
+      steal(users).make_sorted([](const os::process_file_user &left,
+                                   const os::process_file_user &right) {
+        if (left.query_position != right.query_position)
+          return left.query_position < right.query_position;
+        return left.pid < right.pid;
+      });
 
   let standard_output = String{cxt.scratch_allocator()};
   let standard_error = String{cxt.scratch_allocator()};
@@ -159,8 +160,8 @@ fn Fuser::execute(const ExecContext &ec, EvalContext &cxt,
   for (usize operand_position = 0; operand_position < operands.count();
        operand_position++)
   {
-    if (user_position >= users.count() ||
-        users[user_position].query_position != operand_position)
+    if (user_position >= sorted_users.count() ||
+        sorted_users[user_position].query_position != operand_position)
     {
       continue;
     }
@@ -168,10 +169,10 @@ fn Fuser::execute(const ExecContext &ec, EvalContext &cxt,
     metadata_output += operands[operand_position].view();
     metadata_output.push(':');
 
-    while (user_position < users.count() &&
-           users[user_position].query_position == operand_position)
+    while (user_position < sorted_users.count() &&
+           sorted_users[user_position].query_position == operand_position)
     {
-      let const &user = users[user_position];
+      let const &user = sorted_users[user_position];
       let pid = String::from(user.pid, cxt.scratch_allocator());
       if (is_combined) {
         metadata_output += pid.view();

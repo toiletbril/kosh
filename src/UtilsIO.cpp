@@ -111,11 +111,12 @@ fn suggest_directory_entry(const Path &directory, StringView name) throws
   let const entries = read_directory_cached(directory);
   if (entries == nullptr) return None;
 
-  let directory_names = ArrayList<StringView>{heap_allocator()};
+  let directory_names_unsorted = ArrayList<StringView>{heap_allocator()};
   for (let const &entry : *entries)
     if (directory_entry_kind(directory, entry) == Path::entry_kind::Directory)
-      directory_names.push(entry.name.view());
-  directory_names.sort();
+      directory_names_unsorted.push(entry.name.view());
+  let const directory_names =
+      steal(directory_names_unsorted).make_sorted(sort_order::ascending);
 
   let suggestion = NameSuggestion{name};
   for (let const directory_name : directory_names)
