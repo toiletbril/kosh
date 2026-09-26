@@ -644,7 +644,8 @@ fn internal::resolve_redirection(const Redirection &redir, EvalContext &cxt,
       if (redir.should_expand_heredoc) {
         let source_location = SourceLocation{};
         const SourceLocation *source_location_pointer = nullptr;
-        if (redir.heredoc->has_contiguous_source) {
+        if (redir.heredoc->source_mapping ==
+            heredoc_source_mapping::Contiguous) {
           source_location =
               SourceLocation{redir.heredoc->source_position, body.length,
                              fallback_location.source_name_index};

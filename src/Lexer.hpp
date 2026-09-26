@@ -28,6 +28,12 @@ enum class heredoc_tab_policy : u8
   Strip,
 };
 
+enum class heredoc_source_mapping : u8
+{
+  Contiguous,
+  Transformed,
+};
+
 class ParseSession
 {
 public:
@@ -123,14 +129,14 @@ private:
 
 struct heredoc_contents
 {
-  heredoc_contents(Allocator allocator, bool has_contiguous_source)
-      : text{allocator}, has_contiguous_source{has_contiguous_source}
+  heredoc_contents(Allocator allocator, heredoc_source_mapping source_mapping)
+      : text{allocator}, source_mapping{source_mapping}
   {}
 
   String text;
   usize source_position{0};
   usize source_end_position{0};
-  bool has_contiguous_source;
+  heredoc_source_mapping source_mapping;
 };
 
 struct heredoc_pending

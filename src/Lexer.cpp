@@ -341,7 +341,10 @@ cold fn Lexer::register_heredoc(StringView delimiter,
   let &arena = m_parse_session.get_arena();
   let contents =
       arena.create<heredoc_contents>(
-          bump_allocator(arena), tab_policy == heredoc_tab_policy::Preserve);
+          bump_allocator(arena),
+          tab_policy == heredoc_tab_policy::Preserve
+              ? heredoc_source_mapping::Contiguous
+              : heredoc_source_mapping::Transformed);
   ASSERT(contents != nullptr);
 
   LOG(Debug, "registering a pending heredoc with delimiter '%.*s'",
