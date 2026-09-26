@@ -89,6 +89,12 @@ enum class evilps_color_mode : u8
   Colored,
 };
 
+enum class evilps_parent_display_mode : u8
+{
+  HideAncestors,
+  FollowAncestors,
+};
+
 struct evilps_sort_spec
 {
   evilps_sort_key key;
@@ -411,9 +417,11 @@ fn render_process_relatives(String &output, ArrayList<tree_node> &nodes,
                             usize depth, Allocator allocator,
                             usize output_limit, usize &rendered_count,
                             Maybe<evilps_sort_key> sort_key,
-                            usize line_width_limit, bool should_follow_parents,
+                            usize line_width_limit,
                             report_sampling_mode sampling,
-                            evilps_color_mode color_mode) throws -> void
+                            evilps_color_mode color_mode,
+                            evilps_parent_display_mode parent_mode) throws
+    -> void
 {
   let const should_color = color_mode == evilps_color_mode::Colored;
   if (depth > MAXIMUM_TREE_DEPTH || rendered_count >= output_limit) return;
@@ -422,7 +430,9 @@ fn render_process_relatives(String &output, ArrayList<tree_node> &nodes,
   let const parent_pid = nodes[parent_position].pid;
   let const ancestor_pid = nodes[parent_position].parent_pid;
   let ancestor_position = Maybe<usize>{None};
-  if (should_follow_parents && ancestor_pid != parent_pid) {
+  if (parent_mode == evilps_parent_display_mode::FollowAncestors &&
+      ancestor_pid != parent_pid)
+  {
     for (usize position = 0; position < nodes.count(); position++) {
       if (nodes[position].pid != ancestor_pid ||
           !nodes[position].search_visible || nodes[position].was_rendered)
@@ -473,8 +483,8 @@ fn render_process_relatives(String &output, ArrayList<tree_node> &nodes,
     relative_prefix += connector.continuation;
     render_process_relatives(output, nodes, position, relative_prefix,
                              depth + 1, allocator, output_limit, rendered_count,
-                             sort_key, line_width_limit, should_follow_parents,
-                             sampling, color_mode);
+                             sort_key, line_width_limit, sampling, color_mode,
+                             parent_mode);
   }
 }
 
@@ -595,7 +605,7 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
       render_process_relatives(
           output, nodes, root_position, String{allocator, root_indentation}, 0,
           allocator, output_limit, rendered_count, sort_key, line_width_limit,
-          false, sampling, color_mode);
+          sampling, color_mode, evilps_parent_display_mode::HideAncestors);
     }
     visible_line_count = 1;
     if (viewport_rows != 0) {
@@ -649,7 +659,7 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
       render_process_relatives(
           output, nodes, position, String{allocator, root_indentation}, 0,
           allocator, output_limit, rendered_count, sort_key, line_width_limit,
-          true, sampling, color_mode);
+          sampling, color_mode, evilps_parent_display_mode::FollowAncestors);
       continue;
     }
 
@@ -674,7 +684,8 @@ fn render_process_snapshot(const ExecContext &ec, EvalContext &cxt,
     render_process_relatives(output, nodes, position,
                              String{allocator, root_indentation}, 0, allocator,
                              output_limit, rendered_count, sort_key,
-                             line_width_limit, false, sampling, color_mode);
+                             line_width_limit, sampling, color_mode,
+                             evilps_parent_display_mode::HideAncestors);
   }
 
   visible_line_count = rendered_count;
