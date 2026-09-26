@@ -837,12 +837,13 @@ fn open_named_or_stdin(const ExecContext &ec, StringView path) wontthrow
     -> Maybe<input_descriptor>
 {
   if (path == "-")
-    return input_descriptor{ec.in_fd.value_or(KOSH_STDIN), false};
+    return input_descriptor{ec.in_fd.value_or(KOSH_STDIN),
+                            input_descriptor_mode::Borrowed};
 
   let const descriptor =
       os::open_file_descriptor(path, os::file_open_mode::Read);
   if (!descriptor.has_value()) return None;
-  return input_descriptor{*descriptor, true};
+  return input_descriptor{*descriptor, input_descriptor_mode::Owned};
 }
 
 fn source_list_from_operands(const ArrayList<String> &operands,

@@ -190,7 +190,8 @@ fn More::execute(const ExecContext &ec, EvalContext &cxt,
     }
     defer
     {
-      if (input->should_close) os::close_fd(input->descriptor);
+      if (input->mode == input_descriptor_mode::Owned)
+        os::close_fd(input->descriptor);
     };
     char buffer[65536];
     loop

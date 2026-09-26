@@ -64,7 +64,8 @@ fn Uniq::execute(const ExecContext &ec, EvalContext &cxt,
     };
   defer
   {
-    if (input->should_close) os::close_fd(input->descriptor);
+    if (input->mode == input_descriptor_mode::Owned)
+      os::close_fd(input->descriptor);
   };
 
   let const should_show_count = FLAG_UNIQ_COUNT.is_enabled();

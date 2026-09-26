@@ -138,7 +138,8 @@ fn Cmp::execute(const ExecContext &ec, EvalContext &cxt,
   }
   defer
   {
-    if (left_input->should_close) os::close_fd(left_input->descriptor);
+    if (left_input->mode == input_descriptor_mode::Owned)
+      os::close_fd(left_input->descriptor);
   };
 
   let const right_input = open_named_or_stdin(ec, operands[1].view());
@@ -151,7 +152,8 @@ fn Cmp::execute(const ExecContext &ec, EvalContext &cxt,
   }
   defer
   {
-    if (right_input->should_close) os::close_fd(right_input->descriptor);
+    if (right_input->mode == input_descriptor_mode::Owned)
+      os::close_fd(right_input->descriptor);
   };
 
   buffered_byte_reader left{left_input->descriptor,

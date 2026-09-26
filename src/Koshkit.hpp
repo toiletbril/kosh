@@ -817,10 +817,16 @@ fn read_named_or_stdin_batch(const ExecContext &ec,
     -> ArrayList<source_read_result>;
 fn print_environment(const ExecContext &ec, EvalContext &cxt) throws -> void;
 
+enum class input_descriptor_mode : u8
+{
+  Borrowed,
+  Owned,
+};
+
 struct input_descriptor
 {
   os::descriptor descriptor;
-  bool should_close;
+  input_descriptor_mode mode;
 };
 
 fn open_named_or_stdin(const ExecContext &ec, StringView path) wontthrow

@@ -55,7 +55,8 @@ fn file_crc32c(const ExecContext &ec, StringView path,
   if (!input.has_value()) return None;
   defer
   {
-    if (input->should_close) unused(os::close_fd(input->descriptor));
+    if (input->mode == input_descriptor_mode::Owned)
+      unused(os::close_fd(input->descriptor));
   };
 
   u32 crc = 0xffffffffu;
