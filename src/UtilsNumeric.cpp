@@ -574,16 +574,19 @@ static fn parse_magnitude_in_base(StringView text, int_base base) throws
     offset++;
   }
 
-  if (base == int_base::hex && offset + 1 < text.length &&
-      text.data[offset] == '0' &&
-      (text.data[offset + 1] == 'x' || text.data[offset + 1] == 'X'))
-  {
-    offset += 2;
-  } else if (base == int_base::binary && offset + 1 < text.length &&
-             text.data[offset] == '0' &&
-             (text.data[offset + 1] == 'b' || text.data[offset + 1] == 'B'))
-  {
-    offset += 2;
+  switch (base) {
+  case int_base::hex:
+    if (offset + 1 < text.length && text.data[offset] == '0' &&
+        (text.data[offset + 1] == 'x' || text.data[offset + 1] == 'X'))
+      offset += 2;
+    break;
+  case int_base::binary:
+    if (offset + 1 < text.length && text.data[offset] == '0' &&
+        (text.data[offset + 1] == 'b' || text.data[offset + 1] == 'B'))
+      offset += 2;
+    break;
+  case int_base::octal:
+  case int_base::decimal: break;
   }
 
   u64 magnitude = 0;
