@@ -1381,6 +1381,8 @@ static fn execute_kqueue_aio_batch(const batched_syscall *operations,
     case batched_syscall_id::WriteCurrent: return false;
     case batched_syscall_id::Lstat:
     case batched_syscall_id::Stat:
+    case batched_syscall_id::LstatAt:
+    case batched_syscall_id::StatAt:
     case batched_syscall_id::Exists: break;
     case batched_syscall_id::Invalid: return false;
     }
@@ -1415,6 +1417,8 @@ static fn execute_kqueue_aio_batch(const batched_syscall *operations,
       switch (operation_kind) {
       case batched_syscall_id::Lstat:
       case batched_syscall_id::Stat:
+      case batched_syscall_id::LstatAt:
+      case batched_syscall_id::StatAt:
       case batched_syscall_id::Exists:
         execute_batched_syscall_direct(operation, result);
         continue;
