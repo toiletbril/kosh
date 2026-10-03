@@ -17,7 +17,7 @@
   $Here = Get-Location
 
   try {
-    $Arch = switch ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture) {
+    $Arch = switch ([Runtime.InteropServices.RuntimeInformation, mscorlib]::OSArchitecture) {
       "X64" { "amd64" }
       "Arm64" { "aarch64" }
       default { throw "unsupported processor $_" }
