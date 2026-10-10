@@ -381,6 +381,34 @@ fn AssignCommand::evaluate_assignment(EvalContext &cxt) const throws -> i64
       return cxt.execution_store().last_exit_status();
     }
 
+    let const do_is_plain_append_target = [&]() throws -> bool {
+      if (cxt.variable_store().attributes().get_bits(assigned_name) != 0 ||
+          cxt.runtime_state().export_all() || cxt.is_exported(assigned_name) ||
+          cxt.environment_store().confined_write_depth() > 0 ||
+          utils::environment_name_is_path(assigned_name))
+      {
+        return false;
+      }
+
+      for (usize i = 0; i < assigned_name.length; i++)
+        if (assigned_name[i] >= 'a' && assigned_name[i] <= 'z') return true;
+      return false;
+    };
+    if (m_assignment->get_update_mode() == assignment_update_mode::Append &&
+        do_is_plain_append_target())
+    {
+      if (let stored = cxt.variable_store().shell_variables().find(
+              assigned_name))
+      {
+        (*stored)->append(value.view());
+        if (!value_ran_substitution)
+          cxt.execution_store().set_last_exit_status(0);
+        cxt.publish_single_pipe_status(
+            cxt.execution_store().last_exit_status());
+        return cxt.execution_store().last_exit_status();
+      }
+    }
+
     if (m_assignment->get_update_mode() == assignment_update_mode::Append) {
       let appended =
           String{cxt.get_variable_value(m_assignment->key()).value_or("")};

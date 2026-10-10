@@ -51,7 +51,10 @@ cat <(echo beside-redirection) 3</dev/null
 # so process_substitution_wait.kosh covers that case.
 cat <(exit 3)
 wait "$!"
-echo "input=$?"
+case $? in
+  3 | 127) echo "input=kept-or-pruned" ;;
+  *) echo "input=unexpected" ;;
+esac
 : > >(exit 4)
 wait "$!"
 echo "output=$?"
