@@ -41,6 +41,15 @@ struct frecency_entry
   i64 last_access;
 };
 
+struct frecency_rank_comparator
+{
+  pure fn operator()(const frecency_entry &left,
+                     const frecency_entry &right) const wontthrow->bool
+  {
+    return left.rank > right.rank;
+  }
+};
+
 static fn frecency_store_path() throws -> Maybe<Path>
 {
   if (let const override_path =
@@ -195,31 +204,30 @@ fn record_directory_access(StringView directory, Allocator allocator) throws
 
   let entries = read_frecency_store(allocator);
   let const now = now_epoch_seconds();
-  let was_found = false;
-  for (let &entry : entries) {
-    let const is_same_directory =
-        os::paths_match_for_history(entry.path.view(), directory);
-    if (is_same_directory) {
-      entry.rank += 1;
-      entry.last_access = now;
-      was_found = true;
-      break;
-    }
+  let visited = Maybe<frecency_entry>{};
+  for (usize i = 0; i < entries.count(); i++) {
+    if (!os::paths_match_for_history(entries[i].path.view(), directory))
+      continue;
+
+    visited = steal(entries[i]);
+    visited->rank += 1;
+    visited->last_access = now;
+    entries.remove(i);
+    break;
   }
-  if (!was_found) {
-    entries.push(frecency_entry{
-        String{allocator, directory},
-        1, now
-    });
-    if (entries.count() > Z_FRECENCY_MAX) {
-      let const newest = entries.count() - 1;
-      usize weakest = 0;
-      for (usize i = 1; i < newest; i++)
-        if (entries[i].rank < entries[weakest].rank) weakest = i;
-      entries[weakest] = steal(entries[newest]);
-      entries.pop_back();
-    }
+  if (!visited.has_value())
+    visited = frecency_entry{String{allocator, directory}, 1, now};
+
+  if (entries.count() >= Z_FRECENCY_MAX) {
+    let const strongest =
+        steal(entries).make_sorted(frecency_rank_comparator{});
+    entries = ArrayList<frecency_entry>{allocator};
+    entries.reserve(Z_FRECENCY_MAX);
+    for (usize i = 0; i + 1 < Z_FRECENCY_MAX; i++)
+      entries.push(frecency_entry{String{allocator, strongest[i].path.view()},
+                                  strongest[i].rank, strongest[i].last_access});
   }
+  entries.push(steal(*visited));
   write_frecency_store(entries, allocator);
 }
 

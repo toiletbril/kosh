@@ -2602,9 +2602,17 @@ static fn compact_history_file_from_locked_reread(usize entry_limit) -> bool
 fn exit(usize history_size_limit) -> void
 {
   if (!compact_history_file_from_locked_reread(history_size_limit)) {
-    koshka::Error error{"Toiletline: Could not save history: " +
-                        koshka::os::last_system_error_message()};
-    koshka::show_message(error.to_string());
+    if (::itl_g_history_file_is_bad) {
+      koshka::ErrorWithDetails error{
+          "Toiletline: history was not saved because the history file "
+          "contains invalid data",
+          "Remove or repair the file to record history again"};
+      koshka::show_message(error.to_string());
+    } else {
+      koshka::Error error{"Toiletline: Could not save history: " +
+                          koshka::os::last_system_error_message()};
+      koshka::show_message(error.to_string());
+    }
   }
 
   if (::tl_exit() != TL_SUCCESS) {

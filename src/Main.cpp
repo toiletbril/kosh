@@ -2098,9 +2098,14 @@ fn kosh_main(int argc, char **argv) -> int
     program_path = "<unknown>";
   }
 
-  if (koshka::Maybe<int> code =
-          koshka::print_help_or_version_status(program_path))
-    return *code;
+  try {
+    if (koshka::Maybe<int> code =
+            koshka::print_help_or_version_status(program_path))
+      return *code;
+  } catch (const koshka::Error &error) {
+    koshka::show_message(error.to_string());
+    return 1;
+  }
 
   let identity = koshka::make_invocation_identity(steal(program_path));
 
@@ -2174,10 +2179,16 @@ fn kosh_main(int argc, char **argv) -> int
   if (FLAG_LINT.is_enabled() && FLAG_APPLY.is_enabled())
     return koshka::run_lint_apply_operation(
         file_names, FLAG_FORMAT.is_enabled(), context, ast_arena);
-  if (FLAG_FORMAT.is_enabled())
-    return koshka::run_format_operation(file_names, FLAG_APPLY.is_enabled(),
-                                        FLAG_LINT.is_enabled(), ast_arena,
-                                        context, identity.session_mood);
+  if (FLAG_FORMAT.is_enabled()) {
+    try {
+      return koshka::run_format_operation(
+          file_names, FLAG_APPLY.is_enabled(), FLAG_LINT.is_enabled(),
+          ast_arena, context, identity.session_mood);
+    } catch (const koshka::Error &error) {
+      koshka::show_message(error.to_string());
+      return 1;
+    }
+  }
 
   koshka::run_startup(context, init_moods, identity, line, inherited,
                       has_elevated_identity, input.should_be_interactive);

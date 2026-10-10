@@ -809,11 +809,15 @@ hot fn ForLoop::evaluate_status_impl(EvalContext &cxt) const throws
       scope_variable ? cxt.get_variable_value(m_variable_name) : None;
   defer
   {
-    if (scope_variable) {
-      if (saved_value.has_value())
-        cxt.set_shell_variable(m_variable_name, saved_value->view());
-      else
-        cxt.unset_shell_variable(m_variable_name);
+    if (scope_variable && !cxt.is_readonly(m_variable_name)) {
+      try {
+        if (saved_value.has_value())
+          cxt.set_shell_variable(m_variable_name, saved_value->view());
+        else
+          cxt.unset_shell_variable(m_variable_name);
+      } catch (...) {
+        LOG(Debug, "restoring the for loop variable failed and was swallowed");
+      }
     }
   };
 

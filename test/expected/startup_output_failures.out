@@ -1,0 +1,6 @@
+format-closed-stdout=1
+version-closed-stdout=1
+readonly-loop=1
+bash-mood-continues x=1
+store-lines=500
+store-keeps-visited=yes
