@@ -31,6 +31,33 @@ static fn mark_substitution_frames_printed(SourceStore &store) wontthrow -> void
   }
 }
 
+static fn finish_captured_output(String &captured,
+                                 const RuntimeState &runtime) throws -> void
+{
+  let const should_drop_nul_bytes =
+      (runtime.is_bash_compatible() || runtime.is_posix_mode()) &&
+      captured.view().find_character('\0').has_value();
+  if (!should_drop_nul_bytes) {
+    captured.strip_trailing_newlines();
+    return;
+  }
+
+  let kept = String{heap_allocator()};
+  kept.reserve(captured.count());
+  let remaining = captured.view();
+  while (let const nul = remaining.find_character('\0')) {
+    kept.append(remaining.substring_of_length(0, *nul));
+    remaining = remaining.substring(*nul + 1);
+  }
+  kept.append(remaining);
+  kept.strip_trailing_newlines();
+  captured = steal(kept);
+  if (runtime.is_bash_compatible())
+    show_message(
+        Warning{"The command substitution dropped the null bytes of its output"}
+            .to_string());
+}
+
 static fn is_script_fatal_error(const std::exception_ptr &error) wontthrow
     -> bool
 {
@@ -294,7 +321,7 @@ fn EvalContext::read_redirect_substitution(StringView source) throws
     return String{heap_allocator()};
   }
   let result = steal(*content);
-  result.strip_trailing_newlines();
+  finish_captured_output(result, runtime_state());
   return result;
 }
 
@@ -904,7 +931,7 @@ fn EvalContext::run_captured_substitution(
       if (!captured.has_value())
         throw ErrorWithLocation{previous_location,
                                 "Could not read command substitution output"};
-      captured->strip_trailing_newlines();
+      finish_captured_output(*captured, runtime_state());
       return steal(*captured);
     }
   }
@@ -1033,7 +1060,7 @@ fn EvalContext::run_captured_substitution(
           error, runtime_state().is_posix_mode()));
     }
 
-    captured.strip_trailing_newlines();
+    finish_captured_output(captured, runtime_state());
     return captured;
   };
 
@@ -1235,7 +1262,7 @@ fn EvalContext::run_function_substitution(const Expression *ast,
 
   do_contain_error(error);
 
-  captured.strip_trailing_newlines();
+  finish_captured_output(captured, runtime_state());
   return captured;
 }
 

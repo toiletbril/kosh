@@ -1638,7 +1638,9 @@ this suggestion.
 .SS Command substitution
 The forms $(command) and `command` replace a command with its output. A command
 substitution restores runtime state, shell options, directory stack, working
-directory state, and file creation mask when it finishes. A syntax error inside
+directory state, and file creation mask when it finishes. Trailing newlines are
+removed from the output. The bash and sh moods also drop every null byte, as
+Bash and dash do, and the kosh mood keeps them. A syntax error inside
 a command, process, or function substitution is reported at its place in the
 outer source, and a script or command string containing one does not run. Every
 such error in the source is reported. The
