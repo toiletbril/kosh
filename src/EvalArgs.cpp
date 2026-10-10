@@ -609,6 +609,19 @@ hot fn EvalContext::process_args(const ArrayList<const Token *> &args,
         let const &value = assignment_token->value_word();
         for (let const &value_segment : value.segments)
           fallback_word->segments.push(value_segment);
+        if (runtime_state().is_bash_compatible() &&
+            !runtime_state().is_posix_mode())
+        {
+          let &segments = fallback_word->segments;
+          if (segments.count() > 1 && segments[1].is_tilde_candidate() &&
+              !segments[1].text.is_empty() &&
+              segments[1].text.first_character() == '~')
+          {
+            expand_tilde(segments[1], segments.count() > 2, true);
+          }
+          for (usize i = 1; i < segments.count(); i++)
+            expand_colon_tildes(segments[i], i + 1 < segments.count());
+        }
         word = &*fallback_word;
       } else {
         fallback_word = Word{};
