@@ -1082,6 +1082,22 @@ fn Parser::build_heredoc_redirection(
 
   Token *delimiter_token = m_lexer.next_shell_token();
   ASSERT(delimiter_token != nullptr);
+  let is_separated_strip_operator = false;
+  if (delimiter_token->kind() == Token::Kind::Word &&
+      delimiter_token->source_location().position ==
+          op_location.position + op_location.length)
+  {
+    let const &word =
+        static_cast<tokens::WordToken *>(delimiter_token)->word();
+    if (word.segments.count() == 1 &&
+        word.segments[0].kind == WordSegment::Kind::UnquotedText &&
+        word.segments[0].text.view() == "-")
+    {
+      is_separated_strip_operator = true;
+      delimiter_token = m_lexer.next_shell_token();
+      ASSERT(delimiter_token != nullptr);
+    }
+  }
   if (delimiter_token->kind() != Token::Kind::Word) {
     if (delimiter_token->kind() == Token::Kind::Less) {
       throw ErrorWithLocationAndDetails{
@@ -1098,8 +1114,11 @@ fn Parser::build_heredoc_redirection(
 
   let const delimiter_literal = delimiter_word.to_literal_string();
   let delimiter = delimiter_literal.view();
-  heredoc_tab_policy tab_policy = heredoc_tab_policy::Preserve;
+  heredoc_tab_policy tab_policy = is_separated_strip_operator
+                                      ? heredoc_tab_policy::Strip
+                                      : heredoc_tab_policy::Preserve;
   let const has_unquoted_leading_dash =
+      !is_separated_strip_operator &&
       !delimiter_word.segments.is_empty() &&
       delimiter_word.segments[0].kind == WordSegment::Kind::UnquotedText &&
       !delimiter_word.segments[0].text.is_empty() &&

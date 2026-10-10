@@ -1381,7 +1381,11 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
             rendered_operand = quoted_heredoc_delimiter.view();
           }
         }
+        let const would_join_strip_operator =
+            should_attach_heredoc_delimiter && index > 0 &&
+            pieces[index - 1].text == "<<" && rendered_operand.starts_with("-");
         if (is_separated_process_substitution_operand ||
+            would_join_strip_operator ||
             (should_attach_redirection_operand &&
              should_space_redirection_operand))
         {

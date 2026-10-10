@@ -1355,6 +1355,14 @@ flatten hot alwaysinline fn Lexer::lex_identifier() throws -> Token *
           here(m_cursor_position + byte_count, 1), expected_quote};
     }
 
+  if (should_escape && !quote_char.has_value() &&
+      m_cursor_position + byte_count >= m_source.length &&
+      (is_bash_compatible() || is_posix_mode()))
+  {
+    do_append_char(WordSegment::Kind::LiteralText, '\\');
+    should_escape = false;
+  }
+
   if (should_escape) rarely
     {
       throw ErrorWithLocationAndDetails{
