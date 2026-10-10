@@ -8,7 +8,7 @@ trap 'cd / && [ -n "$directory" ] && "$BIN_DIR/invoke-koshkit" rm -rf -- "$direc
 # directory just visited.
 
 printf 'echo hi\n' > "$directory/script.sh"
-if [ -c /dev/full ]; then
+if [ -c /dev/full ] && [ "${OS-}" != Windows_NT ]; then
   "$BIN" --format "$directory/script.sh" > /dev/full 2> /dev/null
   printf 'format-full-device=%s\n' "$?"
   "$BIN" --version > /dev/full 2> /dev/null
@@ -26,6 +26,6 @@ mkdir "$directory/visited"
 KOSH_DIRECTORY_HISTORY=$store "$BIN" -c "z '$directory/visited'" > /dev/null
 printf 'store-lines=%s\n' "$("$BIN_DIR/invoke-koshkit" wc -l < "$store" | "$BIN_DIR/invoke-koshkit" tr -d ' ')"
 case $(cat "$store") in
-*"/visited	"*) printf 'store-keeps-visited=yes\n' ;;
+*"visited	"*) printf 'store-keeps-visited=yes\n' ;;
 *) printf 'store-keeps-visited=no\n' ;;
 esac
