@@ -24,8 +24,10 @@ report async $?
 { kill -USR1 $BASHPID; echo stage_alive; } | /bin/cat
 report stage "${PIPESTATUS[0]}"
 
-coproc CP { kill -USR1 $BASHPID; echo coproc_alive; }
-wait "$CP_PID"
+coproc CP { read -r _; kill -USR1 $BASHPID; echo coproc_alive; }
+coproc_pid=$CP_PID
+echo go >&"${CP[1]}"
+wait "$coproc_pid"
 report coproc $?
 
 echo "--- the parent still holds its own action"

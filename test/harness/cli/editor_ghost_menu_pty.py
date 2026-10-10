@@ -78,6 +78,8 @@ COLUMNS = 120
 ROWS = 40
 WAIT_SECONDS = 8.0
 MENU_HEADER = "selecting completions"
+MENU_HELP = ("selecting completions, enter to run, tab to accept, esc to close, "
+             "ctrl-g to restore")
 MENU_FOOTER = "showing "
 HISTORY_HEADER = "incremental history search"
 HISTORY_NO_MATCH = "no matches, erase to widen the search"
@@ -232,9 +234,16 @@ class Screen:
         lines = self.get_lines()[row + 1:]
         if not lines or MENU_HEADER not in lines[0]:
             return None
+        help_text = lines[0].strip()
+        first_entry = 1
+        while (first_entry < len(lines) and help_text != MENU_HELP
+               and MENU_HELP.startswith(
+                   help_text + " " + lines[first_entry].strip())):
+            help_text += " " + lines[first_entry].strip()
+            first_entry += 1
         entries = []
         total = None
-        for line in lines[1:]:
+        for line in lines[first_entry:]:
             text = line.strip()
             if text.startswith(MENU_FOOTER):
                 total = int(text.split(" of ")[1])
