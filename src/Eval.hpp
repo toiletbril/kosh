@@ -1801,6 +1801,10 @@ public:
     let const byte = static_cast<u8>(c);
     return (m_field_separator_bits[byte >> 6] & (u64{1} << (byte & 63))) != 0;
   }
+  hot pure fn has_non_ascii_field_separators() const wontthrow -> bool
+  {
+    return (m_field_separator_bits[2] | m_field_separator_bits[3]) != 0;
+  }
 
   fn indexed_arrays() wontthrow -> StringMap<ArrayList<String>> &
   {
@@ -3941,6 +3945,7 @@ public:
 
   fn get_glob_charset() const throws -> glob_charset;
   fn get_glob_charset_for(StringView subject) const throws -> glob_charset;
+  fn first_field_separator() const throws -> StringView;
   hot fn get_glob_charset_for(const String &subject) const throws
       -> glob_charset
   {

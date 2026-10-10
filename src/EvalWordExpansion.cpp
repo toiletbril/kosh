@@ -120,27 +120,59 @@ hot fn EvalContext::expand_word(const Word &word) throws
   let const do_emit_empty_field = [&]() { fields.push(glob_field{scratch}); };
 
   let const do_append_split_run = [&](StringView text, bool glob_active) {
+    let const separators = variable_store().field_separators();
+    let const is_multibyte =
+        variable_store().has_non_ascii_field_separators() &&
+        get_glob_charset_for(separators) == glob_charset::Utf8 &&
+        get_glob_charset_for(text) == glob_charset::Utf8;
+    let const do_separator_length = [&](usize at) -> usize {
+      let const byte = text.data[at];
+      if (!is_multibyte || static_cast<u8>(byte) < 0x80)
+        return variable_store().is_field_separator(byte) ? 1 : 0;
+
+      let const length =
+          utils::charset_character_length(text, at, glob_charset::Utf8);
+      let const character = text.substring_of_length(at, length);
+      for (usize position = 0; position < separators.length;) {
+        let const separator_length = utils::charset_character_length(
+            separators, position, glob_charset::Utf8);
+        if (separators.substring_of_length(position, separator_length) ==
+            character)
+          return length;
+        position += separator_length;
+      }
+      return 0;
+    };
+    let const do_step = [&](usize at) -> usize {
+      return is_multibyte
+                 ? utils::charset_character_length(text, at, glob_charset::Utf8)
+                 : 1;
+    };
+
     usize i = 0;
     while (i < text.length) {
-      let const byte = text.data[i];
-      if (!variable_store().is_field_separator(byte)) {
+      if (do_separator_length(i) == 0) {
         usize start = i;
 #pragma clang loop unroll_count(4)
-        while (i < text.length && !variable_store().is_field_separator(text[i]))
-          i++;
+        while (i < text.length && do_separator_length(i) == 0)
+          i += do_step(i);
         do_append_run(StringView{text.data + start, i - start}, glob_active);
         continue;
       }
 
       let const was_field_started = has_current;
       usize delimiter_count = 0;
-#pragma clang loop unroll_count(4)
-      while (i < text.length && variable_store().is_field_separator(text[i])) {
+      while (i < text.length) {
+        let const separator_length = do_separator_length(i);
+        if (separator_length == 0) break;
+
         let const separator = text[i];
-        if (separator != ' ' && separator != '\t' && separator != '\n') {
+        if (separator_length > 1 ||
+            (separator != ' ' && separator != '\t' && separator != '\n'))
+        {
           delimiter_count++;
         }
-        i++;
+        i += separator_length;
       }
 
       do_flush();
@@ -164,7 +196,11 @@ hot fn EvalContext::expand_word(const Word &word) throws
       return;
     }
 
-    do_append_split_run(StringView{separators.data, 1}, true);
+    do_append_split_run(
+        separators.substring_of_length(
+            0, utils::charset_character_length(
+                   separators, 0, get_glob_charset_for(separators))),
+        true);
   };
 
   let const do_emit_elements = [&](const ArrayList<String> &values, bool quoted,
@@ -172,9 +208,10 @@ hot fn EvalContext::expand_word(const Word &word) throws
     if (quoted && star) {
       let const ifs = variable_store().field_separators();
       let joined = String{scratch_allocator()};
+      let const separator = first_field_separator();
       for (usize i = 0; i < values.count(); i++) {
         if (i > 0 && !ifs.is_empty()) {
-          joined.push(ifs[0]);
+          joined.append(separator);
         }
         joined.append(values[i].view());
       }
@@ -537,7 +574,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
                i++)
           {
             if (i > 0 && !ifs.is_empty()) {
-              joined.push(ifs[0]);
+              joined.append(first_field_separator());
             }
             joined.append(
                 do_transform(variable_store().positional_params()[i].view())
@@ -682,7 +719,7 @@ hot fn EvalContext::expand_word(const Word &word) throws
             let joined = String{scratch_allocator()};
             for (usize i = 0; i < elements.count(); i++) {
               if (i > 0 && !ifs.is_empty()) {
-                joined.push(ifs[0]);
+                joined.append(first_field_separator());
               }
               joined.append(do_transform(elements[i].view()).view());
             }

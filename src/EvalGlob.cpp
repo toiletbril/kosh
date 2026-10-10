@@ -90,6 +90,16 @@ hot fn EvalContext::get_glob_charset_for(StringView subject) const throws
   return glob_charset::Bytes;
 }
 
+fn EvalContext::first_field_separator() const throws -> StringView
+{
+  let const separators = variable_store().field_separators();
+  if (separators.is_empty()) return separators;
+
+  return separators.substring_of_length(
+      0, utils::charset_character_length(separators, 0,
+                                         get_glob_charset_for(separators)));
+}
+
 fn EvalContext::expand_path_once(const glob_field &field,
                                  glob_expansion_mode expansion_mode) throws
     -> ArrayList<glob_field>

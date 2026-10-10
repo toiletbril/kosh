@@ -309,9 +309,33 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const field_separators =
       String{cxt.scratch_allocator(), cxt.variable_store().field_separators()};
+  let const is_multibyte =
+      cxt.variable_store().has_non_ascii_field_separators() &&
+      cxt.get_glob_charset_for(field_separators.view()) == glob_charset::Utf8 &&
+      cxt.get_glob_charset_for(line.view()) == glob_charset::Utf8;
+  let const do_step = [&](usize i) -> usize {
+    return is_multibyte ? utils::charset_character_length(line.view(), i,
+                                                          glob_charset::Utf8)
+                        : 1;
+  };
+  let const do_separator_length = [&](usize i) -> usize {
+    if (is_literal_byte[i]) return 0;
+    if (!is_multibyte || static_cast<u8>(line[i]) < 0x80)
+      return field_separators.find_character(line[i]).has_value() ? 1 : 0;
+
+    let const character = line.view().substring_of_length(i, do_step(i));
+    let const separators = field_separators.view();
+    for (usize position = 0; position < separators.length;) {
+      let const length = utils::charset_character_length(separators, position,
+                                                         glob_charset::Utf8);
+      if (separators.substring_of_length(position, length) == character)
+        return character.length;
+      position += length;
+    }
+    return 0;
+  };
   let const do_is_separator = [&](usize i) {
-    return !is_literal_byte[i] &&
-           field_separators.find_character(line[i]).has_value();
+    return do_separator_length(i) > 0;
   };
   let const do_is_ifs_whitespace = [&](usize i) {
     return (line[i] == ' ' || line[i] == '\t' || line[i] == '\n') &&
@@ -338,14 +362,14 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let const do_skip_field = [&]() -> usize {
     let const start = cursor;
     while (cursor < line.length() && !do_is_separator(cursor)) {
-      cursor++;
+      cursor += do_step(cursor);
     }
     return start;
   };
   let const do_skip_delimiter = [&]() {
     do_skip_ifs_whitespace();
     if (cursor < line.length() && do_is_ifs_nonwhitespace(cursor)) {
-      cursor++;
+      cursor += do_separator_length(cursor);
       do_skip_ifs_whitespace();
     }
   };
@@ -376,7 +400,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
       let has_trailing_content = false;
       if (cursor < line.length()) {
-        if (!do_is_ifs_whitespace(cursor)) cursor++;
+        if (!do_is_ifs_whitespace(cursor)) cursor += do_separator_length(cursor);
         do_skip_ifs_whitespace();
         has_trailing_content = cursor < line.length();
       }

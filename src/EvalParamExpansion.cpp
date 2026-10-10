@@ -596,8 +596,9 @@ fn EvalContext::ModifierWordExpander::emit_unquoted_list(
     return;
   }
 
-  let const separator =
-      is_star && !should_join_with_space && !ifs.is_empty() ? ifs[0] : ' ';
+  let const separator = is_star && !should_join_with_space && !ifs.is_empty()
+                            ? m_context.first_field_separator()
+                            : StringView{" "};
   let count = values.count();
   if (is_computed && !is_star && !should_join_with_space && count > 0 &&
       values[count - 1].is_empty() && should_drop_final_empty_element(ifs))
@@ -607,7 +608,7 @@ fn EvalContext::ModifierWordExpander::emit_unquoted_list(
 
   let joined = String{m_context.scratch_allocator()};
   for (usize i = 0; i < count; i++) {
-    if (i > 0) joined.push(separator);
+    if (i > 0) joined.append(separator);
     joined.append(values[i].view());
   }
   if (!joined.is_empty()) emit_run(joined.view(), true);
@@ -2820,11 +2821,12 @@ fn EvalContext::join_list_slice(substring_bounds bounds,
   let const leading_count = leading.has_value() ? usize{1} : usize{0};
   let const ifs = variable_store().field_separators();
   let const has_separator = !is_star || !ifs.is_empty();
-  let const separator = is_star && !ifs.is_empty() ? ifs[0] : ' ';
+  let const separator =
+      is_star && !ifs.is_empty() ? first_field_separator() : StringView{" "};
 
   let joined = String{scratch_allocator()};
   for (i64 index = bounds.start; index < bounds.end; index++) {
-    if (index > bounds.start && has_separator) joined.push(separator);
+    if (index > bounds.start && has_separator) joined.append(separator);
     let const position = static_cast<usize>(index);
     joined.append(position < leading_count
                       ? *leading
@@ -3407,7 +3409,7 @@ fn EvalContext::trim_positional_fields(
   if (is_star && is_quoted) {
     let joined = String{scratch_allocator()};
     for (usize i = 0; i < params.count(); i++) {
-      if (i > 0 && !ifs.is_empty()) joined.push(ifs[0]);
+      if (i > 0 && !ifs.is_empty()) joined.append(first_field_separator());
       joined.append(params[i].view());
     }
     if (!params.is_empty()) fields.push(steal(joined));

@@ -433,24 +433,29 @@ hot fn EvalContext::get_variable_value(StringView name) const throws
 
     case '*':
     case '@': {
-      let separator = ' ';
+      let separator = StringView{" "};
       let has_separator = true;
       if (first_byte == '*' || runtime_state().is_posix_mode()) {
         let const ifs = variable_store().field_separators();
         has_separator = !ifs.is_empty();
-        if (has_separator) separator = ifs[0];
+        if (has_separator) {
+          separator = ifs.substring_of_length(
+              0, utils::charset_character_length(ifs, 0,
+                                                 get_glob_charset_for(ifs)));
+        }
       }
       let joined = String{heap_allocator()};
       usize joined_length = 0;
       for (usize i = 0; i < variable_store().positional_params().count(); i++)
         joined_length += variable_store().positional_params()[i].count();
       if (has_separator && variable_store().positional_params().count() > 1) {
-        joined_length += variable_store().positional_params().count() - 1;
+        joined_length += (variable_store().positional_params().count() - 1) *
+                         separator.length;
       }
       joined.reserve(joined_length);
       for (usize i = 0; i < variable_store().positional_params().count(); i++) {
         if (i > 0 && has_separator) {
-          joined.push(separator);
+          joined.append(separator);
         }
         joined.append(variable_store().positional_params()[i].view());
       }
