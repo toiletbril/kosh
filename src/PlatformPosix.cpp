@@ -611,6 +611,9 @@ static sigset_t SIGNALS_UNBLOCKED_BY_TRAP = {};
 
 static sigset_t SIGNALS_WITH_TRAP_ACTION = {};
 
+static bool IS_PIPE_SIGNAL_IGNORED_BY_TRAP = false;
+static bool WAS_PIPE_SIGNAL_IGNORED_AT_ENTRY = false;
+
 } /* namespace os */
 } /* namespace koshka */
 
@@ -2371,7 +2374,13 @@ static fn reset_signal_handlers() throws -> void
 
   sigemptyset(&SIGNALS_WITH_TRAP_ACTION);
 
-  check_syscall(sigaction(SIGPIPE, &sa, nullptr));
+  if (IS_PIPE_SIGNAL_IGNORED_BY_TRAP || WAS_PIPE_SIGNAL_IGNORED_AT_ENTRY) {
+    struct sigaction ignore = {};
+    ignore.sa_handler = SIG_IGN;
+    check_syscall(sigaction(SIGPIPE, &ignore, nullptr));
+  } else {
+    check_syscall(sigaction(SIGPIPE, &sa, nullptr));
+  }
 
   INTERRUPT_REQUESTED = 0;
 }
@@ -2397,6 +2406,7 @@ static fn capture_entry_ignored_signals() wontthrow -> void
 
     LOG(Info, "signal %d is already ignored at shell entry", signal_number);
     ENTRY_IGNORED_SIGNALS |= u64{1} << (signal_number - 1);
+    if (signal_number == SIGPIPE) WAS_PIPE_SIGNAL_IGNORED_AT_ENTRY = true;
   }
 }
 
@@ -2534,6 +2544,7 @@ fn set_trap_handler(i32 signal_number) throws -> void
 
   LOG(Info, "installing the trap handler for signal %d", signal_number);
 
+  if (signal_number == SIGPIPE) IS_PIPE_SIGNAL_IGNORED_BY_TRAP = false;
   if (signal_number == SIGCHLD) {
     install_child_state_handler();
   } else {
@@ -2555,12 +2566,14 @@ fn set_trap_ignore(i32 signal_number) throws -> void
 
   install_signal_disposition(signal_number, SIG_IGN);
   sigdelset(&SIGNALS_WITH_TRAP_ACTION, signal_number);
+  if (signal_number == SIGPIPE) IS_PIPE_SIGNAL_IGNORED_BY_TRAP = true;
 }
 
 fn clear_trap_handler(i32 signal_number) throws -> void
 {
   if (!is_trappable_signal(signal_number)) return;
   LOG(Info, "clearing the trap for signal %d", signal_number);
+  if (signal_number == SIGPIPE) IS_PIPE_SIGNAL_IGNORED_BY_TRAP = false;
 
   reblock_signal_after_trap(signal_number);
 

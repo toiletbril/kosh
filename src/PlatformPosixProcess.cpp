@@ -312,7 +312,8 @@ hot fn execute_program(ExecContext &ec,
   sigemptyset(&default_signals);
   sigaddset(&default_signals, SIGINT);
   sigaddset(&default_signals, SIGCHLD);
-  sigaddset(&default_signals, SIGPIPE);
+  if (!IS_PIPE_SIGNAL_IGNORED_BY_TRAP && !WAS_PIPE_SIGNAL_IGNORED_AT_ENTRY)
+    sigaddset(&default_signals, SIGPIPE);
   posix_spawnattr_setsigdefault(&attr, &default_signals);
 
   short spawn_flags = POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;

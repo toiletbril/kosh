@@ -237,7 +237,15 @@ fn execute_builtin(ExecContext &&ec, EvalContext &cxt) throws -> i32
       unreachable("Unhandled builtin of kind %d", ENUM(ec.builtin_kind()));
     }
   } catch (const BrokenPipeExit &) {
-    return KOSH_BROKEN_PIPE_EXIT_STATUS;
+    let const pipe_trap = cxt.trap_store().find(StringView{"PIPE"});
+    let const is_pipe_signal_ignored =
+        (pipe_trap.has_value() && pipe_trap.value()->action_text.is_empty()) ||
+        (!pipe_trap.has_value() &&
+         cxt.is_signal_ignored_at_startup(StringView{"PIPE"}));
+    if (!is_pipe_signal_ignored) return KOSH_BROKEN_PIPE_EXIT_STATUS;
+
+    report_soft_builtin_error(ec, cxt, "write error: Broken pipe");
+    return 1;
   } catch (const ErrorWithLocation &) {
     throw;
   } catch (const Error &e) {
