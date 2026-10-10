@@ -1,5 +1,5 @@
 dir=$(mktemp -d) || exit 1
-trap '[ -n "$dir" ] && "$BIN_DIR/invoke-koshkit" rm -rf -- "$dir"' EXIT
+trap 'cd / && [ -n "$dir" ] && "$BIN_DIR/invoke-koshkit" rm -rf -- "$dir"' EXIT
 cd "$dir" || exit 1
 
 # ln -f refuses to replace a file with itself instead of deleting it, cp -r
