@@ -670,3 +670,32 @@ sed -e "s/a\{20,\}/<A>/g" "$root/long-string.out"
 sed -e "s|$root/||" "$root/long-string.err" | sed -e "s/a\{20,\}/<A>/g"
 printf 'echo ok\necho "%s"\n' "$long_word" | "$BIN" --format 2>&1 >/dev/null |
   sed -e "s/a\{20,\}/<A>/g"
+
+format_twice heredoc-then-semicolon \
+'cat <<EOF; echo after
+body
+EOF
+cat <<A & cat <<B
+1
+A
+2
+B
+'
+format_twice coproc-named-group \
+'coproc X { echo hi; }
+'
+format_twice named-descriptor-after-group \
+'{ echo g; } {g}>out
+if true; then :; fi {h}>out
+'
+format_twice background-group \
+'{ echo a; } &
+wait
+'
+format_twice function-in-subshell \
+'( f() { echo in; }; f )
+'
+format_twice regex-operand \
+'[[ $x =~ ^(a|b)$ && $y =~ "a b"(c) ]]
+[[ ( $x =~ ^[[:alpha:]]+$ ) || -z $x ]]
+'

@@ -530,3 +530,55 @@ long-string.sh:2:6: warning: Unbreakable word exceeds 78 columns; consider makin
 2:6: warning: Unbreakable word exceeds 78 columns; consider making it shorter or splitting it.
      2 |  echo "<A>"
        |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+== heredoc-then-semicolon
+status=0
+cat <<EOF; echo after
+body
+EOF
+cat <<A & cat <<B
+1
+A
+2
+B
+idempotent=yes
+== coproc-named-group
+status=0
+coproc X {
+  echo hi
+}
+idempotent=yes
+== named-descriptor-after-group
+status=0
+{
+  echo g
+} {g}>out
+
+if true
+then
+  :
+fi {h}>out
+idempotent=yes
+== background-group
+status=0
+{
+  echo a
+} &
+
+wait
+idempotent=yes
+== function-in-subshell
+status=0
+(
+  f ()
+  {
+    echo in
+  }
+
+  f
+)
+idempotent=yes
+== regex-operand
+status=0
+[[ $x =~ ^(a|b)$ && $y =~ "a b"(c) ]]
+[[ ( $x =~ ^[[:alpha:]]+$ ) || -z $x ]]
+idempotent=yes

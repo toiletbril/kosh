@@ -534,7 +534,12 @@ pure fn piece_begins_redirection(const ArrayList<format_piece> &pieces,
   if (piece.kind == format_piece_kind::Operator)
     return is_redirection_operator(piece.text);
   if (piece.kind != format_piece_kind::Word) return false;
-  if (!piece.text.is_all_decimal_digits()) return false;
+  let const is_descriptor_name =
+      piece.text.length > 2 && piece.text[0] == '{' &&
+      piece.text[piece.text.length - 1] == '}' &&
+      lexer::word_is_variable_name(
+          piece.text.substring_of_length(1, piece.text.length - 2));
+  if (!piece.text.is_all_decimal_digits() && !is_descriptor_name) return false;
 
   return index + 1 < pieces.count() &&
          pieces[index + 1].kind == format_piece_kind::Operator &&
@@ -1009,6 +1014,10 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
   let const indent_step_spaces = layout.indent_step_spaces;
   let const is_bash = layout.is_bash_declaration;
   bool has_pending_statement_end = false;
+  bool is_heredoc_line_open = false;
+  bool is_in_regex_operand = false;
+  usize regex_paren_depth = 0;
+  u32 regex_previous_end = 0;
   bool should_pad_pending_line = false;
   bool did_join_pending_end = false;
   let loop_do_join_states = ArrayList<bool>{heap_allocator()};
@@ -1213,6 +1222,32 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
     if (is_bash && piece.kind != format_piece_kind::Newline) {
       do_flush_statement_end(index);
     }
+    if (is_in_regex_operand) {
+      let const is_operand_piece = piece.kind == format_piece_kind::Word ||
+                                   piece.kind == format_piece_kind::Operator;
+      let const ends_operand =
+          !is_operand_piece ||
+          (regex_paren_depth == 0 &&
+           (text == "]]" || text == "&&" || text == "||" || text == ")"));
+      if (!ends_operand) {
+        if (text == "(")
+          regex_paren_depth++;
+        else if (text == ")")
+          regex_paren_depth--;
+        if (piece.source_position == regex_previous_end)
+          writer.append_attached(text);
+        else
+          writer.append_token(text);
+        regex_previous_end = piece.source_position + static_cast<u32>(text.length);
+        continue;
+      }
+      is_in_regex_operand = false;
+    }
+    if (conditional_depth > 0 && text == "=~") {
+      is_in_regex_operand = true;
+      regex_paren_depth = 0;
+      regex_previous_end = piece.source_position + static_cast<u32>(text.length);
+    }
 
     if (piece.kind == format_piece_kind::Raw) {
       if (!is_bash) {
@@ -1277,6 +1312,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       continue;
     }
     if (piece.kind == format_piece_kind::Newline) {
+      is_heredoc_line_open = false;
       if (piece.should_keep_blank_line) {
         writer.ensure_blank_line();
         continue;
@@ -1548,11 +1584,15 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
     let const operator_kind =
         FORMAT_OPERATORS.find(text).value_or(format_operator::Other);
     switch (operator_kind) {
-    case format_operator::OpenBrace:
+    case format_operator::OpenBrace: {
+      let const is_coproc_body =
+          index >= 2 && pieces[index - 1].kind == format_piece_kind::Word &&
+          pieces[index - 2].kind == format_piece_kind::Word &&
+          pieces[index - 2].text == "coproc";
       is_waiting_for_continued_statement = false;
       has_completed_structural_statement = false;
       do_begin_statement(false, false);
-      if (!is_bash) writer.finish_line();
+      if (!is_bash && !is_coproc_body) writer.finish_line();
       writer.append_token(text);
       if (is_bash) {
         has_pending_statement_end = true;
@@ -1564,6 +1604,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       writer.set_indent(indent);
       do_finish_command();
       continue;
+    }
     case format_operator::OpenParen:
       if (conditional_depth > 0) {
         writer.append_token(text);
@@ -1603,7 +1644,10 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         continue;
       }
       if (!is_followed_by_continuation && !is_followed_by_inline_comment &&
-          !is_followed_by_redirection)
+          !is_followed_by_redirection &&
+          !(index + 1 < pieces.count() &&
+            pieces[index + 1].kind == format_piece_kind::Operator &&
+            pieces[index + 1].text == "&"))
       {
         writer.finish_line();
       }
@@ -1651,6 +1695,14 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       has_completed_structural_statement = false;
       has_continued_declaration_statement = false;
       is_waiting_for_continued_statement = false;
+      if (is_heredoc_line_open && index + 1 < pieces.count() &&
+          pieces[index + 1].kind != format_piece_kind::Newline &&
+          pieces[index + 1].kind != format_piece_kind::Raw)
+      {
+        if (text == ";") writer.append_attached(";");
+        do_finish_command();
+        continue;
+      }
       if (is_bash) {
         if (writer.has_line_text()) has_pending_statement_end = true;
         do_finish_command();
@@ -1666,6 +1718,9 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
       }
       let const is_case_pattern =
           !case_pattern_states.is_empty() && case_pattern_states.back();
+      let const closes_function_header =
+          index > 0 && pieces[index - 1].kind == format_piece_kind::Operator &&
+          pieces[index - 1].text == "(";
       if (is_case_pattern) {
         writer.append_attached(text);
         if (!is_followed_by_inline_comment) writer.finish_line();
@@ -1674,7 +1729,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
         case_pattern_states.back() = false;
         should_attach_case_pattern = false;
         do_finish_command();
-      } else if (subshell_depth > 0) {
+      } else if (subshell_depth > 0 && !closes_function_header) {
         do_begin_statement(false, true);
         do_finish_command();
         if (is_bash) {
@@ -1711,6 +1766,7 @@ fn render_format_pieces(const ArrayList<format_piece> &pieces,
 
     if (is_redirection && (text == "<<" || text == "<<-")) {
       should_attach_heredoc_delimiter = true;
+      is_heredoc_line_open = true;
     }
 
     if (is_redirection) {
