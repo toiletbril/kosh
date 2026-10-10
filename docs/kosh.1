@@ -2621,9 +2621,12 @@ option splits the line into a named indexed array. The
 option replaces the newline delimiter, and an empty value selects a NUL byte.
 The
 .B \-n
-option bounds the byte count, and
+option bounds the byte count. The
+.B \-N
+option reads exactly that many bytes, ignores the delimiter, and stores them
+unsplit in the first name, leaving the rest empty. The
 .B \-t
-bounds the wait in seconds. The
+option bounds the wait in seconds. The
 .B \-p
 option prints a prompt at a terminal, and
 .B \-s

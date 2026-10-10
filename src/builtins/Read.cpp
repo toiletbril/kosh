@@ -16,7 +16,8 @@
 
 FLAG_LIST_DECL();
 
-HELP_SYNOPSIS_DECL("[-ers] [-a name] [-d delim] [-n count] [-p prompt] "
+HELP_SYNOPSIS_DECL("[-ers] [-a name] [-d delim] [-n count] [-N count] "
+                   "[-p prompt] "
                    "[-t timeout] [-u fd] [-q] [name ...]");
 HELP_DESCRIPTION_DECL("The read builtin accepts one line from standard input "
                       "and stores it in the "
@@ -29,6 +30,9 @@ FLAG(READ_PROMPT, String, 'p', "\0",
      "Print the prompt before reading, when reading from a terminal.");
 FLAG(READ_TIMEOUT, String, 't', "\0", "Time out after the given seconds.");
 FLAG(READ_NCHARS, String, 'n', "\0", "Read at most the given number of bytes.");
+FLAG(READ_EXACT_NCHARS, String, 'N', "\0",
+     "Read exactly the given number of bytes, ignoring the delimiter, into "
+     "the first name without splitting.");
 FLAG(READ_SILENT, Bool, 's', "\0", "Do not echo the input from a terminal.");
 FLAG(READ_DELIM, String, 'd', "\0",
      "Read until the first byte of the given delimiter, or until a NUL byte "
@@ -55,7 +59,8 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   if (cxt.runtime_state().is_posix_mode() &&
       (FLAG_READ_ARRAY.is_set() || FLAG_READ_TIMEOUT.is_set() ||
-       FLAG_READ_NCHARS.is_set() || FLAG_READ_QUERY.is_enabled() ||
+       FLAG_READ_NCHARS.is_set() || FLAG_READ_EXACT_NCHARS.is_set() ||
+       FLAG_READ_QUERY.is_enabled() ||
        FLAG_READ_SILENT.is_enabled() || FLAG_READ_DELIM.is_set() ||
        FLAG_READ_FD.is_set() || FLAG_READ_EDIT.is_enabled()))
   {
@@ -189,13 +194,16 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
                                                 : FLAG_READ_DELIM.value()[0])
           : '\n';
 
+  let const is_exact_count = FLAG_READ_EXACT_NCHARS.is_set();
+  let const has_byte_limit = is_exact_count || FLAG_READ_NCHARS.is_set();
   i64 max_bytes = 0;
-  if (FLAG_READ_NCHARS.is_set()) {
-    let const parsed = FLAG_READ_NCHARS.value().to<i64>();
+  if (has_byte_limit) {
+    let const &count_flag =
+        is_exact_count ? FLAG_READ_EXACT_NCHARS : FLAG_READ_NCHARS;
+    let const parsed = count_flag.value().to<i64>();
     if (parsed.is_error() || parsed.value() < 0) {
-      report_soft_builtin_error(ec, cxt, FLAG_READ_NCHARS.value_location(),
-                                FLAG_READ_NCHARS.value() +
-                                    ": invalid byte count");
+      report_soft_builtin_error(ec, cxt, count_flag.value_location(),
+                                count_flag.value() + ": invalid byte count");
       return 1;
     }
     max_bytes = parsed.value();
@@ -209,7 +217,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
   let line = String{cxt.scratch_allocator()};
   let is_literal_byte = ArrayList<bool>{cxt.scratch_allocator()};
 
-  if (FLAG_READ_NCHARS.is_set()) {
+  if (has_byte_limit) {
     i64 output_count = 0;
     while (output_count < max_bytes) {
       char byte = 0;
@@ -233,7 +241,7 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
         continue;
       }
 
-      if (byte == delimiter) {
+      if (!is_exact_count && byte == delimiter) {
         was_newline_terminated = true;
         break;
       }
@@ -315,6 +323,12 @@ fn Read::execute(ExecContext &ec, EvalContext &cxt) const throws -> i32
 
   let const read_status =
       was_timed_out ? 142 : (was_newline_terminated ? 0 : 1);
+  if (is_exact_count && !FLAG_READ_ARRAY.is_set()) {
+    for (usize i = 0; i < operand_count; i++)
+      cxt.set_shell_variable(do_operand_name(i),
+                             i == 0 ? line.view() : StringView{});
+    return read_status;
+  }
   usize cursor = 0;
   let const do_skip_ifs_whitespace = [&]() {
     while (cursor < line.length() && do_is_ifs_whitespace(cursor)) {

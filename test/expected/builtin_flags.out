@@ -72,6 +72,7 @@ globskipdots
 globstar
 == read flags:
 --help
+-N
 -a
 -d
 -e
