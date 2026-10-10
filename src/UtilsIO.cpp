@@ -212,9 +212,13 @@ hot flatten fn BufferedLineReader::next() throws -> Result
     m_buffer_position = delimiter_position;
     if (m_buffer_position < m_buffer_length) {
       m_buffer_position++;
+      m_was_line_terminated = true;
       return Result::Line;
     }
-    if (m_is_at_end) return m_line.is_empty() ? Result::End : Result::Line;
+    if (m_is_at_end) {
+      m_was_line_terminated = false;
+      return m_line.is_empty() ? Result::End : Result::Line;
+    }
 
     let const read_size = os::read_fd(m_descriptor, m_buffer, sizeof(m_buffer));
     if (!read_size.has_value()) return Result::Error;

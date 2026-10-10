@@ -277,6 +277,10 @@ fn Nl::execute(const ExecContext &ec, EvalContext &cxt,
     }
     output += line;
     output += '\n';
+    if (output.count() >= 65536) {
+      ec.print_to_stdout(output);
+      output.clear();
+    }
   }
 
   ec.print_to_stdout(output);

@@ -590,47 +590,36 @@ fn Sed::execute(const ExecContext &ec, EvalContext &cxt,
 
   let const sources = source_list_from_operands(
       operands, cxt.scratch_allocator(), source_start);
-  let contents = ArrayList<String>{cxt.scratch_allocator()};
-  contents.reserve(sources.count());
-  let lines = ArrayList<StringView>{cxt.scratch_allocator()};
   i32 status = 0;
-  let source_results =
-      read_named_or_stdin_batch(ec, sources, cxt.scratch_allocator());
-  if (os::INTERRUPT_REQUESTED) return 130;
 
-  for (usize source_index = 0; source_index < sources.count(); source_index++) {
-    let &source_result = source_results[source_index];
-    if (!source_result.content.has_value()) {
-      os::set_last_system_error(source_result.error_number);
-      KOSHKIT_REPORT_PATH_ERROR("read", sources[source_index]);
-      status = 2;
-      continue;
-    }
+  let output = String{heap_allocator()};
+  let has_written_output = false;
+  let did_written_output_end_in_newline = true;
+  let const do_flush_output = [&](bool should_flush_all) throws {
+    if (output.is_empty() || (!should_flush_all && output.count() < 65536))
+      return;
 
-    contents.push(source_result.content.take());
-    for (let const line :
-         utils::split_lines(contents.back().view(), cxt.scratch_allocator(),
-                            utils::line_terminator_mode::Preserve))
-      lines.push(line);
-  }
+    ec.print_to_stdout(output);
+    has_written_output = true;
+    did_written_output_end_in_newline = output[output.length() - 1] == '\n';
+    output.clear();
+  };
 
-  let output = String{cxt.scratch_allocator()};
   bool should_quit = false;
-  for (usize line_index = 0; line_index < lines.count() && !should_quit;
-       line_index++)
-  {
-    let const source_line = lines[line_index];
-    let const has_terminating_newline =
-        !source_line.is_empty() && source_line[source_line.length - 1] == '\n';
-    String line{cxt.scratch_allocator(),
-                source_line.without_trailing_newline()};
-    String appended_text{cxt.scratch_allocator()};
+  u64 line_number = 0;
+  let const do_process_line = [&](StringView source_line,
+                                  bool has_terminating_newline,
+                                  bool is_last_line) throws {
+    let const line_mark = cxt.expansion_store().scratch_arena().mark();
+    defer { cxt.expansion_store().scratch_arena().release(line_mark); };
+    String line{heap_allocator(), source_line};
+    String appended_text{heap_allocator()};
     bool should_delete = false;
-    let const line_number = static_cast<u64>(line_index + 1);
+    line_number++;
 
     for (let &command : commands) {
       let is_match = sed_command_matches(command, line.view(), line_number,
-                                         line_index + 1 == lines.count());
+                                         is_last_line);
       if (command.is_negated) is_match = !is_match;
       if (!is_match) continue;
 
@@ -649,7 +638,7 @@ fn Sed::execute(const ExecContext &ec, EvalContext &cxt,
         break;
       case sed_command_kind::Quit: should_quit = true; break;
       case sed_command_kind::LineNumber:
-        output += String::from(line_number, cxt.scratch_allocator());
+        output += String::from(line_number, heap_allocator());
         output += '\n';
         break;
       case sed_command_kind::Append:
@@ -662,7 +651,7 @@ fn Sed::execute(const ExecContext &ec, EvalContext &cxt,
         break;
       case sed_command_kind::Change:
         if (!command.has_second_address || !command.is_range_active ||
-            line_index + 1 == lines.count())
+            is_last_line)
         {
           output += command.replacement.view();
           output += '\n';
@@ -680,7 +669,7 @@ fn Sed::execute(const ExecContext &ec, EvalContext &cxt,
           translation[static_cast<u8>(command.replacement[source_position])] =
               command.replacement[source_length + source_position];
 
-        String translated{cxt.scratch_allocator()};
+        String translated{heap_allocator()};
         translated.reserve(line.length());
         for (usize position = 0; position < line.length(); position++)
           translated += translation[static_cast<u8>(line[position])];
@@ -694,15 +683,57 @@ fn Sed::execute(const ExecContext &ec, EvalContext &cxt,
     if (!should_delete && !FLAG_SED_QUIET.is_enabled()) {
       append_sed_pattern_space(output, line.view(), has_terminating_newline);
     }
-    if (!appended_text.is_empty() && !output.is_empty() &&
-        output[output.length() - 1] != '\n')
-    {
+    let const does_output_end_in_newline =
+        !output.is_empty()
+            ? output[output.length() - 1] == '\n'
+            : !has_written_output || did_written_output_end_in_newline;
+    if (!appended_text.is_empty() && !does_output_end_in_newline) {
       output += '\n';
     }
     output += appended_text.view();
-  }
+    do_flush_output(false);
+  };
 
-  ec.print_to_stdout(output);
+  let held_line = String{heap_allocator()};
+  let has_held_line = false;
+  let was_held_line_terminated = false;
+  for (usize source_index = 0;
+       source_index < sources.count() && !should_quit; source_index++)
+  {
+    let const input = open_named_or_stdin(ec, sources[source_index]);
+    if (!input.has_value()) {
+      KOSHKIT_REPORT_PATH_ERROR("read", sources[source_index]);
+      status = 2;
+      continue;
+    }
+    defer
+    {
+      if (input->mode == input_descriptor_mode::Owned)
+        os::close_fd(input->descriptor);
+    };
+
+    let reader = utils::BufferedLineReader{input->descriptor};
+    while (!should_quit) {
+      let const result = reader.next();
+      if (result == utils::BufferedLineReader::Result::End) break;
+      if (result == utils::BufferedLineReader::Result::Error) {
+        if (os::INTERRUPT_REQUESTED) return 130;
+        KOSHKIT_REPORT_PATH_ERROR("read", sources[source_index]);
+        status = 2;
+        break;
+      }
+
+      if (has_held_line) do_process_line(held_line.view(), true, false);
+      held_line.clear();
+      held_line.append(reader.get_line());
+      was_held_line_terminated = reader.was_line_terminated();
+      has_held_line = true;
+    }
+  }
+  if (has_held_line && !should_quit)
+    do_process_line(held_line.view(), was_held_line_terminated, true);
+
+  do_flush_output(true);
   return status;
 }
 

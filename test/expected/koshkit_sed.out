@@ -27,3 +27,11 @@ unchanged
 0000004
 --- a global substitution over a long line ---
 0
+--- quitting stops reading an endless input ---
+y
+y
+y
+--- a file without a final newline is not joined to the next ---
+last
+next
+appended

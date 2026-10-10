@@ -53,3 +53,13 @@ printf 'a\0b\n' | "$BIN" -c 'koshkit sed s/b/X/' | "$BIN_DIR/invoke-koshkit" od 
 echo "--- a global substitution over a long line ---"
 "$BIN" -c 'printf "%200000s" ""' | "$BIN_DIR/invoke-koshkit" tr ' ' a \
   | "$BIN" -c 'koshkit sed s/a/b/g' | "$BIN_DIR/invoke-koshkit" tr -d b | "$BIN_DIR/invoke-koshkit" wc -c
+
+echo "--- quitting stops reading an endless input ---"
+"$BIN" -c 'while :; do echo y; done | koshkit sed 3q'
+
+echo "--- a file without a final newline is not joined to the next ---"
+sed_directory=$(mktemp -d) || exit 1
+trap '[ -n "$sed_directory" ] && "$BIN_DIR/invoke-koshkit" rm -rf -- "$sed_directory"' EXIT
+printf 'last' > "$sed_directory/no-newline.txt"
+printf 'next\n' > "$sed_directory/following.txt"
+"$BIN" -c "koshkit sed '\$a\\appended' '$sed_directory/no-newline.txt' '$sed_directory/following.txt'"

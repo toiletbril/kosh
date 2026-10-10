@@ -448,6 +448,10 @@ public:
 
   fn next() throws -> Result;
   pure fn get_line() const wontthrow -> StringView;
+  pure fn was_line_terminated() const wontthrow -> bool
+  {
+    return m_was_line_terminated;
+  }
 
 private:
   os::descriptor m_descriptor;
@@ -455,6 +459,7 @@ private:
   usize m_buffer_position{0};
   usize m_buffer_length{0};
   bool m_is_at_end{false};
+  bool m_was_line_terminated{false};
   char m_buffer[65536];
 };
 
