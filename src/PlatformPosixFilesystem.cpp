@@ -600,6 +600,17 @@ static fn open_with_flags(StringView path, file_open_mode mode,
       }
     }
 
+    if (fd <= STDERR_FILENO) {
+      let const lifted = ::fcntl(fd, F_DUPFD, STDERR_FILENO + 1);
+      let const saved_errno = errno;
+      ::close(fd);
+      if (lifted < 0) {
+        errno = saved_errno;
+        return koshka::None;
+      }
+      return lifted;
+    }
+
     return fd;
   }
 }

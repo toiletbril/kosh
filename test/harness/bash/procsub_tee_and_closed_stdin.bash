@@ -14,6 +14,8 @@ sleep 0.2
 echo "counts=$(tr -d ' ' < count_a) $(tr -d ' ' < count_b)"
 printf '%s\n' 'echo y | cat' 'echo y | { read -r line; echo "got $line"; }' > closed.sh
 "$BASH" closed.sh 0<&-
+"$BASH" -c 'echo all-closed | cat > all-closed.txt' 0<&- 1>&- 2>&-
+cat all-closed.txt
 nots=""
 for ((i = 0; i < 3000; i++)); do nots+="!"; done
 echo "not-chain=$(( $nots 1 ))"
