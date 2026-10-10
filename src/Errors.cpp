@@ -197,12 +197,36 @@ cold static fn reported_line_number(usize rendered_line,
 
 cold static fn get_context_pointing_to(
     StringView source, usize byte_position, usize byte_count,
-    const utils::source_line_position &line_position, isize line_offset,
+    const utils::source_line_position &full_line_position, isize line_offset,
     Maybe<StringView> message, const diagnostic_color &color,
     EvalContext *eval_context) throws -> String
 {
   let const line_number =
-      reported_line_number(line_position.line_number, line_offset) - 1;
+      reported_line_number(full_line_position.line_number, line_offset) - 1;
+
+  static constexpr usize LONG_LINE_CONTEXT_BYTES = 4096;
+  let line_position = full_line_position;
+  if (line_position.line_end - line_position.line_start >
+      2 * LONG_LINE_CONTEXT_BYTES)
+  {
+    if (byte_position > line_position.line_start + LONG_LINE_CONTEXT_BYTES) {
+      line_position.line_start = byte_position - LONG_LINE_CONTEXT_BYTES;
+      while (line_position.line_start < byte_position &&
+             (static_cast<u8>(source[line_position.line_start]) & 0xC0) == 0x80)
+        line_position.line_start++;
+    }
+
+    let const caret_end_position =
+        byte_count > line_position.line_end - byte_position
+            ? line_position.line_end
+            : byte_position + byte_count;
+    if (line_position.line_end > caret_end_position + LONG_LINE_CONTEXT_BYTES) {
+      line_position.line_end = caret_end_position + LONG_LINE_CONTEXT_BYTES;
+      while (line_position.line_end > caret_end_position &&
+             (static_cast<u8>(source[line_position.line_end]) & 0xC0) == 0x80)
+        line_position.line_end--;
+    }
+  }
   LOG(Debug, "assembling the caret context for line %zu", line_number + 1);
 
   static constexpr usize LINE_NUMBER_FIELD_WIDTH = 6;

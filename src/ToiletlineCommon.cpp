@@ -306,9 +306,21 @@ fn get_utf8_length(const koshka::String &string, usize byte_count) -> usize
 
 fn get_utf8_length(const char *bytes, usize byte_count) -> usize
 {
+  static constexpr u64 LOW_BITS = 0x0101010101010101ULL;
+  static constexpr u64 HIGH_BITS = 0x8080808080808080ULL;
   usize codepoint_count = 0;
-  for (usize byte_offset = 0;
-       byte_offset < byte_count && bytes[byte_offset] != '\0'; byte_offset++)
+  usize byte_offset = 0;
+  while (byte_offset + sizeof(u64) <= byte_count) {
+    u64 word;
+    std::memcpy(&word, bytes + byte_offset, sizeof(word));
+    if (((word - LOW_BITS) & ~word & HIGH_BITS) != 0) break;
+    let const continuation_bits = word & ~(word << 1) & HIGH_BITS;
+    codepoint_count +=
+        sizeof(u64) - static_cast<usize>(__builtin_popcountll(continuation_bits));
+    byte_offset += sizeof(u64);
+  }
+
+  for (; byte_offset < byte_count && bytes[byte_offset] != '\0'; byte_offset++)
   {
     if ((static_cast<u8>(bytes[byte_offset]) & 0xc0) != 0x80) codepoint_count++;
   }
