@@ -999,9 +999,11 @@ fn EvalContext::force_unset_shell_variable(StringView name) throws -> void
   variable_store().shell_variables().erase(name);
   if (is_prompt_special_variable(name))
     variable_store().special_variable_definition_locations().erase(name);
-  record_environment_change(name);
-  os::unset_environment_variable(name);
-  unmark_exported(name);
+  if (is_exported(name)) {
+    record_environment_change(name);
+    os::unset_environment_variable(name);
+    unmark_exported(name);
+  }
   switch (name.is_empty() ? '\0' : name[0]) {
   case 'I':
     if (name == "IFS") variable_store().set_field_separators(" \t\n");

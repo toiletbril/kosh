@@ -1093,7 +1093,16 @@ fn CaseClause::evaluate_status_impl(EvalContext &cxt) const throws
     return t->raw_string();
   };
 
-  let const subject = do_expand_no_glob(m_word);
+  let &scratch_arena = cxt.expansion_store().scratch_arena();
+  let const subject_mark = scratch_arena.mark();
+  let subject = String{heap_allocator()};
+  try {
+    subject.append(do_expand_no_glob(m_word).view());
+  } catch (...) {
+    scratch_arena.release(subject_mark);
+    throw;
+  }
+  scratch_arena.release(subject_mark);
 
   LOG(Debug, "the case subject expanded to '%s'", subject.c_str());
 
@@ -1102,10 +1111,12 @@ fn CaseClause::evaluate_status_impl(EvalContext &cxt) const throws
   let const is_case_insensitive = cxt.is_shopt_enabled("nocasematch");
   let const folded_subject =
       is_case_insensitive ? utils::lowercase_for_glob(subject.view(), charset,
-                                                      cxt.scratch_allocator())
-                          : String{cxt.scratch_allocator()};
+                                                      heap_allocator())
+                          : String{heap_allocator()};
 
   let const do_arm_matches = [&](const case_item &item) throws -> bool {
+    let const arm_mark = scratch_arena.mark();
+    defer { scratch_arena.release(arm_mark); };
     for (let const pattern_token : item.patterns) {
       if (pattern_token->kind() == Token::Kind::Word) {
         const Word &pattern_word =

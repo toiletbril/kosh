@@ -489,6 +489,8 @@ fn ConditionalCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
   i64 status;
   try {
+    let const scratch_mark = cxt.expansion_store().scratch_arena().mark();
+    defer { cxt.expansion_store().scratch_arena().release(scratch_mark); };
     status = cxt.evaluate_conditional(m_elements) ? 0 : 1;
   } catch (const Error &e) {
     SourceLocation span = source_location();

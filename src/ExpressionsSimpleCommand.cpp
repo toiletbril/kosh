@@ -310,6 +310,8 @@ hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
 
 fn AssignCommand::evaluate_assignment(EvalContext &cxt) const throws -> i64
 {
+  let const scratch_mark = cxt.expansion_store().scratch_arena().mark();
+  defer { cxt.expansion_store().scratch_arena().release(scratch_mark); };
   let const value_ran_substitution =
       m_assignment->value_word().runs_substitution();
   let const substitution_mark = cxt.mark_process_substitutions();
