@@ -88,6 +88,51 @@ hot fn EvalContext::expand_word(const Word &word) throws
                  tilde_expanded_segments.count() > 1,
                  !runtime_state().is_posix_mode());
     segments = &tilde_expanded_segments;
+  } else if (runtime_state().is_bash_compatible() &&
+             !runtime_state().is_posix_mode() && !word.segments.is_empty() &&
+             word.segments.front().is_tilde_candidate() &&
+             lexer::word_looks_like_assignment(
+                 word.segments.front().text.view()))
+  {
+    let const first_text = word.segments.front().text.view();
+    let const equals = first_text.find_character('=');
+    let const do_starts_after_separator = [&](usize index) -> bool {
+      if (index == 0) return false;
+
+      let const &previous = word.segments[index - 1].text;
+      let const &current = word.segments[index];
+      if (!current.is_tilde_candidate() || current.text.is_empty() ||
+          current.text.first_character() != '~' ||
+          !word.segments[index - 1].is_tilde_candidate() ||
+          previous.is_empty())
+      {
+        return false;
+      }
+
+      let const last = previous.view()[previous.view().length - 1];
+      return last == ':' || (index == 1 && equals.has_value() &&
+                             *equals + 1 == previous.view().length);
+    };
+    let has_tilde_after_separator =
+        equals.has_value() && *equals + 1 < first_text.length &&
+        first_text[*equals + 1] == '~';
+    for (usize i = 0; i < word.segments.count(); i++) {
+      if ((word.segments[i].is_tilde_candidate() &&
+           word.segments[i].text.find_substring(":~").has_value()) ||
+          do_starts_after_separator(i))
+        has_tilde_after_separator = true;
+    }
+    if (has_tilde_after_separator) {
+      tilde_expanded_segments = clone_word_segments(word, scratch);
+      for (usize i = 0; i < tilde_expanded_segments.count(); i++) {
+        let const does_word_continue = i + 1 < tilde_expanded_segments.count();
+        if (do_starts_after_separator(i))
+          expand_tilde(tilde_expanded_segments[i], does_word_continue, true);
+        expand_colon_tildes(tilde_expanded_segments[i], does_word_continue,
+                            i == 0 ? equals : None);
+      }
+      segments = &tilde_expanded_segments;
+    }
   }
 
   let fields = ArrayList<glob_field>{scratch};

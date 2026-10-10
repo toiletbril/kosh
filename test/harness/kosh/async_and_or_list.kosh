@@ -21,6 +21,7 @@ echo "status=$?"
 false || exit 4 &
 wait $!
 echo "exit=$?"
+jobs > /dev/null
 sleep 5 && echo never &
 jobs
 kill %1

@@ -150,6 +150,18 @@ fn constant_test_verdict(const ArrayList<const Token *> &args,
   return None;
 }
 
+pure fn may_expand_assignment_tilde(StringView text) wontthrow -> bool
+{
+  if (!lexer::word_looks_like_assignment(text)) return false;
+
+  let const equals = text.find_character('=');
+  if (equals.has_value() && *equals + 1 < text.length &&
+      text[*equals + 1] == '~')
+    return true;
+
+  return text.find_substring(":~").has_value();
+}
+
 } /* namespace */
 
 fn literal_word_value(const Word &word) throws -> Maybe<String>
@@ -168,6 +180,9 @@ fn literal_word_value(const Word &word) throws -> Maybe<String>
       if (!segment.text.is_empty() && segment.text[0] == '~') {
         return None;
       }
+      if (&segment == &word.segments.front() &&
+          may_expand_assignment_tilde(segment.text.view()))
+        return None;
       value.append(segment.text.view());
       break;
     default: return None;
@@ -434,6 +449,8 @@ pure fn classify_plain_literal(const Word &word) wontthrow -> Word::PlainLiteral
     if (!only.text.is_empty() && only.text[0] == '~') {
       return Word::PlainLiteral::NotPlain;
     }
+    if (may_expand_assignment_tilde(only.text.view()))
+      return Word::PlainLiteral::NotPlain;
     return Word::PlainLiteral::PlainUnquotedOneSegment;
   }
 

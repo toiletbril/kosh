@@ -4233,7 +4233,8 @@ protected:
   fn expand_tilde(WordSegment &leading_segment, bool word_continues,
                   bool stop_at_colon) const throws -> void;
   fn resolve_tilde_prefix(StringView name) const throws -> Maybe<String>;
-  fn expand_colon_tildes(WordSegment &segment, bool word_continues) const throws
+  fn expand_colon_tildes(WordSegment &segment, bool word_continues,
+                         Maybe<usize> equals_position = None) const throws
       -> void;
 };
 

@@ -658,8 +658,9 @@ fn EvalContext::resolve_tilde_prefix(StringView name) const throws
   return String{heap_allocator(), home->text().view()};
 }
 
-fn EvalContext::expand_colon_tildes(WordSegment &segment,
-                                    bool word_continues) const throws -> void
+fn EvalContext::expand_colon_tildes(WordSegment &segment, bool word_continues,
+                                    Maybe<usize> equals_position) const throws
+    -> void
 {
   if (!segment.is_tilde_candidate()) return;
   let const view = segment.text.view();
@@ -667,7 +668,10 @@ fn EvalContext::expand_colon_tildes(WordSegment &segment,
   let was_changed = false;
   usize i = 0;
   while (i < view.length) {
-    if (view[i] == ':' && i + 1 < view.length && view[i + 1] == '~') {
+    let const is_separator =
+        view[i] == ':' ||
+        (equals_position.has_value() && *equals_position == i);
+    if (is_separator && i + 1 < view.length && view[i + 1] == '~') {
       usize prefix_end = i + 2;
       while (prefix_end < view.length && view[prefix_end] != '/' &&
              view[prefix_end] != ':')
@@ -675,7 +679,7 @@ fn EvalContext::expand_colon_tildes(WordSegment &segment,
       if (!(prefix_end == view.length && word_continues)) {
         let const name = view.substring_of_length(i + 2, prefix_end - i - 2);
         if (let const directory = resolve_tilde_prefix(name)) {
-          rewritten += ':';
+          rewritten += view[i];
           rewritten.append(directory->view());
           i = prefix_end;
           was_changed = true;
