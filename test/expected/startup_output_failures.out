@@ -1,5 +1,5 @@
-format-closed-stdout=1
-version-closed-stdout=1
+format-full-device=1
+version-full-device=1
 readonly-loop=1
 bash-mood-continues x=1
 store-lines=500

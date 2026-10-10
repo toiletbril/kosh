@@ -55,7 +55,7 @@ echo "--- a global substitution over a long line ---"
   | "$BIN" -c 'koshkit sed s/a/b/g' | "$BIN_DIR/invoke-koshkit" tr -d b | "$BIN_DIR/invoke-koshkit" wc -c
 
 echo "--- quitting stops reading an endless input ---"
-"$BIN" -c 'while :; do echo y; done | koshkit sed 3q'
+"$BIN" -c 'while echo y; do :; done 2> /dev/null | koshkit sed 3q'
 
 echo "--- a file without a final newline is not joined to the next ---"
 sed_directory=$(mktemp -d) || exit 1

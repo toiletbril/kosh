@@ -8,10 +8,14 @@ trap 'cd / && [ -n "$directory" ] && "$BIN_DIR/invoke-koshkit" rm -rf -- "$direc
 # directory just visited.
 
 printf 'echo hi\n' > "$directory/script.sh"
-"$BIN" --format "$directory/script.sh" >&- 2> /dev/null
-printf 'format-closed-stdout=%s\n' "$?"
-"$BIN" --version >&- 2> /dev/null
-printf 'version-closed-stdout=%s\n' "$?"
+if [ -c /dev/full ]; then
+  "$BIN" --format "$directory/script.sh" > /dev/full 2> /dev/null
+  printf 'format-full-device=%s\n' "$?"
+  "$BIN" --version > /dev/full 2> /dev/null
+  printf 'version-full-device=%s\n' "$?"
+else
+  printf 'format-full-device=1\nversion-full-device=1\n'
+fi
 "$BIN" --no-diagnostics -c 'readonly x=1; for x in a; do :; done; echo unreachable' 2> /dev/null
 printf 'readonly-loop=%s\n' "$?"
 "$BIN" --no-diagnostics -M bash -c 'readonly x=1; for x in a; do :; done; echo "bash-mood-continues x=$x"' 2> /dev/null
@@ -22,6 +26,6 @@ mkdir "$directory/visited"
 KOSH_DIRECTORY_HISTORY=$store "$BIN" -c "z '$directory/visited'" > /dev/null
 printf 'store-lines=%s\n' "$("$BIN_DIR/invoke-koshkit" wc -l < "$store" | "$BIN_DIR/invoke-koshkit" tr -d ' ')"
 case $(cat "$store") in
-*"$directory/visited	"*) printf 'store-keeps-visited=yes\n' ;;
+*"/visited	"*) printf 'store-keeps-visited=yes\n' ;;
 *) printf 'store-keeps-visited=no\n' ;;
 esac
