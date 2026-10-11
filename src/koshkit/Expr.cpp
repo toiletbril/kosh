@@ -180,7 +180,9 @@ private:
           throw Error{"integer overflow"};
         result = left_number / right_number;
         break;
-      default: result = left_number % right_number; break;
+      default:
+        result = right_number == -1 ? 0 : left_number % right_number;
+        break;
       }
       left = number_string(result);
     }

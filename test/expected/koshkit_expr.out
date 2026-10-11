@@ -11,3 +11,5 @@ note: use a valid basic regular expression.
 9:1: trace:
      9 |  (koshkit expr x : '[') 2>&1
        |  ^
+0
+-1
