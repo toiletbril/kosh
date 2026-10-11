@@ -233,7 +233,6 @@ struct variable_snapshot
 {
   VariableTable variables;
   StringMap<SourceLocation> special_variable_definition_locations;
-  StringMap<ArrayList<String>> indexed_arrays;
   CompositeKeyArrays associative_arrays;
   CompositeKeyArrays sparse_arrays;
   ArrayList<String> positional_params;

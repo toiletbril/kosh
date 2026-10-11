@@ -1597,6 +1597,55 @@ private:
   VariableTable *m_table;
 };
 
+class IndexedArrays
+{
+public:
+  explicit IndexedArrays(VariableTable *table) wontthrow : m_table{table} {}
+
+  hot pure fn find(StringView name) const wontthrow
+      -> Maybe<const ArrayList<String> *>
+  {
+    let const entry = m_table->find(name);
+    if (!entry.has_value() || !(*entry)->is_indexed_array) return None;
+    return &(*entry)->elements;
+  }
+  hot fn find(StringView name) wontthrow -> Maybe<ArrayList<String> *>
+  {
+    let const entry = m_table->find(name);
+    if (!entry.has_value() || !(*entry)->is_indexed_array) return None;
+    return &(*entry)->elements;
+  }
+  fn set(StringView name, ArrayList<String> elements) throws
+      -> ArrayList<String> *
+  {
+    return m_table->set_elements(name, steal(elements));
+  }
+  fn get_or_create(StringView name, ArrayList<String> default_elements) throws
+      -> ArrayList<String> &
+  {
+    if (let const existing = find(name); existing.has_value())
+      return **existing;
+
+    return *m_table->set_elements(name, steal(default_elements));
+  }
+  fn erase(StringView name) throws -> void { m_table->erase_elements(name); }
+  pure fn count() const wontthrow -> usize
+  {
+    return m_table->indexed_array_count();
+  }
+
+  template <typename Callback>
+  fn for_each(Callback do_callback) const throws -> void
+  {
+    m_table->for_each([&](StringView name, const variable_entry &entry) throws {
+      if (entry.is_indexed_array) do_callback(name, entry.elements);
+    });
+  }
+
+private:
+  VariableTable *m_table;
+};
+
 class VariableAttributes
 {
 public:
@@ -1854,14 +1903,13 @@ public:
     return (m_field_separator_bits[2] | m_field_separator_bits[3]) != 0;
   }
 
-  fn indexed_arrays() wontthrow -> StringMap<ArrayList<String>> &
+  fn indexed_arrays() wontthrow -> IndexedArrays
   {
-    return m_indexed_arrays;
+    return IndexedArrays{&m_variables};
   }
-  pure fn indexed_arrays() const wontthrow
-      -> const StringMap<ArrayList<String>> &
+  pure fn indexed_arrays() const wontthrow -> const IndexedArrays
   {
-    return m_indexed_arrays;
+    return IndexedArrays{const_cast<VariableTable *>(&m_variables)};
   }
   fn associative_arrays() wontthrow -> CompositeKeyArrays &
   {
@@ -1963,7 +2011,6 @@ private:
   VariableTable m_variables;
   StringMap<SourceLocation> m_special_variable_definition_locations{
       heap_allocator()};
-  StringMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
   CompositeKeyArrays m_associative_arrays;
   CompositeKeyArrays m_sparse_arrays;
   StringMap<exported_name_value> m_exported_names{heap_allocator()};

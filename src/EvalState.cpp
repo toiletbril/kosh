@@ -767,7 +767,6 @@ fn VariableStore::snapshot() const throws -> variable_snapshot
   return variable_snapshot{
       m_variables,
       m_special_variable_definition_locations,
-      m_indexed_arrays,
       m_associative_arrays,
       m_sparse_arrays,
       m_positional_params,
@@ -789,7 +788,6 @@ fn VariableStore::restore(variable_snapshot snapshot) throws -> void
   m_is_pipestatus_scalar_possible = true;
   m_special_variable_definition_locations =
       steal(snapshot.special_variable_definition_locations);
-  m_indexed_arrays = steal(snapshot.indexed_arrays);
   m_associative_arrays = steal(snapshot.associative_arrays);
   m_sparse_arrays = steal(snapshot.sparse_arrays);
   m_positional_params = steal(snapshot.positional_params);

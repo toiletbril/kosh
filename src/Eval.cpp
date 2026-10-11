@@ -202,10 +202,10 @@ hot fn EvalContext::assign_variable(StringView name, StringView value,
     runtime_state().set_option(shell_option_id::Ignoreeof, true);
   }
 
-  if (entry.has_value())
-    variable_store().variables().assign_value(**entry, value);
-  else
-    variable_store().shell_variables().set(name, value);
+  let &target = entry.has_value()
+                    ? **entry
+                    : variable_store().variables().get_or_create(name);
+  variable_store().variables().assign_value(target, value);
   if (is_pipestatus_name) variable_store().set_pipestatus_scalar_possible(true);
   if (is_glob_ignore_name) {
     runtime_state().set_glob_ignore_assigned(true);
@@ -393,8 +393,7 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
   if (is_bash_directory_stack_special(name)) return;
 
   if (!has_scalar &&
-      ((variable_store().indexed_arrays().count() != 0 &&
-        variable_store().indexed_arrays().find(name).has_value()) ||
+      ((entry.has_value() && (*entry)->is_indexed_array) ||
        variable_store().associative_arrays().has(name)))
   {
     assign_array_element(name, "0", value, assignment_update_mode::Replace);
@@ -733,10 +732,10 @@ fn EvalContext::publish_pipe_statuses(ArrayList<String> values) throws -> void
 
 fn EvalContext::publish_single_pipe_status(i32 status) throws -> void
 {
-  static const StringView PIPESTATUS_NAME{"PIPESTATUS", 10};
-  static const u64 PIPESTATUS_HASH = hash_bytes(PIPESTATUS_NAME);
-  let existing = variable_store().indexed_arrays().find_hashed(PIPESTATUS_NAME,
-                                                               PIPESTATUS_HASH);
+  let const entry = variable_store().variables().find_pipestatus();
+  let existing = entry.has_value() && (*entry)->is_indexed_array
+                     ? Maybe<ArrayList<String> *>{&(*entry)->elements}
+                     : Maybe<ArrayList<String> *>{None};
   if (!existing.has_value() && is_readonly("PIPESTATUS")) return;
 
   if (existing.has_value() && existing->count() == 1 &&

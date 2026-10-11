@@ -183,20 +183,47 @@ enum class variable_attribute : u8
 struct variable_entry
 {
   String value{heap_allocator()};
+  ArrayList<String> elements{heap_allocator()};
   u8 attribute_bits{0};
   bool has_value{false};
+  bool is_indexed_array{false};
 };
 
 class VariableTable
 {
 public:
   VariableTable() = default;
-  VariableTable(VariableTable &&) = default;
-  fn operator=(VariableTable &&) -> VariableTable & = default;
+  VariableTable(VariableTable &&other) wontthrow
+      : m_index{steal(other.m_index)},
+        m_entries{steal(other.m_entries)},
+        m_pipestatus_entry{other.m_pipestatus_entry},
+        m_value_count{other.m_value_count},
+        m_indexed_array_count{other.m_indexed_array_count},
+        m_has_namerefs{other.m_has_namerefs},
+        m_has_declared_marks{other.m_has_declared_marks}
+  {
+    other.forget_moved_entries();
+  }
+  fn operator=(VariableTable &&other) wontthrow -> VariableTable &
+  {
+    if (this == &other) return *this;
+
+    m_index = steal(other.m_index);
+    m_entries = steal(other.m_entries);
+    m_pipestatus_entry = other.m_pipestatus_entry;
+    m_value_count = other.m_value_count;
+    m_indexed_array_count = other.m_indexed_array_count;
+    m_has_namerefs = other.m_has_namerefs;
+    m_has_declared_marks = other.m_has_declared_marks;
+    other.forget_moved_entries();
+
+    return *this;
+  }
 
   VariableTable(const VariableTable &other) throws
       : m_index{other.m_index},
         m_value_count{other.m_value_count},
+        m_indexed_array_count{other.m_indexed_array_count},
         m_has_namerefs{other.m_has_namerefs},
         m_has_declared_marks{other.m_has_declared_marks}
   {
@@ -234,10 +261,42 @@ public:
 
   fn release_if_unused(StringView name, variable_entry &entry) throws -> void
   {
-    if (entry.has_value || entry.attribute_bits != 0) return;
+    if (entry.has_value || entry.is_indexed_array || entry.attribute_bits != 0)
+      return;
 
+    if (&entry == m_pipestatus_entry) m_pipestatus_entry = nullptr;
     m_index.erase(name);
     m_entries.erase(&entry);
+  }
+
+  fn set_elements(StringView name, ArrayList<String> elements) throws
+      -> ArrayList<String> *
+  {
+    let &entry = get_or_create(name);
+    if (!entry.is_indexed_array) m_indexed_array_count++;
+    entry.is_indexed_array = true;
+    entry.elements = steal(elements);
+    return &entry.elements;
+  }
+
+  fn erase_elements(StringView name) throws -> void
+  {
+    let const found = find(name);
+    if (!found.has_value() || !(*found)->is_indexed_array) return;
+
+    (*found)->is_indexed_array = false;
+    (*found)->elements.clear();
+    m_indexed_array_count--;
+    release_if_unused(name, **found);
+  }
+
+  fn find_pipestatus() throws -> Maybe<variable_entry *>
+  {
+    if (m_pipestatus_entry != nullptr) return m_pipestatus_entry;
+
+    let const found = find(StringView{"PIPESTATUS", 10});
+    if (found.has_value()) m_pipestatus_entry = *found;
+    return found;
   }
 
   fn set_value(StringView name, StringView value) throws -> String *
@@ -294,6 +353,10 @@ public:
   }
 
   pure fn value_count() const wontthrow -> usize { return m_value_count; }
+  pure fn indexed_array_count() const wontthrow -> usize
+  {
+    return m_indexed_array_count;
+  }
   pure fn has_namerefs() const wontthrow -> bool { return m_has_namerefs; }
   pure fn has_declared_marks() const wontthrow -> bool
   {
@@ -308,9 +371,19 @@ public:
   }
 
 private:
+  fn forget_moved_entries() wontthrow -> void
+  {
+    m_index.clear();
+    m_pipestatus_entry = nullptr;
+    m_value_count = 0;
+    m_indexed_array_count = 0;
+  }
+
   StringMap<variable_entry *> m_index{heap_allocator()};
   Hive<variable_entry> m_entries;
+  variable_entry *m_pipestatus_entry{nullptr};
   usize m_value_count{0};
+  usize m_indexed_array_count{0};
   bool m_has_namerefs{false};
   bool m_has_declared_marks{false};
 };
