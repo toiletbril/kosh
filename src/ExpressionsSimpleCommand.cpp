@@ -263,7 +263,8 @@ fn AssignCommand::analyze(AnalysisContext &actx,
   }
 }
 
-hot fn AssignCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
+hot fn AssignCommand::evaluate_impl(EvalContext &cxt, root_evaluation_mode)
+    const throws -> status_result
 {
   ASSERT(m_assignment != nullptr);
 

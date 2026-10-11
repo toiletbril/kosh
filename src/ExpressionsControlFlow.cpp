@@ -96,7 +96,7 @@ static fn async_error_status(const EvalContext &cxt, const ErrorBase &error,
 
 fn Command::evaluate_async_body(EvalContext &cxt) const throws -> i64
 {
-  return evaluate_impl(cxt);
+  return evaluate_impl(cxt, root_evaluation_mode::Normal).status;
 }
 
 fn Command::evaluate_async(EvalContext &cxt) const throws -> i64
@@ -263,13 +263,8 @@ cold fn IfClause::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-hot fn IfClause::evaluate_impl(EvalContext &cxt) const throws -> i64
-{
-  return evaluate_status_impl(cxt).status;
-}
-
-hot fn IfClause::evaluate_status_impl(EvalContext &cxt) const throws
-    -> status_result
+hot fn IfClause::evaluate_impl(EvalContext &cxt, root_evaluation_mode) const
+    throws -> status_result
 {
   cxt.execution_store().terminal_exec_allowed() = false;
   let const should_skip_condition_commands = !folded_commands_are_observed(cxt);
@@ -487,13 +482,8 @@ hot fn internal::resolve_loop_control(EvalContext &cxt) throws
   return is_break ? loop_disposition::StopLoop : loop_disposition::RunNext;
 }
 
-hot fn WhileLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
-{
-  return evaluate_status_impl(cxt).status;
-}
-
-hot fn WhileLoop::evaluate_status_impl(EvalContext &cxt) const throws
-    -> status_result
+hot fn WhileLoop::evaluate_impl(EvalContext &cxt, root_evaluation_mode) const
+    throws -> status_result
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_body != nullptr);
@@ -656,13 +646,8 @@ cold fn SelectLoop::to_ast_string(usize layer) const throws -> String
          m_body->to_ast_string(layer + 1);
 }
 
-fn SelectLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
-{
-  return evaluate_status_impl(cxt).status;
-}
-
-fn SelectLoop::evaluate_status_impl(EvalContext &cxt) const throws
-    -> status_result
+fn SelectLoop::evaluate_impl(EvalContext &cxt, root_evaluation_mode) const
+    throws -> status_result
 {
   ASSERT(m_body != nullptr);
 
@@ -780,13 +765,8 @@ cold fn ForLoop::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-hot fn ForLoop::evaluate_impl(EvalContext &cxt) const throws -> i64
-{
-  return evaluate_status_impl(cxt).status;
-}
-
-hot fn ForLoop::evaluate_status_impl(EvalContext &cxt) const throws
-    -> status_result
+hot fn ForLoop::evaluate_impl(EvalContext &cxt, root_evaluation_mode) const
+    throws -> status_result
 {
   ASSERT(m_body != nullptr);
 
@@ -1056,13 +1036,8 @@ cold fn CaseClause::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-fn CaseClause::evaluate_impl(EvalContext &cxt) const throws -> i64
-{
-  return evaluate_status_impl(cxt).status;
-}
-
-fn CaseClause::evaluate_status_impl(EvalContext &cxt) const throws
-    -> status_result
+fn CaseClause::evaluate_impl(EvalContext &cxt, root_evaluation_mode) const
+    throws -> status_result
 {
   ASSERT(m_word != nullptr);
 
@@ -1409,13 +1384,8 @@ cold fn BraceGroup::to_ast_string(usize layer) const throws -> String
          m_body->to_ast_string(layer + 1);
 }
 
-fn BraceGroup::evaluate_impl(EvalContext &cxt) const throws -> i64
-{
-  return evaluate_status_impl(cxt).status;
-}
-
-fn BraceGroup::evaluate_status_impl(EvalContext &cxt) const throws
-    -> status_result
+fn BraceGroup::evaluate_impl(EvalContext &cxt, root_evaluation_mode) const
+    throws -> status_result
 {
   ASSERT(m_body != nullptr);
 
@@ -1471,7 +1441,8 @@ fn CoprocCommand::analyze(AnalysisContext &actx,
 
 static constexpr i32 COPROCESS_FD_FLOOR = 10;
 
-fn CoprocCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
+fn CoprocCommand::evaluate_impl(EvalContext &cxt, root_evaluation_mode) const
+    throws -> status_result
 {
   ASSERT(m_body != nullptr);
 

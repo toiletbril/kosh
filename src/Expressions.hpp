@@ -866,13 +866,22 @@ public:
   pure fn source_end_position() const wontthrow -> usize;
   fn set_source_end_position(usize position) wontthrow -> void;
   virtual fn error_report_location() const wontthrow -> SourceLocation;
-  fn evaluate(EvalContext &cxt) const throws -> i64;
-  fn evaluate_root(EvalContext &cxt, root_evaluation_mode mode) const throws
-      -> i64;
-  fn evaluate_status(EvalContext &cxt) const throws -> status_result;
   fn evaluate_root_status(EvalContext &cxt,
                           root_evaluation_mode mode) const throws
       -> status_result;
+  fn evaluate_status(EvalContext &cxt) const throws -> status_result
+  {
+    return evaluate_root_status(cxt, root_evaluation_mode::Normal);
+  }
+  fn evaluate_root(EvalContext &cxt, root_evaluation_mode mode) const throws
+      -> i64
+  {
+    return evaluate_root_status(cxt, mode).status;
+  }
+  fn evaluate(EvalContext &cxt) const throws -> i64
+  {
+    return evaluate_root_status(cxt, root_evaluation_mode::Normal).status;
+  }
 
   Expression(const Expression &) = delete;
   Expression(Expression &&) noexcept = delete;
@@ -920,14 +929,8 @@ public:
       -> Maybe<bool>;
 
 protected:
-  virtual fn evaluate_impl(EvalContext &cxt) const throws -> i64 = 0;
-  virtual fn evaluate_root_impl(EvalContext &cxt,
-                                root_evaluation_mode mode) const throws -> i64;
-  virtual fn evaluate_status_impl(EvalContext &cxt) const throws
-      -> status_result;
-  virtual fn evaluate_root_status_impl(EvalContext &cxt,
-                                       root_evaluation_mode mode) const throws
-      -> status_result;
+  virtual fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const
+      throws -> status_result = 0;
 
   SourceLocation m_location;
   u32 m_source_end_position;
@@ -950,7 +953,8 @@ public:
       -> void override;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
+      -> status_result override;
 
   const Expression *m_condition;
   const Expression *m_then;
@@ -967,7 +971,8 @@ public:
   fn to_string() const throws -> String override;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
+      -> status_result override;
 };
 
 class PrefixAssignment
@@ -1113,7 +1118,8 @@ public:
       -> bool override;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
+      -> status_result override;
   fn evaluate_assignment(EvalContext &cxt) const throws -> i64;
 
   const Assignment *m_assignment;
@@ -1232,11 +1238,7 @@ public:
       -> bool override;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
-  fn evaluate_root_impl(EvalContext &cxt,
-                        root_evaluation_mode mode) const throws -> i64 override;
-  fn evaluate_root_status_impl(EvalContext &cxt,
-                               root_evaluation_mode mode) const throws
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
       -> status_result override;
 
   ArrayList<const Token *> m_args{heap_allocator()};
@@ -1298,11 +1300,7 @@ public:
       -> bool override;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
-  fn evaluate_status_impl(EvalContext &cxt) const throws
-      -> status_result override;
-  fn evaluate_root_status_impl(EvalContext &cxt,
-                               root_evaluation_mode mode) const throws
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
       -> status_result override;
 
   Kind m_kind;
@@ -1344,13 +1342,7 @@ public:
       -> bool override;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
-  fn evaluate_root_impl(EvalContext &cxt,
-                        root_evaluation_mode mode) const throws -> i64 override;
-  fn evaluate_status_impl(EvalContext &cxt) const throws
-      -> status_result override;
-  fn evaluate_root_status_impl(EvalContext &cxt,
-                               root_evaluation_mode mode) const throws
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
       -> status_result override;
 
   ArrayList<const CompoundListCondition *> m_nodes{heap_allocator()};
@@ -1381,7 +1373,8 @@ public:
   fn error_report_location() const wontthrow -> SourceLocation override;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
+      -> status_result override;
 
   fn evaluate_with_compound_stages(EvalContext &cxt) const throws -> i64;
 
@@ -1433,8 +1426,7 @@ public:
       -> bool override;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
-  fn evaluate_status_impl(EvalContext &cxt) const throws
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
       -> status_result override;
 
   ArrayList<if_branch> m_branches{heap_allocator()};
@@ -1469,8 +1461,7 @@ public:
   fn as_while_loop() const wontthrow -> const WhileLoop * override;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
-  fn evaluate_status_impl(EvalContext &cxt) const throws
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
       -> status_result override;
 
   const Expression *m_condition;
@@ -1495,8 +1486,7 @@ public:
   pure fn words() const wontthrow -> const ArrayList<const Token *> &;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
-  fn evaluate_status_impl(EvalContext &cxt) const throws
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
       -> status_result override;
 
   StringView m_variable_name;
@@ -1533,8 +1523,7 @@ public:
       -> void override;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
-  fn evaluate_status_impl(EvalContext &cxt) const throws
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
       -> status_result override;
 
   const Token *m_word;
@@ -1557,8 +1546,7 @@ public:
       -> bool override;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
-  fn evaluate_status_impl(EvalContext &cxt) const throws
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
       -> status_result override;
 
   const Expression *m_body;
@@ -1577,7 +1565,8 @@ public:
       -> void override;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
+      -> status_result override;
 
   StringView m_name;
   const Expression *m_body;
@@ -1603,7 +1592,8 @@ public:
   }
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
+      -> status_result override;
 
   fn collapsed_body() const wontthrow -> const Expression *;
 
@@ -1625,7 +1615,8 @@ public:
       -> void override;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
+      -> status_result override;
 
   ArrayList<conditional_element> m_elements;
 };
@@ -1647,7 +1638,8 @@ public:
       -> bool override;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
+      -> status_result override;
 
   StringView m_expression;
 };
@@ -1675,8 +1667,7 @@ public:
   fn as_cstyle_for_loop() const wontthrow -> const CStyleForLoop * override;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
-  fn evaluate_status_impl(EvalContext &cxt) const throws
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
       -> status_result override;
 
   usize m_header_position;
@@ -1710,8 +1701,7 @@ public:
       -> void override;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
-  fn evaluate_status_impl(EvalContext &cxt) const throws
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
       -> status_result override;
 
   StringView m_variable_name;
@@ -1741,8 +1731,7 @@ public:
   pure fn redirections() const wontthrow -> const SparseList<Redirection> &;
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
-  fn evaluate_status_impl(EvalContext &cxt) const throws
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
       -> status_result override;
   fn evaluate_async_body(EvalContext &cxt) const throws -> i64 override;
 
@@ -1774,7 +1763,8 @@ public:
   }
 
 protected:
-  fn evaluate_impl(EvalContext &cxt) const throws -> i64 override;
+  fn evaluate_impl(EvalContext &cxt, root_evaluation_mode mode) const throws
+      -> status_result override;
 
   String m_name;
   FunctionBodyHandle m_body_storage;

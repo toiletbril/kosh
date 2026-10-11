@@ -501,19 +501,14 @@ cold fn Expression::to_ast_string(usize layer) const throws -> String
   return indent_for_layer(layer) + "[" + to_string() + "]";
 }
 
-hot flatten fn Expression::evaluate(EvalContext &cxt) const throws -> i64
-{
-  return evaluate_root(cxt, root_evaluation_mode::Normal);
-}
-
-hot flatten fn Expression::evaluate_root(EvalContext &cxt,
-                                         root_evaluation_mode mode) const throws
-    -> i64
+hot flatten fn Expression::evaluate_root_status(
+    EvalContext &cxt, root_evaluation_mode mode) const throws -> status_result
 {
   if (os::INTERRUPT_REQUESTED) {
     os::INTERRUPT_REQUESTED = 0;
     throw InterruptErrorWithLocation{source_location()};
   }
+
   if (os::SIGNAL_PENDING) {
     let const was_control_flow_pending = cxt.control_flow_store().has_pending();
     cxt.run_pending_traps();
@@ -529,7 +524,7 @@ hot flatten fn Expression::evaluate_root(EvalContext &cxt,
     if (command->is_async()) return command->evaluate_async(cxt);
   }
   try {
-    return evaluate_root_impl(cxt, mode);
+    return evaluate_impl(cxt, mode);
   } catch (InterruptErrorWithLocation &error) {
     let const location = error.location();
     if (location.position == 0 && location.length == 0 &&
@@ -539,73 +534,6 @@ hot flatten fn Expression::evaluate_root(EvalContext &cxt,
     }
     throw;
   }
-}
-
-hot flatten fn Expression::evaluate_status(EvalContext &cxt) const throws
-    -> status_result
-{
-  return evaluate_root_status(cxt, root_evaluation_mode::Normal);
-}
-
-hot flatten fn Expression::evaluate_root_status(
-    EvalContext &cxt, root_evaluation_mode mode) const throws -> status_result
-{
-  if (os::INTERRUPT_REQUESTED) {
-    os::INTERRUPT_REQUESTED = 0;
-    throw InterruptErrorWithLocation{source_location()};
-  }
-
-  if (os::SIGNAL_PENDING) {
-    let const was_control_flow_pending = cxt.control_flow_store().has_pending();
-    cxt.run_pending_traps();
-
-    if (!was_control_flow_pending && cxt.control_flow_store().has_pending())
-      return {cxt.execution_store().last_exit_status(), 0};
-  }
-
-  cxt.evaluation_metrics_store().add_evaluated_expression(
-      cxt.runtime_state().stats_enabled());
-  if (is_compound_command()) {
-    let const command = static_cast<const CompoundCommand *>(this);
-    if (command->is_async())
-      return {static_cast<i32>(command->evaluate_async(cxt)), 0};
-  }
-  try {
-    return evaluate_root_status_impl(cxt, mode);
-  } catch (InterruptErrorWithLocation &error) {
-    let const location = error.location();
-    if (location.position == 0 && location.length == 0 &&
-        location.source_name_index == 0)
-    {
-      error.set_location(source_location());
-    }
-    throw;
-  }
-}
-
-fn Expression::evaluate_root_impl(EvalContext &cxt,
-                                  root_evaluation_mode mode) const throws -> i64
-{
-  ASSERT(mode == root_evaluation_mode::Normal);
-  unused(mode);
-
-  return evaluate_impl(cxt);
-}
-
-fn Expression::evaluate_status_impl(EvalContext &cxt) const throws
-    -> status_result
-{
-  return {static_cast<i32>(evaluate_impl(cxt)), 0};
-}
-
-fn Expression::evaluate_root_status_impl(EvalContext &cxt,
-                                         root_evaluation_mode mode) const throws
-    -> status_result
-{
-  ASSERT(mode == root_evaluation_mode::Normal);
-  unused(mode);
-
-  return evaluate_status_impl(cxt);
 }
 
 fn Expression::operator delete(opaque *pointer) wontthrow -> void
@@ -2523,7 +2451,8 @@ IfStatement::IfStatement(SourceLocation location, const Expression *condition,
 
 IfStatement::~IfStatement() = default;
 
-hot fn IfStatement::evaluate_impl(EvalContext &cxt) const throws -> i64
+hot fn IfStatement::evaluate_impl(EvalContext &cxt, root_evaluation_mode) const
+    throws -> status_result
 {
   ASSERT(m_condition != nullptr);
   ASSERT(m_then != nullptr);
@@ -2651,7 +2580,8 @@ DummyExpression::DummyExpression(SourceLocation location)
 
 fn DummyExpression::is_dummy() const wontthrow -> bool { return true; }
 
-fn DummyExpression::evaluate_impl(EvalContext &cxt) const throws -> i64
+fn DummyExpression::evaluate_impl(EvalContext &cxt, root_evaluation_mode) const
+    throws -> status_result
 {
   SET_AND_RETURN_EXIT_STATUS(cxt, 0);
 }

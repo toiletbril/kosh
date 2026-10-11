@@ -145,26 +145,9 @@ cold fn CompoundList::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-hot fn CompoundList::evaluate_impl(EvalContext &cxt) const throws -> i64
-{
-  return evaluate_status_impl(cxt).status;
-}
-
-hot fn CompoundList::evaluate_root_impl(EvalContext &cxt,
-                                        root_evaluation_mode mode) const throws
-    -> i64
-{
-  return evaluate_root_status_impl(cxt, mode).status;
-}
-
-hot fn CompoundList::evaluate_status_impl(EvalContext &cxt) const throws
+hot fn CompoundList::evaluate_impl(EvalContext &cxt,
+                                   root_evaluation_mode mode) const throws
     -> status_result
-{
-  return evaluate_root_status_impl(cxt, root_evaluation_mode::Normal);
-}
-
-hot fn CompoundList::evaluate_root_status_impl(
-    EvalContext &cxt, root_evaluation_mode mode) const throws -> status_result
 {
   ASSERT(m_nodes.count() > 0);
 
@@ -498,20 +481,9 @@ cold fn CompoundListCondition::to_ast_string(usize layer) const throws -> String
   return s;
 }
 
-hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt) const throws
-    -> i64
-{
-  return evaluate_status_impl(cxt).status;
-}
-
-hot fn CompoundListCondition::evaluate_status_impl(
-    EvalContext &cxt) const throws -> status_result
-{
-  return evaluate_root_status_impl(cxt, root_evaluation_mode::Normal);
-}
-
-hot fn CompoundListCondition::evaluate_root_status_impl(
-    EvalContext &cxt, root_evaluation_mode mode) const throws -> status_result
+hot fn CompoundListCondition::evaluate_impl(EvalContext &cxt,
+                                            root_evaluation_mode mode) const
+    throws -> status_result
 {
   ASSERT(m_cmd != nullptr);
   cxt.evaluation_metrics_store().begin_command_evaluation();
@@ -866,7 +838,8 @@ cold fn Pipeline::evaluate_with_compound_stages(EvalContext &cxt) const throws
   SET_AND_RETURN_EXIT_STATUS(cxt, ret);
 }
 
-hot fn Pipeline::evaluate_impl(EvalContext &cxt) const throws -> i64
+hot fn Pipeline::evaluate_impl(EvalContext &cxt, root_evaluation_mode) const
+    throws -> status_result
 {
   ASSERT(m_commands.count() > 1);
 

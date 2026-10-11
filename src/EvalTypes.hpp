@@ -142,6 +142,12 @@ struct status_result
   i32 status{0};
   u32 flags{0};
 
+  constexpr status_result() wontthrow = default;
+  constexpr status_result(i64 exit_status, u32 status_flags = 0) wontthrow
+      : status{static_cast<i32>(exit_status)},
+        flags{status_flags}
+  {}
+
   pure fn has(status_flag flag) const wontthrow -> bool
   {
     return (flags & static_cast<u32>(flag)) != 0;

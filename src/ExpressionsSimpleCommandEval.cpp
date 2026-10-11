@@ -173,20 +173,9 @@ hot fn SimpleCommand::get_literal_command_lookup(
   return &*m_literal_command_lookup;
 }
 
-hot fn SimpleCommand::evaluate_impl(EvalContext &cxt) const throws -> i64
-{
-  return evaluate_root_impl(cxt, root_evaluation_mode::Normal);
-}
-
-hot fn SimpleCommand::evaluate_root_status_impl(
-    EvalContext &cxt, root_evaluation_mode mode) const throws -> status_result
-{
-  return {static_cast<i32>(evaluate_root_impl(cxt, mode)), 0};
-}
-
-hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
-                                         root_evaluation_mode mode) const throws
-    -> i64
+hot fn SimpleCommand::evaluate_impl(EvalContext &cxt,
+                                    root_evaluation_mode mode) const throws
+    -> status_result
 {
   ASSERT(m_args.count() > 0 || !m_redirections.is_empty() ||
          m_local_vars.count() > 0 || !m_array_args.is_empty());
@@ -202,8 +191,9 @@ hot fn SimpleCommand::evaluate_root_impl(EvalContext &cxt,
   {
     let const do_run_in_child = [](void *context, EvalContext &child_cxt)
                                     throws -> i64 {
-      return static_cast<const SimpleCommand *>(context)->evaluate_root_impl(
-          child_cxt, root_evaluation_mode::PreparedAsyncCommand);
+      return static_cast<const SimpleCommand *>(context)
+          ->evaluate_impl(child_cxt, root_evaluation_mode::PreparedAsyncCommand)
+          .status;
     };
 
     let full_location = source_location();
