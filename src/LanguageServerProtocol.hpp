@@ -714,7 +714,7 @@ public:
   {
     if (line >= line_starts.count()) return None;
     let const[start, end] = get_line_bounds(line);
-    if (encoding == position_encoding::Utf8) {
+    if (encoding == position_encoding::Utf8 || normalized_source.is_ascii()) {
       if (character > end - start) return None;
       let const position = start + character;
       if (position < end &&
@@ -755,7 +755,7 @@ public:
     }
     let const line = lower;
     let const start = line_starts[line];
-    if (encoding == position_encoding::Utf8)
+    if (encoding == position_encoding::Utf8 || normalized_source.is_ascii())
       return {line, byte_position - start};
 
     usize units = 0;
@@ -782,7 +782,8 @@ public:
   {
     if (end < start) return 0;
     if (end > normalized_source.count()) end = normalized_source.count();
-    if (encoding == position_encoding::Utf8) return end - start;
+    if (encoding == position_encoding::Utf8 || normalized_source.is_ascii())
+      return end - start;
     usize units = 0;
 
     while (start < end) {
