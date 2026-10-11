@@ -492,6 +492,12 @@ same encoding that every spawned process receives."
 - Small types stay in light headers. Shared behavior stays on the value type.
   `ArrayList::find` returns `Maybe<usize>`. Membership uses
   `find().has_value()`.
+- `VariableTable` holds every scalar value and attribute byte in one
+  `variable_entry` per name, indexed by a `StringMap` of pointers into a
+  `Hive`, so an entry keeps its address until the name loses both its value
+  and its attributes. `shell_variables()` and `attributes()` are views of
+  it. A hot path finds the entry once and passes it on instead of looking
+  the name up again, and a snapshot copies the table without hashing.
 - `CompositeKeyArrays` stamps each associative element with an insertion
   sequence, and key and value listings sort by it, so the order of an
   associative array never depends on the hash table or on other arrays.

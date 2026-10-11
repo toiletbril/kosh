@@ -20,6 +20,7 @@
 #include "base/Bitset.hpp"
 #include "base/Common.hpp"
 #include "base/Containers.hpp"
+#include "base/Hive.hpp"
 #include "base/Maybe.hpp"
 #include "base/Path.hpp"
 
@@ -177,6 +178,141 @@ enum class variable_attribute : u8
   Uppercase = 1U << 3,
   Declared = 1U << 4,
   Nameref = 1U << 5,
+};
+
+struct variable_entry
+{
+  String value{heap_allocator()};
+  u8 attribute_bits{0};
+  bool has_value{false};
+};
+
+class VariableTable
+{
+public:
+  VariableTable() = default;
+  VariableTable(VariableTable &&) = default;
+  fn operator=(VariableTable &&) -> VariableTable & = default;
+
+  VariableTable(const VariableTable &other) throws
+      : m_index{other.m_index},
+        m_value_count{other.m_value_count},
+        m_has_namerefs{other.m_has_namerefs},
+        m_has_declared_marks{other.m_has_declared_marks}
+  {
+    m_index.for_each([&](StringView, variable_entry *&entry) throws {
+      entry = m_entries.emplace(*entry);
+    });
+  }
+  fn operator=(const VariableTable &other) throws -> VariableTable &
+  {
+    if (this != &other) *this = VariableTable{other};
+    return *this;
+  }
+
+  hot pure fn find(StringView name) const wontthrow -> Maybe<variable_entry *>
+  {
+    let const found = m_index.find(name);
+    if (!found.has_value()) return None;
+    return *found.value();
+  }
+
+  fn get_or_create(StringView name) throws -> variable_entry &
+  {
+    if (let const found = m_index.find(name); found.has_value())
+      return **found.value();
+
+    let *const created = m_entries.emplace();
+    try {
+      m_index.set(name, created);
+    } catch (...) {
+      m_entries.erase(created);
+      throw;
+    }
+    return *created;
+  }
+
+  fn release_if_unused(StringView name, variable_entry &entry) throws -> void
+  {
+    if (entry.has_value || entry.attribute_bits != 0) return;
+
+    m_index.erase(name);
+    m_entries.erase(&entry);
+  }
+
+  fn set_value(StringView name, StringView value) throws -> String *
+  {
+    return assign_value(get_or_create(name), value);
+  }
+
+  fn assign_value(variable_entry &entry, StringView value) throws -> String *
+  {
+    if (!entry.has_value) m_value_count++;
+    entry.has_value = true;
+    let const is_buffer_wasteful = entry.value.count() > 256 &&
+                                   value.length < entry.value.count() / 2;
+    if (is_buffer_wasteful) {
+      entry.value = String{heap_allocator(), value};
+      return &entry.value;
+    }
+    entry.value.clear();
+    entry.value.append(value);
+    return &entry.value;
+  }
+
+  fn erase_value(StringView name) throws -> void
+  {
+    let const found = find(name);
+    if (!found.has_value() || !(*found)->has_value) return;
+
+    (*found)->has_value = false;
+    (*found)->value.clear();
+    m_value_count--;
+    release_if_unused(name, **found);
+  }
+
+  fn set_attribute_bits(StringView name, u8 bits) throws -> void
+  {
+    note_attribute_bits(bits);
+    if (bits == 0) {
+      if (let const found = find(name); found.has_value()) {
+        (*found)->attribute_bits = 0;
+        release_if_unused(name, **found);
+      }
+      return;
+    }
+
+    get_or_create(name).attribute_bits = bits;
+  }
+
+  template <typename Callback>
+  fn for_each(Callback do_callback) const throws -> void
+  {
+    m_index.for_each([&](StringView name, variable_entry *const &entry) throws {
+      do_callback(name, *entry);
+    });
+  }
+
+  pure fn value_count() const wontthrow -> usize { return m_value_count; }
+  pure fn has_namerefs() const wontthrow -> bool { return m_has_namerefs; }
+  pure fn has_declared_marks() const wontthrow -> bool
+  {
+    return m_has_declared_marks;
+  }
+  fn note_attribute_bits(u8 bits) wontthrow -> void
+  {
+    if ((bits & static_cast<u8>(variable_attribute::Nameref)) != 0)
+      m_has_namerefs = true;
+    if ((bits & static_cast<u8>(variable_attribute::Declared)) != 0)
+      m_has_declared_marks = true;
+  }
+
+private:
+  StringMap<variable_entry *> m_index{heap_allocator()};
+  Hive<variable_entry> m_entries;
+  usize m_value_count{0};
+  bool m_has_namerefs{false};
+  bool m_has_declared_marks{false};
 };
 
 struct glob_field

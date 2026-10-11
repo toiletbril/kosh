@@ -154,7 +154,8 @@ fn EvalContext::record_history_event(StringView command) throws -> bool
   return toiletline::append_history_event(command).has_value();
 }
 
-hot fn EvalContext::assign_variable(StringView name, StringView value) throws
+hot fn EvalContext::assign_variable(StringView name, StringView value,
+                                    Maybe<variable_entry *> entry) throws
     -> void
 {
   LOG(All, "assigning variable '%.*s' to a value of %zu bytes",
@@ -201,7 +202,10 @@ hot fn EvalContext::assign_variable(StringView name, StringView value) throws
     runtime_state().set_option(shell_option_id::Ignoreeof, true);
   }
 
-  variable_store().shell_variables().set(name, value);
+  if (entry.has_value())
+    variable_store().variables().assign_value(**entry, value);
+  else
+    variable_store().shell_variables().set(name, value);
   if (is_pipestatus_name) variable_store().set_pipestatus_scalar_possible(true);
   if (is_glob_ignore_name) {
     runtime_state().set_glob_ignore_assigned(true);
@@ -337,7 +341,10 @@ fn EvalContext::guard_restricted_path(StringView path,
 hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
     -> void
 {
-  let const attribute_bits = variable_store().attributes().get_bits(name);
+  let const entry = variable_store().find_variable(name);
+  let const attribute_bits =
+      entry.has_value() ? (*entry)->attribute_bits : u8{0};
+  let const has_scalar = entry.has_value() && (*entry)->has_value;
   if ((attribute_bits & static_cast<u8>(variable_attribute::Nameref)) != 0)
     rarely
     {
@@ -385,7 +392,7 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
   }
   if (is_bash_directory_stack_special(name)) return;
 
-  if (!variable_store().shell_variables().find(name).has_value() &&
+  if (!has_scalar &&
       ((variable_store().indexed_arrays().count() != 0 &&
         variable_store().indexed_arrays().find(name).has_value()) ||
        variable_store().associative_arrays().has(name)))
@@ -427,7 +434,7 @@ hot fn EvalContext::set_shell_variable(StringView name, StringView value) throws
       return;
     }
 
-  assign_variable(name, value);
+  assign_variable(name, value, entry);
 }
 
 fn EvalContext::seed_shell_identity_variables(

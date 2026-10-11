@@ -1000,8 +1000,7 @@ fn EvalContext::readonly_names() const throws
     -> SortedArrayList<String, order_comparator<String>>
 {
   let out = ArrayList<String>{heap_allocator()};
-  out.reserve(variable_store().attributes().count() +
-              countof(RESTRICTED_READONLY_KEYS) +
+  out.reserve(countof(RESTRICTED_READONLY_KEYS) +
               countof(BASH_IMPLICIT_READONLY_KEYS));
   variable_store().attributes().for_each_marked(
       variable_attribute::Readonly,

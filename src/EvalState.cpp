@@ -765,14 +765,13 @@ fn EvalContext::snapshot_state() throws -> eval_state_snapshot
 fn VariableStore::snapshot() const throws -> variable_snapshot
 {
   return variable_snapshot{
-      m_shell_variables,
+      m_variables,
       m_special_variable_definition_locations,
       m_indexed_arrays,
       m_associative_arrays,
       m_sparse_arrays,
       m_positional_params,
       m_directory_stack,
-      m_attributes.entries(),
       m_exported_names,
       static_cast<u32>(m_bash_arguments.values().count()),
       static_cast<u32>(m_bash_arguments.frame_counts().count()),
@@ -786,7 +785,7 @@ fn VariableStore::snapshot() const throws -> variable_snapshot
 
 fn VariableStore::restore(variable_snapshot snapshot) throws -> void
 {
-  m_shell_variables = steal(snapshot.shell_variables);
+  m_variables = steal(snapshot.variables);
   m_is_pipestatus_scalar_possible = true;
   m_special_variable_definition_locations =
       steal(snapshot.special_variable_definition_locations);
@@ -806,10 +805,9 @@ fn VariableStore::restore(variable_snapshot snapshot) throws -> void
   m_directory_stack = steal(snapshot.directory_stack);
   m_disabled_bash_special_arrays = snapshot.disabled_bash_special_arrays;
   m_unset_dynamic_readers = snapshot.unset_dynamic_readers;
-  m_attributes.set_entries(steal(snapshot.attributes));
   m_exported_names = steal(snapshot.exported_names);
 
-  if (let const ifs = m_shell_variables.find(StringView{"IFS", 3});
+  if (let const ifs = shell_variables().find(StringView{"IFS", 3});
       ifs.has_value())
     set_field_separators(ifs->view());
   else

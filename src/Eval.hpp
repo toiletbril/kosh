@@ -1561,20 +1561,61 @@ private:
   bool m_is_active{false};
 };
 
+class ScalarVariables
+{
+public:
+  explicit ScalarVariables(VariableTable *table) wontthrow : m_table{table} {}
+
+  hot pure fn find(StringView name) const wontthrow -> Maybe<const String *>
+  {
+    let const entry = m_table->find(name);
+    if (!entry.has_value() || !(*entry)->has_value) return None;
+    return &(*entry)->value;
+  }
+  hot fn find(StringView name) wontthrow -> Maybe<String *>
+  {
+    let const entry = m_table->find(name);
+    if (!entry.has_value() || !(*entry)->has_value) return None;
+    return &(*entry)->value;
+  }
+  fn set(StringView name, StringView value) throws -> String *
+  {
+    return m_table->set_value(name, value);
+  }
+  fn erase(StringView name) throws -> void { m_table->erase_value(name); }
+  pure fn count() const wontthrow -> usize { return m_table->value_count(); }
+
+  template <typename Callback>
+  fn for_each(Callback do_callback) const throws -> void
+  {
+    m_table->for_each([&](StringView name, const variable_entry &entry) throws {
+      if (entry.has_value) do_callback(name, entry.value);
+    });
+  }
+
+private:
+  VariableTable *m_table;
+};
+
 class VariableAttributes
 {
 public:
+  explicit VariableAttributes(VariableTable *table) wontthrow : m_table{table}
+  {}
+
   pure fn get_bits(StringView name) const wontthrow -> u8
   {
-    let const entry = m_bits.find(name);
-    return entry.has_value() ? *entry.value() : u8{0};
+    let const entry = m_table->find(name);
+    return entry.has_value() ? (*entry)->attribute_bits : u8{0};
   }
   fn set_bits(StringView name, u8 bits) throws -> void
   {
-    note_nameref_bits(bits);
-    m_bits.set(name, bits);
+    m_table->set_attribute_bits(name, bits);
   }
-  fn erase(StringView name) throws -> void { m_bits.erase(name); }
+  fn erase(StringView name) throws -> void
+  {
+    m_table->set_attribute_bits(name, 0);
+  }
 
   pure fn has(StringView name, variable_attribute attribute) const wontthrow
       -> bool
@@ -1587,16 +1628,16 @@ public:
     let const mask = static_cast<u8>(attribute);
 
     if (is_enabled) {
-      note_nameref_bits(mask);
-      m_bits.get_or_create(name, u8{0}) |= mask;
+      m_table->note_attribute_bits(mask);
+      m_table->get_or_create(name).attribute_bits |= mask;
       return;
     }
 
-    let entry = m_bits.find(name);
+    let const entry = m_table->find(name);
     if (!entry.has_value()) return;
 
-    *entry.value() &= static_cast<u8>(~mask);
-    if (*entry.value() == 0) m_bits.erase(name);
+    (*entry)->attribute_bits &= static_cast<u8>(~mask);
+    m_table->release_if_unused(name, **entry);
   }
 
   pure fn is_readonly(StringView name) const wontthrow -> bool
@@ -1625,10 +1666,13 @@ public:
             (static_cast<u8>(variable_attribute::Lowercase) |
              static_cast<u8>(variable_attribute::Uppercase))) != 0;
   }
-  hot pure fn has_namerefs() const wontthrow -> bool { return m_has_namerefs; }
+  hot pure fn has_namerefs() const wontthrow -> bool
+  {
+    return m_table->has_namerefs();
+  }
   hot pure fn is_nameref(StringView name) const wontthrow -> bool
   {
-    return m_has_namerefs && has(name, variable_attribute::Nameref);
+    return m_table->has_namerefs() && has(name, variable_attribute::Nameref);
   }
 
   fn mark_readonly(StringView name) throws -> void
@@ -1645,7 +1689,8 @@ public:
   }
   fn unmark_declared(StringView name) throws -> void
   {
-    if (m_has_declared_marks) set(name, variable_attribute::Declared, false);
+    if (m_table->has_declared_marks())
+      set(name, variable_attribute::Declared, false);
   }
   fn mark_integer(StringView name) throws -> void
   {
@@ -1687,36 +1732,30 @@ public:
   fn for_each_marked(variable_attribute attribute,
                      Callback do_callback) const throws -> void
   {
-    m_bits.for_each([&](StringView name, u8 bits) throws {
-      if ((bits & static_cast<u8>(attribute)) != 0) do_callback(name);
+    m_table->for_each([&](StringView name, const variable_entry &entry) throws {
+      if ((entry.attribute_bits & static_cast<u8>(attribute)) != 0)
+        do_callback(name);
     });
   }
   template <typename Callback>
   fn for_each_name(Callback do_callback) const throws -> void
   {
-    m_bits.for_each([&](StringView name, u8) throws { do_callback(name); });
+    m_table->for_each([&](StringView name, const variable_entry &entry) throws {
+      if (entry.attribute_bits != 0) do_callback(name);
+    });
   }
 
-  pure fn count() const wontthrow -> usize { return m_bits.count(); }
-  pure fn entries() const wontthrow -> const StringMap<u8> & { return m_bits; }
-  fn set_entries(StringMap<u8> entries) wontthrow -> void
+  fn entries() const throws -> StringMap<u8>
   {
-    m_bits = steal(entries);
-    m_bits.for_each([&](StringView, u8 bits) { note_nameref_bits(bits); });
+    let marked = StringMap<u8>{heap_allocator()};
+    for_each_name([&](StringView name) throws {
+      marked.set(name, get_bits(name));
+    });
+    return marked;
   }
 
 private:
-  fn note_nameref_bits(u8 bits) wontthrow -> void
-  {
-    if ((bits & static_cast<u8>(variable_attribute::Nameref)) != 0)
-      m_has_namerefs = true;
-    if ((bits & static_cast<u8>(variable_attribute::Declared)) != 0)
-      m_has_declared_marks = true;
-  }
-
-  StringMap<u8> m_bits{heap_allocator()};
-  bool m_has_namerefs{false};
-  bool m_has_declared_marks{false};
+  VariableTable *m_table;
 };
 
 class VariableStore
@@ -1746,20 +1785,29 @@ public:
     return m_field_separators.view();
   }
 
-  fn shell_variables() wontthrow -> StringMap<String> &
+  fn shell_variables() wontthrow -> ScalarVariables
   {
-    return m_shell_variables;
+    return ScalarVariables{&m_variables};
   }
-  pure fn shell_variables() const wontthrow -> const StringMap<String> &
+  pure fn shell_variables() const wontthrow -> const ScalarVariables
   {
-    return m_shell_variables;
+    return ScalarVariables{const_cast<VariableTable *>(&m_variables)};
   }
   hot pure fn find_plain_scalar(StringView name) const wontthrow
       -> Maybe<const String *>
   {
-    if (m_attributes.is_nameref(name)) rarely return None;
+    let const entry = m_variables.find(name);
+    if (!entry.has_value() || !(*entry)->has_value) return None;
+    if (((*entry)->attribute_bits &
+         static_cast<u8>(variable_attribute::Nameref)) != 0)
+      rarely return None;
 
-    return m_shell_variables.find(name);
+    return &(*entry)->value;
+  }
+  hot pure fn find_variable(StringView name) const wontthrow
+      -> Maybe<variable_entry *>
+  {
+    return m_variables.find(name);
   }
   pure fn is_pipestatus_scalar_possible() const wontthrow -> bool
   {
@@ -1779,7 +1827,7 @@ public:
   }
   fn history_limit(StringView name, usize fallback) const wontthrow -> usize
   {
-    let const value = m_shell_variables.find(name);
+    let const value = shell_variables().find(name);
     if (!value.has_value()) return fallback;
     let const parsed = value->view().to<i64>();
     if (parsed.is_error() || parsed.value() < 0) return fallback;
@@ -1840,11 +1888,15 @@ public:
   {
     return m_exported_names;
   }
-  fn attributes() wontthrow -> VariableAttributes & { return m_attributes; }
-  pure fn attributes() const wontthrow -> const VariableAttributes &
+  fn attributes() wontthrow -> VariableAttributes
   {
-    return m_attributes;
+    return VariableAttributes{&m_variables};
   }
+  pure fn attributes() const wontthrow -> const VariableAttributes
+  {
+    return VariableAttributes{const_cast<VariableTable *>(&m_variables)};
+  }
+  fn variables() wontthrow -> VariableTable & { return m_variables; }
   fn positional_params() wontthrow -> ArrayList<String> &
   {
     return m_positional_params;
@@ -1908,14 +1960,13 @@ private:
   String m_field_separators{" \t\n"};
   u64 m_field_separator_bits[4]{(u64{1} << ' ') | (u64{1} << '\t') |
                                 (u64{1} << '\n')};
-  StringMap<String> m_shell_variables{heap_allocator()};
+  VariableTable m_variables;
   StringMap<SourceLocation> m_special_variable_definition_locations{
       heap_allocator()};
   StringMap<ArrayList<String>> m_indexed_arrays{heap_allocator()};
   CompositeKeyArrays m_associative_arrays;
   CompositeKeyArrays m_sparse_arrays;
   StringMap<exported_name_value> m_exported_names{heap_allocator()};
-  VariableAttributes m_attributes;
   ArrayList<String> m_positional_params{heap_allocator()};
   ArrayList<String> m_directory_stack{heap_allocator()};
   mutable BashArgumentStack m_bash_arguments;
@@ -4149,7 +4200,8 @@ protected:
 
   fn expand_variable(StringView name) const throws -> String;
 
-  fn assign_variable(StringView name, StringView value) throws -> void;
+  fn assign_variable(StringView name, StringView value,
+                     Maybe<variable_entry *> entry = None) throws -> void;
 
   fn force_unset_shell_variable(StringView name) throws -> void;
   fn peel_caller_local_binding(StringView name) throws -> bool;

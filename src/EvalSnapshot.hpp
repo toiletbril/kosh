@@ -231,14 +231,13 @@ struct completion_spec
 
 struct variable_snapshot
 {
-  StringMap<String> shell_variables;
+  VariableTable variables;
   StringMap<SourceLocation> special_variable_definition_locations;
   StringMap<ArrayList<String>> indexed_arrays;
   CompositeKeyArrays associative_arrays;
   CompositeKeyArrays sparse_arrays;
   ArrayList<String> positional_params;
   ArrayList<String> directory_stack;
-  StringMap<u8> attributes;
   StringMap<exported_name_value> exported_names;
   u32 bash_argument_value_count;
   u32 bash_argument_frame_count;
