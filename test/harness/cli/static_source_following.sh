@@ -198,3 +198,14 @@ printf 'path-source=%s rc=%s\n' "$path_count" "$rc"
 run_and_capture "$BIN" --lint parse-root.bash
 parse_count=$(printf '%s\n' "$output" | grep -c 'Unterminated if')
 printf 'parse-source=%s rc=%s\n' "$parse_count" "$rc"
+
+if [ "${OS-}" != Windows_NT ] && mkfifo "$root/pipe"; then
+  printf 'source /dev/zero\nsource ./pipe\n. ./special-ok.bash\necho "$SPECIAL_OK"\n' \
+    > "$root/special-root.bash"
+  printf 'SPECIAL_OK=1\n' > "$root/special-ok.bash"
+  run_and_capture "$BIN" --lint special-root.bash
+  special_count=$(printf '%s\n' "$output" | grep -c 'SPECIAL_OK')
+  printf 'special-files-skipped unset-reports=%s rc=%s\n' "$special_count" "$rc"
+else
+  printf 'special-files-skipped unset-reports=0 rc=0\n'
+fi

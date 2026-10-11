@@ -1616,7 +1616,16 @@ fn expressions::internal::analyze_followed_source(
   let contents = actx.source_provider != nullptr
                      ? actx.source_provider->read_source(*canonical_path)
                      : Maybe<String>{None};
-  if (!contents.has_value()) contents = canonical_path->read_entire_file();
+  static constexpr u64 MAX_FOLLOWED_SOURCE_BYTES = 16 * 1024 * 1024;
+  if (!contents.has_value()) {
+    let const size = canonical_path->file_size();
+    if (!canonical_path->is_regular_file() || !size.has_value() ||
+        *size > MAX_FOLLOWED_SOURCE_BYTES)
+    {
+      return do_give_up_on_source();
+    }
+    contents = canonical_path->read_entire_file();
+  }
   if (!contents.has_value()) return do_give_up_on_source();
   contents->normalize_crlf_line_endings();
 

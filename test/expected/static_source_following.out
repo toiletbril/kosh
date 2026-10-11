@@ -9,3 +9,4 @@ path-mutation-followed=0 assignment=1 rc=1
 ordinary-grandchild=1 child=1 rc=1
 path-source=1 rc=1
 parse-source=1 rc=1
+special-files-skipped unset-reports=0 rc=0
